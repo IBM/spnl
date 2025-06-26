@@ -1,13 +1,14 @@
 version: 2
 updates:
-  - package-ecosystem: "cargo"
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "npm"
-    directory: "/web" # Location of package manifests
-    schedule:
-      interval: "weekly"
+  # Notes: renovate will take care of cargo and npm updates
+  # - package-ecosystem: "cargo"
+  #   directory: "/" # Location of package manifests
+  #   schedule:
+  #     interval: "weekly"
+  # - package-ecosystem: "npm"
+  #   directory: "/web" # Location of package manifests
+  #   schedule:
+  #     interval: "weekly"
   - package-ecosystem: "github-actions"
     directory: "/" # Location of package manifests
     schedule:
