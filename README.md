@@ -1,5 +1,8 @@
 # Span Queries
 
+[![core tests](https://github.com/IBM/spnl/actions/workflows/core.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/core.yml)
+[![python tests](https://github.com/IBM/spnl/actions/workflows/python.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/python.yml)
+
 :rocket: [Playground](https://pages.github.ibm.com/cloud-computer/spnl/?qv=false) **|** [Research Poster](./docs/poster-20250529.pdf) **|** [About Span Queries](./docs/about.md) **|** [Contribute](./docs/dev.md)
 
 What if we had a way to plan and optimize GenAI like we do for
