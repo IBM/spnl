@@ -148,6 +148,7 @@ mod tests {
         let result = run(
             &"hello".into(),
             &RunParameters {
+                prepare: None,
                 vecdb_table: "".into(),
                 vecdb_uri: "".into(),
             },

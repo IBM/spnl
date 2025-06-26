@@ -185,6 +185,7 @@ async fn main() -> Result<(), SpnlError> {
     match run(
         &program,
         &RunParameters {
+            prepare: None,
             vecdb_uri: "".to_string(),
             vecdb_table: "".to_string(),
         },
