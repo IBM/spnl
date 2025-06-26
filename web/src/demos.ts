@@ -12,7 +12,8 @@ export default [
       .replace(/"\{n\}"/g, "4")
       .replace(/\{n\}/g, "4")
       .replace(/\{model\}/g, "model")
-      .replace(/\"{temperature\}"/g, "0.2")
+      .replace(/"\{temperature\}"/g, "0.2")
+      .replace(/\{temperature\}/g, "0.2")
       .replace(/"\{max_tokens\}"/g, "100")
       .replace(/\{max_tokens\}/g, "100"),
   },
@@ -26,7 +27,8 @@ export default [
       .replace(/"\{n\}"/g, "4")
       .replace(/\{n\}/g, "4")
       .replace(/\{model\}/g, "model")
-      .replace(/\"{temperature\}"/g, "0.2")
+      .replace(/"\{temperature\}"/g, "0.2")
+      .replace(/\{temperature\}/g, "0.2")
       .replace(/"\{max_tokens\}"/g, "100")
       .replace(/\{max_tokens\}/g, "100"),
   },
@@ -39,7 +41,8 @@ export default [
       .replace(/"\{n\}"/g, "4")
       .replace(/\{n\}/g, "4")
       .replace(/\{model\}/g, "model")
-      .replace(/\"{temperature\}"/g, "0.2")
+      .replace(/"\{temperature\}"/g, "0.2")
+      .replace(/\{temperature\}/g, "0.2")
       .replace(/"\{max_tokens\}"/g, "100")
       .replace(/\{max_tokens\}/g, "100"),
   },

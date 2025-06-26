@@ -1,0 +1,34 @@
+name: web
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+    
+jobs:
+  build_and_test:
+    name: web
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./web
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          # - windows-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup
+        run: npm ci
+
+      - name: run tests
+        run: npm test

@@ -8,7 +8,9 @@
     "build:wasm": "wasm-pack build ../wasm --target bundler",
     "build": "npm run build:wasm --release && tsc -b && vite build",
     "lint": "eslint .",
-    "format": "prettier --write 'tests/**/*.ts' 'src/**/*.{ts,tsx,css}'",
+    "format": "prettier --write 'src/**/*.{ts,tsx,css}'",
+    "test": "prettier --check 'src/**/*.{ts,tsx,css}' && npm run lint && npm run build",
+    "preinstall": "if ! which wasm-pack; then npm install -g wasm-pack; fi; npm run build:wasm",
     "preview": "vite preview"
   },
   "dependencies": {
