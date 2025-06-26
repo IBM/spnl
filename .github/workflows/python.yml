@@ -27,7 +27,7 @@ jobs:
         os:
           - ubuntu-latest
           # - windows-latest
-          - macos-latest
+          # - macos-latest <-- disabled only because of hopefully transient maturin installation issues https://github.com/PyO3/maturin/issues/2659
     steps:
       - uses: actions/checkout@v4
       # - uses: Swatinem/rust-cache@v2
@@ -44,7 +44,7 @@ jobs:
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
           
       - name: install maturin
-        run: cargo install cargo-binstall && cargo binstall maturin@1.8.7 # 1.9.0 currently has some issues, as it was just published and the bin is not distributed, and compilation fails
+        run: cargo install cargo-binstall && cargo binstall maturin
 
       - name: maturin develop
         run: maturin develop -m py/Cargo.toml --no-default-features -F tok
