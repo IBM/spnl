@@ -49,4 +49,4 @@ jobs:
         with:
           name: wheels
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.9.0
+        uses: pypa/gh-action-pypi-publish@v1.12.4
