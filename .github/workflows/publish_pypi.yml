@@ -32,8 +32,8 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
+          name: build-${{ matrix.os }}-${{matrix.python-version}}-${{ github.sha }}
           path: target/wheels/*.whl
-          overwrite: true
 
   publish_to_pypi:
     needs: build_wheels
@@ -47,6 +47,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+      - name: Unpack artifacts
+        run: cd artifacts && unzip *.zip
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
