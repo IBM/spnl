@@ -51,7 +51,7 @@ jobs:
         run: |
           ls -ltr artifacts
           cd artifacts
-          unzip build-*
+          for i in build-*; do unzip $i; done
           rm -f build-*
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
