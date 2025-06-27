@@ -45,7 +45,9 @@ jobs:
       url: https://pypi.org/p/spnl
     steps:
       - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
-          packages_dir: artifact/
+          packages_dir: artifacts/
