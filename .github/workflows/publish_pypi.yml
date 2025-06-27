@@ -48,7 +48,11 @@ jobs:
         with:
           path: artifacts/
       - name: Unpack artifacts
-        run: ls -ltr artifacts
+        run: |
+          ls -ltr artifacts
+          cd artifacts
+          unzip build-*
+          rm -f build-*
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
