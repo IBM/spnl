@@ -26,9 +26,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: install maturin
-        run: cargo install cargo-binstall && cargo binstall maturin
+        run: pip install maturin
       - name: maturin build
-        run: maturin build --release -m py/Cargo.toml --no-default-features -F pypi
+        run: maturin build --release -m spnl/Cargo.toml --no-default-features -F pypi
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
