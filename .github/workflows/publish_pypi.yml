@@ -1,0 +1,52 @@
+name: Publish spnl to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build_wheels:
+    runs-on: ${{ matrix.os }} 
+    strategy:
+      matrix:
+        os:
+          #- windows-latest
+          - ubuntu-latest
+          - macos-latest
+        python-version:
+          - 3.9
+          - 3.10
+          - 3.11
+          - 3.12
+          - 3.13
+          - 3.14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: install maturin
+        run: cargo install cargo-binstall && cargo binstall maturin
+      - name: maturin build
+        run: maturin build --release -m py/Cargo.toml --no-default-features -F pypi
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: target/wheels
+
+  publish_to_pypi:
+    needs: build_wheels
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Needed for trusted publishing
+    environment:
+      name: pypi
+      url: https://pypi.org/p/spnl
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.9.0
