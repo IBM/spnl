@@ -35,6 +35,8 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Inspect target cache
+        run: ls target && find target | wc -l
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
