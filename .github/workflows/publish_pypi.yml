@@ -33,6 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: target/wheels/*.whl
+          overwrite: true
 
   publish_to_pypi:
     needs: build_wheels
