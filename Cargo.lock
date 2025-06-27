@@ -6013,15 +6013,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spnl_py"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "serde",
- "spnl",
-]
-
-[[package]]
 name = "sqlparser"
 version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -9,14 +9,13 @@ cli_support = ["dep:ptree","dep:rustyline"]
 lisp = ["dep:serde-lexpr"]
 ollama = ["run","dep:ollama-rs","dep:tokio","dep:tokio-stream"]
 openai = ["dep:async-openai","dep:tokio","dep:tokio-stream"]
+openssl-vendored = ["dep:openssl"]
 pull = ["dep:duct","dep:fs4","dep:rayon"]
-python_bindings = ["dep:pyo3"]
+pypi = ["tok","dep:pyo3","pyo3/extension-module"]
 rag = ["run","dep:anyhow","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arrow-array","dep:itertools","dep:pdf-extract"]
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
-tok = ["python_bindings","dep:moka","dep:tokenizers"]
+tok = ["dep:pyo3","dep:moka","dep:tokenizers"]
 spnl-api = []
-openssl-vendored = ["dep:openssl"]
-
 
 [dependencies]
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"], optional = true }

@@ -1,18 +1,18 @@
 use pyo3::prelude::*;
 
-#[pymodule]
+#[pymodule(name = "spnl")]
 pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(feature = "tok")]
-    m.add_class::<spnl_core::tokenizer::TokenizedQuery>()?;
+    m.add_class::<crate::tokenizer::TokenizedQuery>()?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(spnl_core::tokenizer::tokenize_query, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::tokenizer::tokenize_query, m)?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(spnl_core::tokenizer::tokenize_prepare, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::tokenizer::tokenize_prepare, m)?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(spnl_core::tokenizer::init, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::tokenizer::init, m)?)?;
 
     //m.add_class::<SimpleQuery>()?;
     //m.add_class::<SimpleGenerate>()?;

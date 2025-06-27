@@ -10,5 +10,10 @@ pub mod pull;
 #[cfg(feature = "tok")]
 pub mod tokenizer;
 
+#[cfg(feature = "pypi")]
+mod python;
+#[cfg(feature = "pypi")]
+pub use python::spnl_py;
+
 #[cfg(feature = "lisp")]
 mod lisp;

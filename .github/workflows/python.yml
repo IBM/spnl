@@ -47,9 +47,9 @@ jobs:
         run: cargo install cargo-binstall && cargo binstall maturin
 
       - name: maturin develop
-        run: maturin develop -m py/Cargo.toml --no-default-features -F tok
+        run: maturin develop -m spnl/Cargo.toml --no-default-features -F pypi
 
       - name: invoke the python tokenize api
         run: |
           query=$(cat examples/tests/tok_query.json)
-          python -c "import spnl_py; s = spnl_py.init(1); spnl_py.tokenize_query(s, '$query', 27, 10, 31, 16)"
+          python -c "import spnl; s = spnl.init(1); spnl.tokenize_query(s, '$query', 27, 10, 31, 16)"
