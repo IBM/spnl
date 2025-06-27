@@ -26,15 +26,17 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: download rust-cache
+        run: |
+          mkdir rust-cache-action && cd rust-cache-action
+          mkdir -p dist/save
+          (cd dist/save && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/save/index.js)
+          mkdir -p dist/restore
+          (cd dist/restore && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/restore/index.js)
+          wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/action.yml
+      - uses: ./rust-cache-action
+
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
