@@ -32,7 +32,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-${{matrix.python-version}}-${{ github.sha }}
+          name: build-${{ matrix.os }}-${{matrix.python-version}}-${{ github.sha }}.zip
           path: target/wheels/*.whl
 
   publish_to_pypi:
@@ -48,7 +48,7 @@ jobs:
         with:
           path: artifacts/
       - name: Unpack artifacts
-        run: cd artifacts && unzip *.zip
+        run: cd artifacts && unzip *.zip && rm -f *.zip
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
