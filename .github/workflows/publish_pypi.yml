@@ -32,7 +32,6 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-${{matrix.python-version}}-${{ github.sha }}
           path: target/wheels/*.whl
 
   publish_to_pypi:
