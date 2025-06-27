@@ -44,8 +44,7 @@ jobs:
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
           
       - name: install maturin
-        run: cargo install cargo-binstall && cargo binstall maturin
-
+        run: pip install maturin
       - name: maturin develop
         run: maturin develop -m spnl/Cargo.toml --no-default-features -F pypi
 
