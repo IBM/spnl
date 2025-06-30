@@ -13,16 +13,18 @@ together data into a
 [map/reduce](https://en.wikipedia.org/wiki/MapReduce) tree of one or
 more generation calls. For example, in a RAG scenario, a span query
 allows you to express that the relevant document fragments are
-independent of each other. The goals of this work are to:
+independent of each other.
 
-<img align="right" src="docs/abba-chart.svg" width=275>
+**Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
 
-- Improve cache locality and reduce inference latency for deep
-  research (c.f. [block attention](https://arxiv.org/pdf/2409)). The
-  image to the right shows the results of an "ABBA"
-  microbenchmark. This first "prepares" a query with a given shape (a
-  system prompt followed by two documents). The chart shows that vLLM
-  can run quickly, independent of the order of the documents.
+## Goals
+
+[<img align="right" src="/examples/abba/abba-chart.svg" width=275>](/examples/abba#readme)
+
+- Improve cache locality for deep research workloads [^1]. The chart
+  to the right shows the results of an ["ABBA"
+  microbenchmark](/examples/abba#readme): inference calls can run
+  quickly, independent of the order of the documents.
 - Provide a generalized inference scaling strategy using the power of map/reduce.
 - Facilitate [query planning](./docs/query-planning.md) to improve
   generation outcomes as well as to provide a plannable basis for
@@ -30,8 +32,8 @@ independent of each other. The goals of this work are to:
 - As with SQL, allow for a clean separation of concerns between
   conventional programming logic and backend interactions.
 
-**Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
-
+[^1]: c.f. [block attention](https://arxiv.org/pdf/2409)
+  
 > [!NOTE]
 > Plans are underway for integration with model serving backends (stay tuned!) and with user-facing libraries such as [PDL](https://github.com/IBM/prompt-declaration-language). Please open an issue documenting your use cases!
 
