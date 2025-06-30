@@ -15,13 +15,19 @@ more generation calls. For example, in a RAG scenario, a span query
 allows you to express that the relevant document fragments are
 independent of each other. The goals of this work are to:
 
-- improve cache locality and reduce inference latency for deep
-  research (c.f. [block attention](https://arxiv.org/pdf/2409)).
-- provide a generalized inference scaling strategy using the power of map/reduce.
-- facilitate [query planning](./docs/query-planning.md) to improve
+<img align="right" src="docs/abba-chart.svg" width=275>
+
+- Improve cache locality and reduce inference latency for deep
+  research (c.f. [block attention](https://arxiv.org/pdf/2409)). The
+  image to the right shows the results of an "ABBA"
+  microbenchmark. This first "prepares" a query with a given shape (a
+  system prompt followed by two documents). The chart shows that vLLM
+  can run quickly, independent of the order of the documents.
+- Provide a generalized inference scaling strategy using the power of map/reduce.
+- Facilitate [query planning](./docs/query-planning.md) to improve
   generation outcomes as well as to provide a plannable basis for
   routing future requests.
-- as with SQL, allow for a clean separation of concerns between
+- As with SQL, allow for a clean separation of concerns between
   conventional programming logic and backend interactions.
 
 **Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
