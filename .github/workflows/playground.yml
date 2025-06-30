@@ -1,4 +1,4 @@
-name: web
+name: playground
 
 on:
   push:
@@ -13,11 +13,11 @@ concurrency:
     
 jobs:
   build_and_test:
-    name: web
+    name: playground
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: ./web
+        working-directory: ./playground
     strategy:
       matrix:
         os:
