@@ -15,28 +15,33 @@ more generation calls. For example, in a RAG scenario, a span query
 allows you to express that the relevant document fragments are
 independent of each other.
 
+> [!NOTE]
+> Plans are underway for integration with [vLLM](https://github.com/vllm-project/vllm) and with user-facing libraries such as [PDL](https://github.com/IBM/prompt-declaration-language).
+
+
 **Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
 
 ## Goals
 
-[<img align="right" src="/examples/abba/abba-chart.svg" width=275>](/examples/abba#readme)
+[<img align="right" src="/examples/abba/abba-chart.svg" width=225>](/examples/abba#readme)
 
-- Improve cache locality for deep research workloads [^1]. The chart
-  to the right shows the results of an ["ABBA"
-  microbenchmark](/examples/abba#readme): inference calls can run
-  quickly, independent of the order of the documents.
-- Provide a generalized inference scaling strategy using the power of map/reduce.
-- Facilitate [query planning](./docs/query-planning.md) to improve
-  generation outcomes as well as to provide a plannable basis for
-  routing future requests.
-- As with SQL, allow for a clean separation of concerns between
-  conventional programming logic and backend interactions.
+1. Improve cache locality for deep research workloads[^1]. The
+   [chart](/examples/abba/abba-chart.svg) shows good speedup compared
+   to without block attention, and this is independent of the order in
+   which documents are sequenced in a prompt (AB vs. BA).<br/>
+   [Details](/examples/abba#readme)
+2. Provide a generalized inference scaling strategy using the power of
+   map/reduce.
+3. Facilitate [query planning](./docs/query-planning.md) to improve
+   generation outcomes as well as to provide a plannable basis for
+   routing future requests.
+4. As with SQL, allow for a clean separation of concerns between
+   conventional programming logic and backend interactions.
+
+<img src="/docs/locality/mtrag-locality.svg">
 
 [^1]: c.f. [block attention](https://arxiv.org/pdf/2409)
   
-> [!NOTE]
-> Plans are underway for integration with model serving backends (stay tuned!) and with user-facing libraries such as [PDL](https://github.com/IBM/prompt-declaration-language). Please open an issue documenting your use cases!
-
 ## Getting Started
 
 To kick the tires, you can use the [online
