@@ -26,7 +26,7 @@ the first use.  For example, we expect either of the following to
 exhibit the same cache locality, independent of the order of
 presentation of the document fragments.
 
-<img src="../benchmarks/abba/abba-diagram.svg" width=500>
+<img src="../../benchmarks/abba/abba-diagram.svg" width=500>
 
 ## Connection to Span Queries
 
