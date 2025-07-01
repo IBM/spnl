@@ -6,33 +6,25 @@
 
 :rocket: [Playground](https://ibm.github.io/spnl/) **|** [Research Poster](./docs/poster-20250529.pdf)
 
-What if we had a way to plan and optimize GenAI like we do for
-[SQL](https://en.wikipedia.org/wiki/SQL)? A [Span
-Query](./docs/about.md) is a declarative description of how to link
-together data into a
-[map/reduce](https://en.wikipedia.org/wiki/MapReduce) tree of one or
-more generation calls. Plans are underway for integration with
-[vLLM](https://github.com/vllm-project/vllm) and with user-facing
-libraries such as
-[PDL](https://github.com/IBM/prompt-declaration-language).
+## What if we had a way to plan and optimize GenAI like we do for [SQL](https://en.wikipedia.org/wiki/SQL)? 
 
-## Goals
+The primary goal of span queries is to provide a mechanism for running
+(and optimizing) portions of generative AI (GenAI) programs **directly
+on model serving components**.  To this end, a **span query** is a
+declarative and optimizable specification of what should be run on the
+backend. As with [SQL](https://en.wikipedia.org/wiki/SQL), a full
+GenAI program is expressed as the interludes around the queries.
 
-The primary goal of span queries is to provide a mechanism for
-offloading critical aspects of generative AI (GenAI) programs,
-shifting logic from clients and to server components.
-
-A span query is a declarative specification of how to
-*generate* new content from a combination of *dependent* and
-*independent* inputs. For example, in a RAG query, the final output
-depends on all of the provided input, yet each fragment from the
-corpus of documents is independent of the other
+A span query specifies how to *generate* new content from a
+combination of *dependent* and *independent* inputs. For example, in a
+RAG query, the final output depends on all of the provided input, yet
+each fragment from the corpus of documents is independent of the other
 fragments. [Details - Span Query](./docs/about.md)
 
 By expressing these data dependencies, and the relationship to a
-corpus, the backend can do better optimizations.  [Details - KV Cache
-Locality](/docs/locality/#readme) **|** [Details - Query
-Planning](./docs/query-planning.md)
+corpus, the backend can do a better job optimizing query execution.
+[Details - KV Cache Locality](/docs/locality/#readme) **|** [Details -
+Query Planning](./docs/query-planning.md)
 
 We further argue that by reconsidering GenAI programs as a tree of
 such generative expressions, we can achieve a generalized inference
@@ -41,6 +33,12 @@ scaling strategy. Independent elements are akin to the *map* of a
 depedendent elements are a *reduce*.
 
 **Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
+
+> [!NOTE]
+> Plans are underway for integration with
+> [vLLM](https://github.com/vllm-project/vllm) and with user-facing
+> libraries such as
+> [PDL](https://github.com/IBM/prompt-declaration-language).
 
 ## Getting Started
 
