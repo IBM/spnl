@@ -27,13 +27,11 @@ programmatic interludes around the declarative queries.
 > libraries such as
 > [PDL](https://github.com/IBM/prompt-declaration-language).
 
-A span query specifies how to *generate* (**g** in the diagram to the
+A span query specifies how to *generate* (**G** in the diagram to the
 right) new content from a combination of *dependent* (**x**) and
-*independent* (**+**) inputs. For example, in a RAG query, the final
+*independent* (**+**) inputs. For example, in a RAG query the final
 output depends on all of the provided input, yet each fragment from
-the corpus of documents is independent of the other
-fragments. 
-<br>[More on Span Queries](./docs/about.md)
+the corpus of documents is independent of the rest.
 
 By expressing these data dependencies, and the relationship to a
 corpus, the backend can do a better job optimizing query execution.
@@ -46,6 +44,8 @@ strategy. Independent elements are akin to the *map* of a
 [map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
 depedendent elements are a *reduce*. Map/reduce is a proven way to
 code scale-up and scale-out implementations.
+
+[More on Span Queries](./docs/about.md)
 
 **Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
 

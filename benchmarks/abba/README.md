@@ -1,6 +1,6 @@
 # ABBA Microbenchmark
 
-<img align="right" src="/benchmarks/abba/abba-chart.svg" width=275>
+<img align="right" src="/benchmarks/abba/abba-chart.svg" width="350">
 
 This microbenchmark helps to identify the potential of [block
 attention](https://arxiv.org/pdf/2409), in which the blocks of a
