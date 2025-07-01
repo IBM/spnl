@@ -3,13 +3,13 @@
 <img align="right" src="/benchmarks/abba/abba-chart.svg" width=275>
 
 This microbenchmark helps to identify the potential of [block
-  attention](https://arxiv.org/pdf/2409), in which the blocks of a
-  [paged attention](https://arxiv.org/abs/2309.06180) model serving
-  architecture can be identified as *relocatable* blocks. The KV cache
-  entries of such blocks can still be used, even if used in a sequence
-  order that is different than originally seen. We expect either of
-  the following to exhibit the same cache locality, independent of the
-  order of presentation of the document fragments.
+attention](https://arxiv.org/pdf/2409), in which the blocks of a
+[paged attention](https://arxiv.org/abs/2309.06180) model serving
+architecture can be identified as *relocatable* blocks. The KV cache
+entries of such blocks can still be used, even if used in a sequence
+order that is different than originally seen. We expect either of the
+following to exhibit the same cache locality, independent of the order
+of presentation of the document fragments.
 
 <img src="./abba-diagram.svg" width=500>
 

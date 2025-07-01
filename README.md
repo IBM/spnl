@@ -4,44 +4,44 @@
 [![CI - Python](https://github.com/IBM/spnl/actions/workflows/python.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/python.yml)
 [![CI - Playground](https://github.com/IBM/spnl/actions/workflows/playground.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/playground.yml)
 
-:rocket: [Playground](https://ibm.github.io/spnl/) **|** [Research Poster](./docs/poster-20250529.pdf) **|** [About Span Queries](./docs/about.md) **|** [Contribute](./docs/dev.md)
+:rocket: [Playground](https://ibm.github.io/spnl/) **|** [Research Poster](./docs/poster-20250529.pdf)
 
 What if we had a way to plan and optimize GenAI like we do for
 [SQL](https://en.wikipedia.org/wiki/SQL)? A [Span
 Query](./docs/about.md) is a declarative description of how to link
 together data into a
 [map/reduce](https://en.wikipedia.org/wiki/MapReduce) tree of one or
-more generation calls. For example, in a RAG scenario, a span query
-allows you to express that the relevant document fragments are
-independent of each other.
-
-> [!NOTE]
-> Plans are underway for integration with [vLLM](https://github.com/vllm-project/vllm) and with user-facing libraries such as [PDL](https://github.com/IBM/prompt-declaration-language).
-
-
-**Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
+more generation calls. Plans are underway for integration with
+[vLLM](https://github.com/vllm-project/vllm) and with user-facing
+libraries such as
+[PDL](https://github.com/IBM/prompt-declaration-language).
 
 ## Goals
 
-[<img align="right" src="/benchmarks/abba/abba-chart.svg" width=225>](/benchmarks/abba#readme)
+The primary goal of span queries is to provide a mechanism for
+offloading critical aspects of generative AI (GenAI) programs,
+shifting logic from clients and to server components.
 
-1. Improve cache locality for deep research workloads[^1]. The
-   [chart](/benchmarks/abba/abba-chart.svg) shows good speedup compared
-   to without block attention, and this is independent of the order in
-   which documents are sequenced in a prompt (AB vs. BA).<br/>
-   [Details](/benchmarks/abba#readme)
-2. Provide a generalized inference scaling strategy using the power of
-   map/reduce.
-3. Facilitate [query planning](./docs/query-planning.md) to improve
-   generation outcomes as well as to provide a plannable basis for
-   routing future requests.
-4. As with SQL, allow for a clean separation of concerns between
-   conventional programming logic and backend interactions.
+A span query is a declarative specification of how to
+*generate* new content from a combination of *dependent* and
+*independent* inputs. For example, in a RAG query, the final output
+depends on all of the provided input, yet each fragment from the
+corpus of documents is independent of the other
+fragments. [Details - Span Query](./docs/about.md)
 
-<img src="/docs/locality/mtrag-locality.svg">
+By expressing these data dependencies, and the relationship to a
+corpus, the backend can do better optimizations.  [Details - KV Cache
+Locality](/docs/locality/#readme) **|** [Details - Query
+Planning](./docs/query-planning.md)
 
-[^1]: c.f. [block attention](https://arxiv.org/pdf/2409)
-  
+We further argue that by reconsidering GenAI programs as a tree of
+such generative expressions, we can achieve a generalized inference
+scaling strategy. Independent elements are akin to the *map* of a
+[map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
+depedendent elements are a *reduce*.
+
+**Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
+
 ## Getting Started
 
 To kick the tires, you can use the [online
