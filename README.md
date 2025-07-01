@@ -10,12 +10,14 @@
 
 ## What if we had a way to plan and optimize GenAI like we do for [SQL](https://en.wikipedia.org/wiki/SQL)? 
 
-The primary goal of span queries is to provide a mechanism for running
-(and optimizing) portions of generative AI (GenAI) programs **directly
-on model serving components**.  To this end, a **span query** is a
-declarative and optimizable specification of what should be run on the
-backend. As with [SQL](https://en.wikipedia.org/wiki/SQL), a full
-GenAI program is expressed as the interludes around the queries.
+A **Span Query** is a declarative way to specify which portions of a
+generative AI (GenAI) program should be **run directly on model
+serving components**. As with
+[SQL](https://en.wikipedia.org/wiki/SQL), this declarative structure
+is safe to run on the backend and provides a clean starting point for
+optimization. Also like SQL, some GenAI programs will be entirely
+expressible as queries, though most will be expressed as the
+programmatic interludes around the declarative queries.
 
 A span query specifies how to *generate* new content from a
 combination of *dependent* and *independent* inputs. For example, in a
