@@ -138,11 +138,11 @@ impl ::std::fmt::Display for Query {
                 f,
                 "{}",
                 v.iter()
-                    .map(|u| format!("{}", u))
+                    .map(|u| format!("{u}"))
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Query::System(s) | Query::User(s) => write!(f, "{}", s),
+            Query::System(s) | Query::User(s) => write!(f, "{s}"),
             _ => Ok(()),
         }
     }

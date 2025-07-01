@@ -48,7 +48,7 @@ fn windowed_jsonl(s: &str) -> Result<Vec<String>, SpnlError> {
         .filter_map(|line| match line {
             Ok(JsonlText { text }) => Some(text),
             Err(s) => {
-                eprintln!("Error parsing jsonl line {:?}", s);
+                eprintln!("Error parsing jsonl line {s}");
                 None
             }
         })

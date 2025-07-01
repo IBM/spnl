@@ -51,7 +51,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
 
     match unit {
         Query::Print(m) => {
-            println!("{}", m);
+            println!("{m}");
             Ok(Query::Print(m.clone()))
         }
         Query::User(s) => Ok(Query::User(s.clone())),

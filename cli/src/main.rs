@@ -22,7 +22,7 @@ async fn main() -> Result<(), SpnlError> {
         vecdb_table: args
             .demo
             .clone()
-            .map(|d| format!("demo.{:?}", d))
+            .map(|d| format!("demo.{d:?}"))
             .unwrap_or(args.file.clone().unwrap_or("default".to_string())),
     };
 
@@ -66,7 +66,7 @@ async fn main() -> Result<(), SpnlError> {
 
     let res = run(&program, &rp, None).await.map(|res| {
         if !res.to_string().is_empty() {
-            println!("{}", res);
+            println!("{res}");
         }
         Ok(())
     })?;

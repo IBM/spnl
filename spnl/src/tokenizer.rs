@@ -163,22 +163,22 @@ fn tokenize_part(
         Query::User(m) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
         Query::System(m) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
         _ => {
-            eprintln!("Warning: Unhandled span query component {:?}", input);
+            eprintln!("Warning: Unhandled span query component {input}");
             Ok(vec![])
         }
     }
 }
 
 fn handle_arc_err(e: ::std::sync::Arc<tokenizers::tokenizer::Error>) -> PyErr {
-    pyo3::exceptions::PyTypeError::new_err(format!("Error in tokenization {:?}", e))
+    pyo3::exceptions::PyTypeError::new_err(format!("Error in tokenization {e}"))
 }
 
 fn handle_err(e: tokenizers::tokenizer::Error) -> PyErr {
-    pyo3::exceptions::PyTypeError::new_err(format!("Error in tokenization {:?}", e))
+    pyo3::exceptions::PyTypeError::new_err(format!("Error in tokenization {e}"))
 }
 
 fn handle_serde_err(e: serde_json::Error) -> PyErr {
-    pyo3::exceptions::PyTypeError::new_err(format!("Error in deserialization {:?}", e))
+    pyo3::exceptions::PyTypeError::new_err(format!("Error in deserialization {e}"))
 }
 
 //#[pyclass]

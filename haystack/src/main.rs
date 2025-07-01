@@ -235,14 +235,14 @@ async fn main() -> Result<(), SpnlError> {
             if !quiet || messed_up {
                 eprintln!("\tPrecision: {precision}");
                 eprintln!("\tRecall: {recall}");
-                eprintln!("\tExpected names: {:?}", expected_names);
-                eprintln!("\tActual names raw: {:?}", s);
-                eprintln!("\tActual names: {:?}", generated_names);
+                eprintln!("\tExpected names: {expected_names:?}");
+                eprintln!("\tActual names raw: {s}");
+                eprintln!("\tActual names: {generated_names:?}");
             }
 
             println!("{model} {temperature} {num_documents} {length} {precision} {recall}");
             Ok(())
         }
-        x => Err(Box::from(format!("Unexpected non-string response {:?}", x))),
+        x => Err(Box::from(format!("Unexpected non-string response {x}"))),
     }
 }
