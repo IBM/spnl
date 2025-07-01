@@ -29,9 +29,12 @@ programmatic interludes around the declarative queries.
 
 A span query specifies how to *generate* (**G** in the diagram to the
 right) new content from a combination of *dependent* (**x**) and
-*independent* (**+**) inputs. For example, in a RAG query the final
+*independent* (**+**) inputs.For example, in a RAG query the final
 output depends on all of the provided input, yet each fragment from
-the corpus of documents is independent of the rest.
+the corpus of documents is independent of the rest.  E.g. `a+b`
+signifies that the token sequences `a` and `b` should be considered as
+independent of each other. In this sense, a span query can be
+considered an expression tree such as those visualized to the right.
 
 By expressing these data dependencies, and the relationship to a
 corpus, the backend can do a better job optimizing query execution.
