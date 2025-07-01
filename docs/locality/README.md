@@ -7,7 +7,7 @@ improving KV cache locality for deep research workloads.
 
 ## Block Attention
 
-Normally every KV-cached block in a [paged
+Normally every KV cache entry in a [paged
 attention](https://arxiv.org/abs/2309.06180) model serving
 architecture is a) positionally encoded to reflect the block's
 location in a sequential token stream; and b) "tainted" by what came
@@ -18,22 +18,22 @@ need to append to an existing sequential stream of tokens.
 
 A [recent paper](https://arxiv.org/pdf/2409) documents the power of
 what they term *block attention*. In a block attention architecture,
-the cached blocks can be identified as being *relocatable*. When a KV
-cache block is indicated as being relocatable, the model server can
-reuse a cached block no matter its position in a given token sequence.
-
-## ABBA Microbenchmark
-
-This microbenchmark helps to identify the potential of [block
-attention](https://arxiv.org/pdf/2409), in which the blocks of a
-[paged attention](https://arxiv.org/abs/2309.06180) model serving
-architecture can be identified as *relocatable* blocks. The KV cache
-entries of such blocks can still be used, even if used in a sequence
-order that is different than originally seen. We expect either of the
-following to exhibit the same cache locality, independent of the order
-of presentation of the document fragments.
+the cached blocks can be identified as being *relocatable*. With a few
+caveats, the model server can reuse a relocatable KV cache entry, even
+if the position of the second use of the block differs from that of
+the first use.  For example, we expect either of the following to
+exhibit the same cache locality, independent of the order of
+presentation of the document fragments.
 
 [<img align="right" src="/benchmarks/abba/abba-chart.svg" width="350">](/benchmarks/abba#readme)
+
+
+## Benchmarks
+
+To measure how well span queries work to leverage block attention, we
+explore two benchmarks.
+
+### ABBA Microbenchmark
 
 The chart to the right shows good speedup compared to without block
 attention, and this is independent of the order in which documents are

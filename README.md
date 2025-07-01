@@ -38,10 +38,10 @@ corpus, the backend can do a better job optimizing query execution.
 <br>[More on KV Cache Locality](/docs/locality/#readme) **|** [More on Query Planning](./docs/query-planning.md)
 
 By reconsidering GenAI programs as a tree of such generative
-expressions (such as shown in the *Federation Layer* of the diagram to
-the right), we may also achieve a generalized inference scaling
-strategy. Independent elements are akin to the *map* of a
-[map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
+expressions (such as the query visualized inside the *Federation
+Layer* of the diagram to the right), we may also achieve a generalized
+inference scaling strategy. Independent elements are akin to the *map*
+of a [map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
 depedendent elements are a *reduce*. Map/reduce is a proven way to
 code scale-up and scale-out implementations.
 
