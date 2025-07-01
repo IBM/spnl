@@ -13,8 +13,9 @@ architecture is a) positionally encoded to reflect the block's
 location in a sequential token stream; and b) "tainted" by what came
 before. The cache entry for the block records not only where it is,
 but also caches the matrix arithmetic necessary to attend this block's
-tokens to prior tokens.  This is desirable for applications that only
-need to append to an existing sequential stream of tokens.
+tokens to prior tokens.  This is desirable for applications, such as
+chat, that only need to append to an existing sequential stream of
+tokens.
 
 A [recent paper](https://arxiv.org/pdf/2409) documents the power of
 what they term *block attention*. In a block attention architecture,
@@ -25,13 +26,18 @@ the first use.  For example, we expect either of the following to
 exhibit the same cache locality, independent of the order of
 presentation of the document fragments.
 
-[<img align="right" src="/benchmarks/abba/abba-chart.svg" width="350">](/benchmarks/abba#readme)
+<img src="./abba-diagram.svg" width=500>
 
+## Connection to Span Queries
+
+A [span query](../about.md) can encode that input sequences are
+independent.
 
 ## Benchmarks
 
 To measure how well span queries work to leverage block attention, we
-explore two benchmarks.
+explore two benchmarks. First is a microbenchmark aimed to measure an
+uppper bound on performance gains possible from exploiting 
 
 ### ABBA Microbenchmark
 
