@@ -19,30 +19,35 @@ optimization. Also like SQL, some GenAI programs will be entirely
 expressible as queries, though most will be expressed as the
 programmatic interludes around the declarative queries.
 
-A span query specifies how to *generate* new content from a
-combination of *dependent* and *independent* inputs. For example, in a
-RAG query, the final output depends on all of the provided input, yet
-each fragment from the corpus of documents is independent of the other
-fragments. [Details - Span Query](./docs/about.md)
+<img align="right" src="/docs/spnl-cake.svg" width="230">
+
+> [!TIP]
+> Stay tuned for integration with
+> [vLLM](https://github.com/vllm-project/vllm) and programming
+> libraries such as
+> [PDL](https://github.com/IBM/prompt-declaration-language).
+
+A span query specifies how to *generate* (**g** in the diagram to the
+right) new content from a combination of *dependent* (**x**) and
+*independent* (**+**) inputs. For example, in a RAG query, the final
+output depends on all of the provided input, yet each fragment from
+the corpus of documents is independent of the other
+fragments. 
+<br>[More on Span Queries](./docs/about.md)
 
 By expressing these data dependencies, and the relationship to a
 corpus, the backend can do a better job optimizing query execution.
-[Details - KV Cache Locality](/docs/locality/#readme) **|** [Details -
-Query Planning](./docs/query-planning.md)
+<br>[More on KV Cache Locality](/docs/locality/#readme) **|** [More on Query Planning](./docs/query-planning.md)
 
-We further argue that by reconsidering GenAI programs as a tree of
-such generative expressions, we can achieve a generalized inference
-scaling strategy. Independent elements are akin to the *map* of a
+By reconsidering GenAI programs as a tree of such generative
+expressions (such as shown in the *Federation Layer* of the diagram to
+the right), we may also achieve a generalized inference scaling
+strategy. Independent elements are akin to the *map* of a
 [map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
-depedendent elements are a *reduce*.
+depedendent elements are a *reduce*. Map/reduce is a proven way to
+code scale-up and scale-out implementations.
 
 **Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
-
-> [!NOTE]
-> Plans are underway for integration with
-> [vLLM](https://github.com/vllm-project/vllm) and with user-facing
-> libraries such as
-> [PDL](https://github.com/IBM/prompt-declaration-language).
 
 ## Getting Started
 
