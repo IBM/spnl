@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "cli", "spnl", "haystack", "wasm"]
+members = [ "cli", "spnl", "benchmarks/haystack", "wasm"]
 default-members = [ "cli" ]
 
 [workspace.metadata.cross.target.x86_64-unknown-linux-gnu]

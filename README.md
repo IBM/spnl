@@ -23,13 +23,13 @@ independent of each other.
 
 ## Goals
 
-[<img align="right" src="/examples/abba/abba-chart.svg" width=225>](/examples/abba#readme)
+[<img align="right" src="/benchmarks/abba/abba-chart.svg" width=225>](/benchmarks/abba#readme)
 
 1. Improve cache locality for deep research workloads[^1]. The
-   [chart](/examples/abba/abba-chart.svg) shows good speedup compared
+   [chart](/benchmarks/abba/abba-chart.svg) shows good speedup compared
    to without block attention, and this is independent of the order in
    which documents are sequenced in a prompt (AB vs. BA).<br/>
-   [Details](/examples/abba#readme)
+   [Details](/benchmarks/abba#readme)
 2. Provide a generalized inference scaling strategy using the power of
    map/reduce.
 3. Facilitate [query planning](./docs/query-planning.md) to improve
