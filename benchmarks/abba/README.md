@@ -13,21 +13,12 @@ of presentation of the document fragments.
 
 <img src="./abba-diagram.svg" width=500>
 
-To send a query, first prepare the query shape:
+## Running the ABBA Microbenchmark
 
-```bash
-curl -s -XPOST http://localhost:8000/v1/query/prepare --data @./query-ab.json -o /dev/null -w "%{time_total}\n"
-1.504452
-```
+> [!WARNING]
+> To see the benefits of relocatable blocks currently requires a
+> branch of vLLM. Stay tuned!
 
-And then you can execute the query in either order, and you should see millisecond-level TTFT:
+First, make sure you have a running vLLM endpoint [with vLLM span
+support](/docs/vllm.md). More coming soon.
 
-```bash
-curl -s -XPOST http://localhost:8000/v1/query/execute --data @./query-ba.json -o /dev/null -w "%{time_total}\n"
-0.077699
-```
-
-```bash
-curl -s -XPOST http://localhost:8000/v1/query/execute --data @./query-ab.json -o /dev/null -w "%{time_total}\n"
-0.078419
-```
