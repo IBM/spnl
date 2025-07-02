@@ -69,8 +69,7 @@ cross:
 ## Benchmarks
 
 To measure how well span queries work to leverage block attention, we
-explore two benchmarks. First is a microbenchmark aimed to measure an
-uppper bound on performance gains possible from exploiting 
+explore two benchmarks.
 
 <img align="right" src="/benchmarks/abba/abba-chart.svg" width="250">
 
