@@ -71,14 +71,15 @@ To measure how well span queries work to leverage block attention, we
 explore two benchmarks. First is a microbenchmark aimed to measure an
 uppper bound on performance gains possible from exploiting 
 
-### ABBA Microbenchmark
+<img align="right" src="/benchmarks/abba/abba-chart.svg" width="250">
 
-This is a simple microbenchmark helpful to gauge how well we can
-tolerate different order of occurrence of the inputs: AB vs. BA.
+- **ABBA Microbenchmark** A simple microbenchmark helpful to gauge how
+well we can tolerate different order of occurrence of the inputs: AB
+vs. BA. [Details on the ABBA experiments](/benchmarks/abba#readme)
 
-[Details on the ABBA Microbenchmark](/benchmarks/abba#readme)
-
-### Multi-turn RAG 
+- [**Multi-turn RAG**](https://github.com/IBM/mt-rag-benchmark) An
+  open-source benchmark intended to capture multi-turn human
+  interactions with a RAG framework.
 
 <img src="/docs/locality/mtrag-locality.svg">
  
