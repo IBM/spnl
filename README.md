@@ -98,9 +98,9 @@ Arguments:
 
 Options:
   -d, --demo <DEMO>
-          Demo to run [possible values: chat, email, email2, email3, sweagent, gsm8k, rag]
+          Demo to run [possible values: chat, email, email2, email3, sweagent, gsm8k]
   -m, --model <MODEL>
-          Generative Model [default: ollama/granite3.2:2b]
+          Generative Model [default: ollama/granite3.3:2b]
   -e, --embedding-model <EMBEDDING_MODEL>
           Embedding Model [default: ollama/mxbai-embed-large:335m]
   -t, --temperature <TEMPERATURE>
@@ -113,8 +113,18 @@ Options:
           Chunk size [default: 1]
       --vecdb-uri <VECDB_URI>
           Vector DB Url [default: data/spnl]
+  -r, --reverse
+          Reverse order
+  -p, --prepare
+          Prepare query
+  -w, --question <QUESTION>
+          Question to pose [default: "Does PDL have a contribute keyword?"]
+  -u, --document <DOCUMENT>
+          Document that will augment the question [default: ./rag-doc1.pdf]
   -s, --show-query
           Re-emit the compiled query
+      --time
+          Report query execution time to stderr
   -v, --verbose
           Verbose output
   -h, --help
