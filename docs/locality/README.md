@@ -35,10 +35,11 @@ example, if we expect either of the following to exhibit the same
 cache locality, independent of the order of presentation of the
 document fragments, normal paged attention does not suffice.[^1]
 
-[^1] A contrasting approach is
-[CacheBlend](https://arxiv.org/pdf/2405.16444), implemented in
-[LMCache](https://github.com/LMCache/LMCache). CacheBlend has the
-advantage of not requiring fine tuning or changes to the model server.
+[^1]: A contrasting approach is
+    [CacheBlend](https://arxiv.org/pdf/2405.16444), implemented in
+    [LMCache](https://github.com/LMCache/LMCache). CacheBlend has the
+    advantage of not requiring fine tuning or changes to the model
+    server.
 
 <img src="/benchmarks/abba/abba-diagram.svg" width=500>
 
