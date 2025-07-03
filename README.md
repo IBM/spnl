@@ -56,12 +56,12 @@ code scale-up and scale-out implementations.
 
 [More on Span Queries](./docs/about.md)
 
-**Examples** [Judge/generator](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://pages.github.ibm.com/cloud-computer/spnl/?demo=email3&qv=true)
+**Examples** [Judge/generator](https://ibm.github.io/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://ibm.github.io/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://ibm.github.io/spnl/?demo=email3&qv=true)
 
 ## Getting Started
 
 To kick the tires, you can use the [online
-playground](https://pages.github.ibm.com/cloud-computer/spnl/?qv=false),
+playground](https://ibm.github.io/spnl/?qv=false),
 or the Span Query CLI. The playground will let you run queries
 directly in browsers that support
 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
