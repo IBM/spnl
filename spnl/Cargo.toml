@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["cli_support","lisp","run","ollama","openai","pull"]
+default = ["cli_support","lisp","run","ollama","openai","pull","yaml"]
 cli_support = ["dep:ptree","dep:rustyline"]
 lisp = ["dep:serde-lexpr"]
 ollama = ["run","dep:ollama-rs","dep:tokio","dep:tokio-stream"]
@@ -16,6 +16,7 @@ rag = ["run","dep:anyhow","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-sch
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
 tok = ["dep:pyo3","dep:moka","dep:tokenizers"]
 spnl-api = []
+yaml = ["dep:serde_yaml2"]
 
 [dependencies]
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"], optional = true }
@@ -40,6 +41,7 @@ arrow-array = { version = "55.2", optional = true }
 itertools = { version = "0.14.0", optional = true }
 pdf-extract = { version = "0.9.0", optional = true }
 serde_json = { version = "1.0.140" }
+serde_yaml2 = { version = "0.1.3", optional = true }
 sha2 = { version = "0.10.9", optional = true }
 pyo3 = { version = "0.25.0", features = ["macros"], optional = true }
 tokenizers = { version = "0.21.1", features = ["hf-hub", "http"], optional = true }

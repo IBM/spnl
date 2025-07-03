@@ -183,6 +183,41 @@ pub fn from_str(s: &str) -> serde_json::Result<Query> {
     serde_json::from_str(s)
 }
 
+#[cfg(feature = "yaml")]
+#[derive(Debug, Clone)]
+pub struct FromYamlError {
+    message: String,
+}
+
+#[cfg(feature = "yaml")]
+impl From<serde::de::value::Error> for FromYamlError {
+    fn from(e: serde::de::value::Error) -> Self {
+        Self {
+            message: e.to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "yaml")]
+impl ::std::error::Error for FromYamlError {
+    fn description(&self) -> &str {
+        self.message.as_str()
+    }
+}
+
+#[cfg(feature = "yaml")]
+impl ::std::fmt::Display for FromYamlError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+#[cfg(feature = "yaml")]
+/// Deserialize a SPNL query from a YAML string
+pub fn from_yaml_str(s: &str) -> Result<Query, FromYamlError> {
+    Ok(serde_yaml2::from_str(s)?)
+}
+
 /// Deserialize a SPNL query from a reader
 pub fn from_reader(r: impl ::std::io::Read) -> serde_json::Result<Query> {
     serde_json::from_reader(r)

@@ -62,7 +62,7 @@ export default function QueryEditor(props: Props) {
       customControls={customControls}
       options={{ fontSize: 14, wordWrap: "on" }}
       onChange={props.setQuery}
-      language={Language.json}
+      language={Language.yaml}
       onEditorDidMount={(editor) => {
         editor.layout()
       }}

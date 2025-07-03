@@ -1,6 +1,6 @@
-import email from "../../../cli/src/demos/email.json?raw"
-import email2 from "../../../cli/src/demos/email2.json?raw"
-import email3 from "../../../cli/src/demos/email3.json?raw"
+import email from "../../../cli/src/demos/email.yaml?raw"
+import email2 from "../../../cli/src/demos/email2.yaml?raw"
+import email3 from "../../../cli/src/demos/email3.yaml?raw"
 
 export default [
   {
