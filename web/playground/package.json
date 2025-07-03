@@ -9,8 +9,9 @@
     "build": "npm run build:wasm --release && tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write 'src/**/*.{ts,tsx,css}'",
-    "test": "prettier --check 'src/**/*.{ts,tsx,css}' && npm run lint && npm run build",
+    "test": "prettier --check 'src/**/*.{ts,tsx,css}' && npm run lint && npm run build && playwright test",
     "preinstall": "if ! which wasm-pack; then npm install -g wasm-pack; fi; npm run build:wasm",
+    "postinstall": "playwright install chromium --only-shell",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -31,7 +32,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@playwright/test": "^1.53.2",
     "@tanstack/router-plugin": "^1.120.3",
+    "@types/node": "^24.0.10",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@vitejs/plugin-react-swc": "^3.9.0",
