@@ -7,30 +7,21 @@ pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error
         ..
     } = args;
 
-    let doc = if document == "./rag-doc1.pdf" {
-        document
+    let docs: Vec<String> = if let Some(docs) = document {
+        docs.into_iter()
+            .map(::std::path::absolute)
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|doc| doc.into_os_string().into_string().expect("string"))
+            .collect()
     } else {
-        ::std::path::absolute(document)?
-            .into_os_string()
-            .into_string()
-            .expect("string")
+        vec!["./rag-doc1.pdf".to_string()]
     };
 
-    Ok(
-        match ::std::path::Path::new(&doc)
-            .extension()
-            .and_then(std::ffi::OsStr::to_str)
-        {
-            Some("txt") | Some("json") | Some("jsonl") => spnl::spnl!(g model
-                      (cross (system r#"You answer only with either "UNANSWERABLE" or "ANSWERABLE" depending on whether or not the given documents are sufficient to answer the question."#)
-                       (with embedding_model
-                        (user question)
-                        (fetchn doc)))),
-            _ => spnl::spnl!(g model
-                       (cross (system r#"The format of your answer is either "UNANSWERABLE" or "ANSWERABLE" depending on whether or not the given documents are sufficient to answer the question."#)
-                        (with embedding_model
-                    (user question)
-                    (fetchb doc)))),
-        },
-    )
+    Ok(spnl::spnl!(
+        g model
+            (cross
+             (system r#"You answer only with either "UNANSWERABLE" or "ANSWERABLE" depending on whether or not the given documents are sufficient to answer the question."#)
+             (with embedding_model (user question) docs))
+    ))
 }

@@ -57,8 +57,8 @@ pub struct Args {
     pub question: String,
 
     /// Document that will augment the question
-    #[arg(short = 'u', long, default_value = "./rag-doc1.pdf")]
-    pub document: String,
+    #[arg(short = 'u', long)]
+    pub document: Option<Vec<String>>,
 
     /// Re-emit the compiled query
     #[arg(short, long, default_value_t = false)]

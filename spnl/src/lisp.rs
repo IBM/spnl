@@ -96,22 +96,33 @@ macro_rules! spnl {
     );
 
     // Data: incorporate one or more documents
-    (with $embedding_model:tt $input:tt $( $doc:tt )+) => (
+    (with $embedding_model:tt $input:tt $docs:tt) => {{
+        let docs: Vec<$crate::Query> = $crate::spnl_arg!($docs)
+            .into_iter()
+            .map(|doc| match ::std::path::Path::new(&doc)
+                 .extension()
+                 .and_then(std::ffi::OsStr::to_str) {
+                     Some("txt") | Some("json") | Some("jsonl") => $crate::spnl!(fetchn doc),
+                     _ => $crate::spnl!(fetchb doc),
+                 })
+            .map(|doc| $crate::spnl!(__spnl_retrieve $embedding_model $input doc))
+            .collect();
+
         $crate::spnl!(
             cross
-                (plus $( (__spnl_retrieve $embedding_model $input $doc) )+)
+                (plus docs)
                 (user "Please answer this question:")
                 $input
         )
-    );
+    }};
 
     // Internal
     (__spnl_retrieve $embedding_model:tt $input:tt $doc:tt) => (
-        vec![$crate::Query::Retrieve($crate::Retrieve {
-            embedding_model: $crate::spnl_arg!($embedding_model),
+        $crate::Query::Retrieve($crate::Retrieve {
+            embedding_model: $crate::spnl_arg!($embedding_model).clone(),
             body: Box::new($crate::spnl_arg!($input)),
             doc: $crate::spnl_arg!( $doc ).into()
-        })]
+        })
     );
 
     // Sugar: this unfolds to a `(g $model (cross $body))` but with
