@@ -28,7 +28,7 @@ jobs:
       - name: install maturin
         run: pip install maturin
       - name: maturin build
-        run: maturin build --release -m spnl/Cargo.toml --no-default-features -F pypi
+        run: maturin build --release -m spnl/Cargo.toml --no-default-features -F run_py -F tok
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
