@@ -113,7 +113,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
         },
 
         #[cfg(not(feature = "cli_support"))]
-        Query::Ask(message) => todo!("ask"),
+        Query::Ask(_message) => todo!("ask"),
         #[cfg(feature = "cli_support")]
         Query::Ask(message) => {
             use rustyline::error::ReadlineError;

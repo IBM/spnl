@@ -177,7 +177,7 @@ fn handle_err(e: tokenizers::tokenizer::Error) -> PyErr {
     pyo3::exceptions::PyTypeError::new_err(format!("Error in tokenization {e}"))
 }
 
-fn handle_serde_err(e: serde_json::Error) -> PyErr {
+pub fn handle_serde_err(e: serde_json::Error) -> PyErr {
     pyo3::exceptions::PyTypeError::new_err(format!("Error in deserialization {e}"))
 }
 
