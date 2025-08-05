@@ -24,7 +24,8 @@ pub async fn generate(
         todo!()
     }
 
-    let client = Client::with_config(OpenAIConfig::new().with_api_base("http://localhost:8000/v1"));
+    let api_base = ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".into());
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base));
 
     let input_messages = messagify(input);
 
