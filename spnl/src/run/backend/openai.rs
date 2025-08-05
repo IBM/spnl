@@ -12,7 +12,13 @@ use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequ
 
 use crate::{Generate, Query, run::result::SpnlResult};
 
+pub enum Provider {
+    OpenAI,
+    Gemini,
+}
+
 pub async fn generate(
+    provider: Provider,
     model: &str,
     input: &Query,
     max_tokens: &Option<i32>,
@@ -24,7 +30,15 @@ pub async fn generate(
         todo!()
     }
 
-    let api_base = ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".into());
+    let api_base = ::std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| {
+        match provider {
+            // Note: NO TRAILING SLASHES!
+            Provider::OpenAI => "https://api.openai.com/v1",
+            Provider::Gemini => "https://generativelanguage.googleapis.com/v1beta/openai",
+        }
+        .into()
+    });
+
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base));
 
     let input_messages = messagify(input);

@@ -25,8 +25,30 @@ pub async fn generate(
 
         #[cfg(feature = "openai")]
         m if m.starts_with("openai/") => {
-            crate::run::backend::openai::generate(&m[7..], input, max_tokens, temp, mp, prepare)
-                .await
+            crate::run::backend::openai::generate(
+                crate::run::backend::openai::Provider::OpenAI,
+                &m[7..],
+                input,
+                max_tokens,
+                temp,
+                mp,
+                prepare,
+            )
+            .await
+        }
+
+        #[cfg(feature = "gemini")]
+        m if m.starts_with("gemini/") => {
+            crate::run::backend::openai::generate(
+                crate::run::backend::openai::Provider::Gemini,
+                &m[7..],
+                input,
+                max_tokens,
+                temp,
+                mp,
+                prepare,
+            )
+            .await
         }
 
         #[cfg(feature = "spnl-api")]
