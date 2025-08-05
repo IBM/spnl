@@ -31,7 +31,7 @@ futures = { version = "0.3.31", optional = true }
 indicatif = { version = "0.17.11", features = ["rayon"], optional = true }
 ollama-rs = { version = "0.3.1", features = ["stream"], optional = true }
 rayon = { version = "1.10.0", optional = true }
-rustyline = { version = "16.0.0", features = ["with-file-history"], optional = true } 
+rustyline = { version = "17.0.0", features = ["with-file-history"], optional = true } 
 tokio = { version = "1.44.1", features = ["io-std"], optional = true }
 tokio-stream = { version = "0.1.17", optional = true }
 anyhow = { version = "1.0.98", optional = true }
