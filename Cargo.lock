@@ -6699,7 +6699,6 @@ dependencies = [
  "esaxx-rs",
  "getrandom 0.3.3",
  "hf-hub",
- "indicatif",
  "itertools 0.14.0",
  "log",
  "macro_rules_attribute",
