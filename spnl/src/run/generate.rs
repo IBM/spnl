@@ -42,14 +42,30 @@ pub async fn generate(
     match model {
         #[cfg(feature = "ollama")]
         m if m.starts_with("ollama/") => {
-            crate::run::backend::ollama::generate(&m[7..], input, max_tokens, temp, mp, prepare)
-                .await
+            crate::run::backend::openai::generate(
+                crate::run::backend::openai::Provider::Ollama,
+                &m[7..],
+                input,
+                max_tokens,
+                temp,
+                mp,
+                prepare,
+            )
+            .await
         }
 
         #[cfg(feature = "ollama")]
         m if m.starts_with("ollama_chat/") => {
-            crate::run::backend::ollama::generate(&m[12..], input, max_tokens, temp, mp, prepare)
-                .await
+            crate::run::backend::openai::generate(
+                crate::run::backend::openai::Provider::Ollama,
+                &m[12..],
+                input,
+                max_tokens,
+                temp,
+                mp,
+                prepare,
+            )
+            .await
         }
 
         #[cfg(feature = "openai")]

@@ -15,6 +15,21 @@ use crate::{Generate, Query, run::result::SpnlResult};
 pub enum Provider {
     OpenAI,
     Gemini,
+    Ollama,
+}
+
+fn api_base(provider: Provider) -> String {
+    ::std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| {
+        {
+            match provider {
+                // Note: NO TRAILING SLASHES!
+                Provider::OpenAI => "https://api.openai.com/v1",
+                Provider::Gemini => "https://generativelanguage.googleapis.com/v1beta/openai",
+                Provider::Ollama => "http://localhost:11434/v1",
+            }
+        }
+        .into()
+    })
 }
 
 pub async fn generate(
@@ -30,17 +45,7 @@ pub async fn generate(
         todo!()
     }
 
-    let api_base = ::std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| {
-        match provider {
-            // Note: NO TRAILING SLASHES!
-            Provider::OpenAI => "https://api.openai.com/v1",
-            Provider::Gemini => "https://generativelanguage.googleapis.com/v1beta/openai",
-        }
-        .into()
-    });
-
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base));
-
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
     let input_messages = messagify(input);
 
     let quiet = m.is_some();
@@ -140,4 +145,51 @@ pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
             }
         }
     }
+}
+
+#[cfg(feature = "rag")]
+pub fn contentify(input: &Query) -> Vec<String> {
+    match input {
+        Query::Cross(v) => v.iter().flat_map(contentify).collect(),
+        Query::Plus(v) => v.iter().flat_map(contentify).collect(),
+        Query::System(s) => vec![s.clone()],
+        o => {
+            let s = o.to_string();
+            if s.is_empty() {
+                vec![]
+            } else {
+                vec![o.to_string()]
+            }
+        }
+    }
+}
+
+#[cfg(feature = "rag")]
+pub async fn embed(
+    provider: Provider,
+    embedding_model: &str,
+    data: &crate::run::with::embed::EmbedData,
+) -> Result<Vec<Vec<f32>>, crate::run::result::SpnlError> {
+    use async_openai::types::CreateEmbeddingRequestArgs;
+
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
+
+    let docs = match data {
+        crate::run::with::embed::EmbedData::Vec(v) => v,
+        crate::run::with::embed::EmbedData::Query(u) => &contentify(u),
+    };
+
+    let request = CreateEmbeddingRequestArgs::default()
+        .model(embedding_model)
+        .input(docs)
+        .build()?;
+
+    Ok(client
+        .embeddings()
+        .create(request)
+        .await?
+        .data
+        .into_iter()
+        .map(|e| e.embedding)
+        .collect())
 }
