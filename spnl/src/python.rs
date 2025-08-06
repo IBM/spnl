@@ -2,12 +2,12 @@ use pyo3::prelude::*;
 
 #[cfg(feature = "run_py")]
 fn handle_run_err(e: crate::run::result::SpnlError) -> PyErr {
-    pyo3::exceptions::PyTypeError::new_err(format!("Error in generation {e}"))
+    pyo3::exceptions::PyOSError::new_err(format!("{e}"))
 }
 
 #[cfg(feature = "run_py")]
 fn handle_serde_err(e: serde_json::Error) -> PyErr {
-    pyo3::exceptions::PyTypeError::new_err(format!("Error in deserialization {e}"))
+    pyo3::exceptions::PyOSError::new_err(format!("Error in deserialization {e}"))
 }
 
 #[cfg(feature = "run_py")]
@@ -67,6 +67,8 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
 
 #[pymodule(name = "spnl")]
 pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // TODO pyo3::create_exception!(m, PyModelNotFoundError, pyo3::exceptions::PyException);
+
     #[cfg(feature = "run_py")]
     m.add_function(wrap_pyfunction!(crate::python::execute, m)?)?;
     #[cfg(feature = "run_py")]

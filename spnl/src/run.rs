@@ -7,6 +7,7 @@ mod with;
 
 use indicatif::MultiProgress;
 
+pub use crate::run::generate::ModelNotFoundError;
 use crate::{Generate, Query, run::result::SpnlResult};
 
 pub struct RunParameters {
