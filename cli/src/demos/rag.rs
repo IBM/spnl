@@ -18,10 +18,16 @@ pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error
         vec!["./rag-doc1.pdf".to_string()]
     };
 
+    let system_prompt = r#"
+You answer only with either "UNANSWERABLE" or "ANSWERABLE" depending
+on whether or not the given documents are sufficient to answer the
+question.
+"#;
+
     Ok(spnl::spnl!(
         g model
             (cross
-             (system r#"You answer only with either "UNANSWERABLE" or "ANSWERABLE" depending on whether or not the given documents are sufficient to answer the question."#)
+             (system system_prompt)
              (with embedding_model (user question) docs))
     ))
 }

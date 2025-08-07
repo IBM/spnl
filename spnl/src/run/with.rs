@@ -62,6 +62,10 @@ pub async fn embed_and_retrieve(
     db_uri: &str,
     table_name_base: &str,
 ) -> SpnlResult {
+    let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
+        .map(|var| !matches!(var.as_str(), "false"))
+        .unwrap_or(false);
+
     use std::time::Instant;
     let now = Instant::now();
 
@@ -133,7 +137,9 @@ pub async fn embed_and_retrieve(
             .open(done_file)?;
     }
 
-    eprintln!("Embedding question {body}");
+    if verbose {
+        eprintln!("Embedding question {body}");
+    }
     let body_vectors = embed(embedding_model, EmbedData::Query(body.clone()))
         .await?
         .into_iter()
@@ -148,7 +154,9 @@ pub async fn embed_and_retrieve(
         })
         .collect::<Vec<_>>();
 
-    eprintln!("Matching question to document");
+    if verbose {
+        eprintln!("Matching question to document");
+    }
     let matching_docs = try_join_all(
         body_vectors
             .into_iter()
@@ -178,45 +186,51 @@ pub async fn embed_and_retrieve(
     .flatten()
     .unique();
 
-    eprintln!(
-        "RAGSizes {}",
-        matching_docs.clone().map(|doc| doc.len()).join(" ")
-    );
-    eprintln!(
-        "RAGHashes {}",
-        matching_docs
-            .clone()
-            .map(|doc| {
-                let mut hasher = sha2::Sha256::new();
-                hasher.update(doc);
-                format!("{:x}", hasher.finalize())
-            })
-            .join(" ")
-    );
+    if verbose {
+        eprintln!(
+            "RAGSizes {}",
+            matching_docs.clone().map(|doc| doc.len()).join(" ")
+        );
+        eprintln!(
+            "RAGHashes {}",
+            matching_docs
+                .clone()
+                .map(|doc| {
+                    let mut hasher = sha2::Sha256::new();
+                    hasher.update(doc);
+                    format!("{:x}", hasher.finalize())
+                })
+                .join(" ")
+        );
+    }
 
     let len1 = match content {
         Document::Text(c) => c.len(),
         Document::Binary(b) => b.len(),
     } as f64;
     let len2 = matching_docs.clone().map(|doc| doc.len()).sum::<usize>() as f64;
-    eprintln!(
-        "RAG fragments total_fragments {} relevant_fragments {}",
-        match content {
-            Document::Text(t) => t.len(),
-            Document::Binary(b) => b.len(),
-        },
-        matching_docs.clone().count()
-    );
-    eprintln!(
-        "RAG size reduction factor {:.2} {len1} -> {len2} bytes",
-        len1 / len2,
-    );
+    if verbose {
+        eprintln!(
+            "RAG fragments total_fragments {} relevant_fragments {}",
+            match content {
+                Document::Text(t) => t.len(),
+                Document::Binary(b) => b.len(),
+            },
+            matching_docs.clone().count()
+        );
+        eprintln!(
+            "RAG size reduction factor {:.2} {len1} -> {len2} bytes",
+            len1 / len2,
+        );
+    }
 
     let d = matching_docs
         .enumerate()
         .map(|(idx, doc)| Query::User(format!("Relevant document {idx}: {doc}")))
         .collect::<Vec<_>>();
 
-    eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());
+    if verbose {
+        eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());
+    }
     Ok(Query::Plus(d))
 }
