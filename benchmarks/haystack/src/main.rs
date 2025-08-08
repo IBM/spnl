@@ -189,7 +189,6 @@ async fn main() -> Result<(), SpnlError> {
             vecdb_uri: "".to_string(),
             vecdb_table: "".to_string(),
         },
-        Some(&indicatif::MultiProgress::new()),
     )
     .await?
     {

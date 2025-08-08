@@ -27,7 +27,7 @@ async fn cross(units: &[Query], rp: &RunParameters, mm: Option<&MultiProgress>) 
 
     let mut evaluated = vec![];
     for u in units.iter() {
-        evaluated.push(run(u, rp, Some(m)).await?);
+        evaluated.push(run_subtree(u, rp, Some(m)).await?);
     }
 
     Ok(Query::Cross(evaluated))
@@ -36,7 +36,7 @@ async fn cross(units: &[Query], rp: &RunParameters, mm: Option<&MultiProgress>) 
 async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
     let m = MultiProgress::new();
     let evaluated =
-        futures::future::try_join_all(units.iter().map(|u| run(u, rp, Some(&m)))).await?;
+        futures::future::try_join_all(units.iter().map(|u| run_subtree(u, rp, Some(&m)))).await?;
 
     if evaluated.len() == 1 {
         Ok(evaluated[0].clone())
@@ -45,8 +45,15 @@ async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
     }
 }
 
+pub async fn run(query: &Query, rp: &RunParameters) -> SpnlResult {
+    #[cfg(feature = "rag")]
+    crate::run::with::index(query, rp.vecdb_uri.as_str(), rp.vecdb_table.as_str()).await?;
+
+    run_subtree(query, rp, None).await
+}
+
 #[async_recursion::async_recursion]
-pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) -> SpnlResult {
+async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) -> SpnlResult {
     #[cfg(feature = "pull")]
     crate::pull::pull_if_needed(unit).await?;
 
@@ -64,7 +71,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
             body,
             doc,
         }) => {
-            crate::run::with::embed_and_retrieve(
+            crate::run::with::retrieve(
                 embedding_model,
                 body,
                 doc,
@@ -86,7 +93,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
             None | Some(false) => {
                 crate::run::generate::generate(
                     model.as_str(),
-                    &run(input, rp, m).await?,
+                    &run_subtree(input, rp, m).await?,
                     max_tokens,
                     temperature,
                     m,
@@ -107,7 +114,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
                         temperature: *temperature,
                         accumulate: None,
                     });
-                    let out = run(&program, rp, m).await?;
+                    let out = run_subtree(&program, rp, m).await?;
                     accum.push(out.clone());
                 }
             }
@@ -153,7 +160,6 @@ mod tests {
                 vecdb_table: "".into(),
                 vecdb_uri: "".into(),
             },
-            None,
         )
         .await?;
         assert_eq!(result, Query::User("hello".to_string()));

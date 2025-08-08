@@ -64,7 +64,7 @@ async fn main() -> Result<(), SpnlError> {
         ptree::write_tree(&program, ::std::io::stderr())?;
     }
 
-    let res = run(&program, &rp, None).await.map(|res| {
+    let res = run(&program, &rp).await.map(|res| {
         if !res.to_string().is_empty() {
             println!("{res}");
         }

@@ -55,30 +55,47 @@ fn windowed_jsonl(s: &str) -> Result<Vec<String>, SpnlError> {
         .collect())
 }
 
-pub async fn embed_and_retrieve(
-    embedding_model: &String,
-    body: &Query,
-    (filename, content): &(String, Document),
+fn extract_augments(query: &Query) -> Vec<crate::Augment> {
+    match query {
+        Query::Generate(crate::Generate { input, .. }) => extract_augments(input),
+        Query::Plus(v) | Query::Cross(v) => v.iter().flat_map(extract_augments).collect(),
+        Query::Augment(a) => vec![a.clone()],
+        _ => vec![],
+    }
+}
+
+pub async fn index(query: &Query, db_uri: &str, table_name_base: &str) -> Result<(), SpnlError> {
+    let m = MultiProgress::new();
+    let _ = try_join_all(
+        extract_augments(query)
+            .into_iter()
+            .map(|a| index_one(a, db_uri, table_name_base, &m)),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn index_one(
+    a: crate::Augment,
     db_uri: &str,
     table_name_base: &str,
-) -> SpnlResult {
-    let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
-        .map(|var| !matches!(var.as_str(), "false"))
-        .unwrap_or(false);
-
-    use std::time::Instant;
-    let now = Instant::now();
-
-    let embedding_batch_size = 64; // Number of fragment embeddings to perform in a single call
-    let max_matches = 100; // Maximum number of relevant fragments to consider
-
+    m: &MultiProgress,
+) -> Result<(), SpnlError> {
+    let (filename, content) = &a.doc;
     let window_size = match content {
         Document::Text(_) => 1,
         Document::Binary(_) => 8,
     };
 
+    let batch_size = 64; // Number of fragment embeddings to perform in a single call
+
     let table_name = storage::VecDB::sanitize_table_name(
-        format!("{table_name_base}.{embedding_model}.{window_size}.{filename}").as_str(),
+        format!(
+            "{table_name_base}.{}.{window_size}.{filename}",
+            a.embedding_model
+        )
+        .as_str(),
     );
     let db = storage::VecDB::connect(db_uri, table_name.as_str()).await?;
 
@@ -99,18 +116,18 @@ pub async fn embed_and_retrieve(
         }?;
         let key = doc_content.as_slice();
 
-        eprintln!(
-            "Embedding document {filename} with {} fragments using {embedding_model}",
-            doc_content.len()
+        let sty = indicatif::ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )?;
+        let pb = m.add(
+            ProgressBar::new((doc_content.len() / batch_size).try_into()?)
+                .with_style(sty)
+                .with_message(filename.clone()),
         );
-        let m = MultiProgress::new();
-        let pb = m.add(ProgressBar::new(
-            (doc_content.len() / embedding_batch_size).try_into()?,
-        ));
         pb.inc(0);
         let mut docs_vectors = vec![];
-        for docs in doc_content.chunks(embedding_batch_size) {
-            let vecs = embed(embedding_model, EmbedData::Vec(docs.to_vec()))
+        for docs in doc_content.chunks(batch_size) {
+            let vecs = embed(&a.embedding_model, EmbedData::Vec(docs.to_vec()))
                 .await?
                 .into_iter()
                 .map(|vec| {
@@ -136,6 +153,34 @@ pub async fn embed_and_retrieve(
             .write(true)
             .open(done_file)?;
     }
+
+    Ok(())
+}
+
+pub async fn retrieve(
+    embedding_model: &String,
+    body: &Query,
+    (filename, content): &(String, Document),
+    db_uri: &str,
+    table_name_base: &str,
+) -> SpnlResult {
+    let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
+        .map(|var| !matches!(var.as_str(), "false"))
+        .unwrap_or(false);
+
+    use std::time::Instant;
+    let now = Instant::now();
+    let max_matches = 100; // Maximum number of relevant fragments to consider
+
+    let window_size = match content {
+        Document::Text(_) => 1,
+        Document::Binary(_) => 8,
+    };
+
+    let table_name = storage::VecDB::sanitize_table_name(
+        format!("{table_name_base}.{embedding_model}.{window_size}.{filename}").as_str(),
+    );
+    let db = storage::VecDB::connect(db_uri, table_name.as_str()).await?;
 
     if verbose {
         eprintln!("Embedding question {body}");
@@ -166,18 +211,17 @@ pub async fn embed_and_retrieve(
     .into_iter()
     .flatten()
     .filter_map(|record_batch| {
-        if let Some(files_array) = record_batch.column_by_name("filename") {
-            if let Some(files) = files_array
+        if let Some(files_array) = record_batch.column_by_name("filename")
+            && let Some(files) = files_array
                 .as_any()
                 .downcast_ref::<arrow_array::StringArray>()
-            {
-                return Some(
-                    files
-                        .iter()
-                        .filter_map(|b| b.map(|b| b.to_string()))
-                        .collect::<Vec<String>>(),
-                );
-            }
+        {
+            return Some(
+                files
+                    .iter()
+                    .filter_map(|b| b.map(|b| b.to_string()))
+                    .collect::<Vec<String>>(),
+            );
         }
 
         // no matching docs for this body vector

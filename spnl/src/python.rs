@@ -54,7 +54,6 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
             vecdb_table: "".into(),
             prepare: None,
         },
-        None,
     ));
 
     res.map(|res| ChatResponse {
