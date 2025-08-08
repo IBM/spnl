@@ -8,7 +8,7 @@ permissions:
   contents: read
     
 jobs:
-  build_wheels:
+  build_wheels_and_sdist:
     runs-on: ${{ matrix.os }} 
     strategy:
       matrix:
@@ -32,14 +32,14 @@ jobs:
         run: pip install maturin
       - name: maturin build
         run: maturin build --sdist --release -m spnl/Cargo.toml --no-default-features -F run_py,tok
-      - name: Upload wheels
+      - name: Upload wheels and sdist
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.os }}-${{matrix.python-version}}-${{ github.sha }}
-          path: target/wheels/*.whl
+          path: target/wheels/
 
   publish_to_pypi:
-    needs: build_wheels
+    needs: build_wheels_and_sdist
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # Needed for trusted publishing
@@ -54,7 +54,7 @@ jobs:
         run: |
           find artifacts1
           mkdir artifacts
-          find artifacts1 -name '*.whl' -exec mv {} artifacts \; -print
+          find artifacts1 \( -name '*.whl' -o -name '*.tar.gz' \) -exec mv {} artifacts \; -print
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
