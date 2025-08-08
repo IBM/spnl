@@ -82,6 +82,11 @@ fn truncate(s: &str, max_chars: usize) -> String {
 }
 
 #[cfg(feature = "cli_support")]
+fn trim(s: &str, max_chars: usize) -> String {
+    truncate(s, max_chars).trim().replace("\n", " ")
+}
+
+#[cfg(feature = "cli_support")]
 impl ptree::TreeItem for Query {
     type Child = Self;
     fn write_self<W: ::std::io::Write>(
@@ -93,9 +98,8 @@ impl ptree::TreeItem for Query {
             f,
             "{}",
             match self {
-                Query::User(s) => style.paint(format!("\x1b[33mUser\x1b[0m {}", truncate(s, 700))),
-                Query::System(s) =>
-                    style.paint(format!("\x1b[34mSystem\x1b[0m {}", truncate(s, 700))),
+                Query::User(s) => style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
+                Query::System(s) => style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
                 Query::Generate(Generate {
@@ -125,7 +129,7 @@ impl ptree::TreeItem for Query {
                 ..
             }) => vec![
                 *body.clone(),
-                Query::User(format!("<augmentation document: {filename}>")),
+                Query::User(format!("\x1b[35m<{filename}>\x1b[0m")),
             ],
         })
     }
