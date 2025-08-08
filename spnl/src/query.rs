@@ -112,7 +112,7 @@ impl ptree::TreeItem for Query {
             }
         )
     }
-    fn children(&self) -> ::std::borrow::Cow<[Self::Child]> {
+    fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
             Query::Ask(_) | Query::User(_) | Query::System(_) | Query::Print(_) => vec![],
             Query::Plus(v) | Query::Cross(v) => v.clone(),
