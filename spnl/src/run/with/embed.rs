@@ -48,6 +48,6 @@ pub async fn embed(embedding_model: &String, data: EmbedData) -> Result<Vec<Vec<
             .await
         }
 
-        _ => todo!(),
+        _ => todo!("Unsupported embedding model {embedding_model}"),
     }
 }
