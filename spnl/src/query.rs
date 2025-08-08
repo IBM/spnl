@@ -29,7 +29,7 @@ pub struct Repeat {
 
 #[cfg(feature = "rag")]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct Retrieve {
+pub struct Augment {
     pub embedding_model: String,
     pub body: Box<Query>,
     pub doc: (String, Document),
@@ -66,7 +66,7 @@ pub enum Query {
     /// (embedding_model, question, docs): Incorporate information relevant to the
     /// question gathered from the given docs
     #[cfg(feature = "rag")]
-    Retrieve(Retrieve),
+    Augment(Augment),
 }
 
 #[cfg(feature = "cli_support")]
@@ -112,7 +112,7 @@ impl ptree::TreeItem for Query {
                 Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
                 #[cfg(feature = "rag")]
-                Query::Retrieve(_) => style.paint("\x1b[34;1mAugment\x1b[0m".to_string()),
+                Query::Augment(_) => style.paint("\x1b[34;1mAugment\x1b[0m".to_string()),
             }
         )
     }
@@ -123,7 +123,7 @@ impl ptree::TreeItem for Query {
             Query::Repeat(Repeat { query, .. }) => vec![*query.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]
-            Query::Retrieve(Retrieve {
+            Query::Augment(Augment {
                 body,
                 doc: (filename, _),
                 ..

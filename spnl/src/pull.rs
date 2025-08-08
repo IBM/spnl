@@ -77,7 +77,7 @@ pub fn extract_models(query: &Query) -> Vec<String> {
 fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
     match query {
         #[cfg(feature = "rag")]
-        Query::Retrieve(crate::Retrieve {
+        Query::Augment(crate::Augment {
             embedding_model, ..
         }) => models.push(embedding_model.clone()),
         Query::Generate(Generate { model, .. }) => models.push(model.clone()),

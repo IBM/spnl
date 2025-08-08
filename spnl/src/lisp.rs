@@ -118,7 +118,7 @@ macro_rules! spnl {
 
     // Internal
     (__spnl_retrieve $embedding_model:tt $input:tt $doc:tt) => (
-        $crate::Query::Retrieve($crate::Retrieve {
+        $crate::Query::Augment($crate::Augment {
             embedding_model: $crate::spnl_arg!($embedding_model).clone(),
             body: Box::new($crate::spnl_arg!($input)),
             doc: $crate::spnl_arg!( $doc ).into()

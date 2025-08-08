@@ -59,7 +59,7 @@ pub async fn run(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) ->
         Query::System(s) => Ok(Query::System(s.clone())),
 
         #[cfg(feature = "rag")]
-        Query::Retrieve(crate::Retrieve {
+        Query::Augment(crate::Augment {
             embedding_model,
             body,
             doc,
