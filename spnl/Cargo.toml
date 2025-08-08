@@ -17,7 +17,7 @@ rag = ["run","dep:anyhow","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-sch
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
 run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini","dep:tokio","tokio/rt-multi-thread"]
 tok = ["dep:pyo3","dep:moka","dep:tokenizers"]
-spnl-api = []
+spnl-api = ["dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
 
 [dependencies]
@@ -48,5 +48,5 @@ pyo3 = { version = "0.25.0", features = ["macros"], optional = true }
 tokenizers = { version = "0.21.1", default-features = false, features = ["onig", "esaxx_fast", "hf-hub", "http"], optional = true }
 derive_builder = "0.20.2"
 moka = { version = "0.12.10", features = ["sync"], optional = true }
-reqwest = { version = "0.12.20", features = ["json"] }
+reqwest = { version = "0.12.20", features = ["json"], optional = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
