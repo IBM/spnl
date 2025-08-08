@@ -49,12 +49,8 @@ pub struct Args {
     pub prepare: bool,
 
     /// Question to pose
-    #[arg(
-        short = 'w',
-        long,
-        default_value = "Does PDL have a contribute keyword?"
-    )]
-    pub question: String,
+    #[arg(short = 'w', long)]
+    pub question: Option<String>,
 
     /// Document that will augment the question
     #[arg(short = 'u', long)]

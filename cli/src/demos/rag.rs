@@ -2,12 +2,18 @@ pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error
     let crate::args::Args {
         model,
         embedding_model,
-        question,
-        document,
         ..
     } = args;
 
-    let docs: Vec<String> = if let Some(docs) = document {
+    // The question to augment. We use a default value that pertains
+    // to the Prompt Declaration Language (PDL)
+    // documentation. https://github.com/IBM/prompt-declaration-language
+    let question = args
+        .question
+        .unwrap_or_else(|| "Does PDL have a contribute keyword?".into());
+
+    // The corpus to mine for augmentations.
+    let docs: Vec<String> = if let Some(docs) = args.document {
         docs.into_iter()
             .map(::std::path::absolute)
             .collect::<Result<Vec<_>, _>>()?
@@ -15,6 +21,7 @@ pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error
             .map(|doc| doc.into_os_string().into_string().expect("string"))
             .collect()
     } else {
+        // Default value, which is the PDL documentation (see link above)
         vec!["./rag-doc1.pdf".to_string()]
     };
 
