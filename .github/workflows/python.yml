@@ -32,7 +32,7 @@ jobs:
           # - windows-latest
           # - macos-latest <-- disabled only because of hopefully transient maturin installation issues https://github.com/PyO3/maturin/issues/2659
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # - uses: Swatinem/rust-cache@v2
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
