@@ -117,12 +117,18 @@ async fn index_one(
         let key = doc_content.as_slice();
 
         let sty = indicatif::ProgressStyle::with_template(
-            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+            "[{elapsed_precise}] {bar:35.cyan/blue} {pos:>7}/{len:7} {msg}",
         )?;
         let pb = m.add(
             ProgressBar::new((doc_content.len() / batch_size).try_into()?)
                 .with_style(sty)
-                .with_message(filename.clone()),
+                .with_message(
+                    ::std::path::Path::new(filename)
+                        .file_name()
+                        .ok_or("Could not determine base name")?
+                        .display()
+                        .to_string(),
+                ),
         );
         pb.inc(0);
         let mut docs_vectors = vec![];

@@ -26,9 +26,9 @@ pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error
     };
 
     let system_prompt = r#"
-You answer only with either "UNANSWERABLE" or "ANSWERABLE" depending
+Respond with either "UNANSWERABLE" or "ANSWERABLE" depending
 on whether or not the given documents are sufficient to answer the
-question.
+question. Include citation to documents used to service the question.
 "#;
 
     Ok(spnl::spnl!(

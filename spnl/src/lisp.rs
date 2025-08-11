@@ -95,7 +95,7 @@ macro_rules! spnl {
             .collect::<Vec<_>>()
     );
 
-    // Data: incorporate one or more documents
+    // Data: augment a prompt with relevant fragments from one or more documents
     (with $embedding_model:tt $input:tt $docs:tt) => {{
         let docs: Vec<$crate::Query> = $crate::spnl_arg!($docs)
             .into_iter()
@@ -108,6 +108,14 @@ macro_rules! spnl {
             .map(|doc| $crate::spnl!(__spnl_retrieve $embedding_model $input doc))
             .collect();
 
+        // Note how (with embedding_model "question" "document")
+        // macro-expands to a "cross of plus" pattern. Each inside
+        // "plus" uses (just above) an `Augment` tree node to defer
+        // (beyond compile time, which is where we are now) the
+        // indexing and retrieval logic. We could perhaps do the
+        // indexing at compile time (probably not super useful, but a
+        // possibility), but the retrieval in general by definition is
+        // not a compile-time
         $crate::spnl!(
             cross
                 (plus docs)
