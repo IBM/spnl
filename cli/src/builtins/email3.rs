@@ -4,7 +4,7 @@ use crate::args::Args;
 use spnl::{Query, spnl};
 
 // https://github.ibm.com/AI4BA/agentic-policy
-pub fn demo(args: Args) -> Query {
+pub fn query(args: Args) -> Query {
     let Args {
         model,
         n,

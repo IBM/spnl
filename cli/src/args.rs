@@ -1,16 +1,16 @@
-use crate::demos::Demo;
+use crate::builtins::Builtin;
 use clap::Parser;
 
 #[derive(Parser, Debug, serde::Serialize)]
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// File to process
-    #[arg(required_unless_present("demo"))]
+    #[arg(required_unless_present("builtin"))]
     pub file: Option<String>,
 
-    /// Demo to run
+    /// Builtin to run
     #[arg(value_enum, short, long)]
-    pub demo: Option<Demo>,
+    pub builtin: Option<Builtin>,
 
     /// Generative Model
     #[arg(short, long, default_value = "ollama/granite3.3:2b")]

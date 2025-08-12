@@ -1,7 +1,7 @@
 use crate::args::Args;
 use spnl::{Query, spnl};
 
-pub fn demo(args: Args) -> Query {
+pub fn query(args: Args) -> Query {
     let Args {
         model, temperature, ..
     } = args;

@@ -1,14 +1,14 @@
 use clap::Parser;
 
 use crate::args::Args;
-use crate::demos::*;
+use crate::builtins::*;
 use spnl::{
     from_str, pretty_print,
     run::{RunParameters, plan::plan, result::SpnlError, run},
 };
 
 mod args;
-mod demos;
+mod builtins;
 
 #[tokio::main]
 async fn main() -> Result<(), SpnlError> {
@@ -20,10 +20,10 @@ async fn main() -> Result<(), SpnlError> {
         prepare: Some(args.prepare),
         vecdb_uri: args.vecdb_uri.clone(),
         vecdb_table: args
-            .demo
+            .builtin
             .clone()
-            .map(|d| format!("demo.{d:?}"))
-            .unwrap_or(args.file.clone().unwrap_or("default".to_string())),
+            .map(|builtin| format!("builtin.{builtin:?}"))
+            .unwrap_or_else(|| args.file.clone().unwrap_or("default".to_string())),
     };
 
     let time = if args.time {
@@ -32,17 +32,17 @@ async fn main() -> Result<(), SpnlError> {
         None
     };
 
-    let program = plan(&match args.demo {
-        Some(Demo::Chat) => chat::demo(args),
-        Some(Demo::Email) => email::demo(args),
-        Some(Demo::Email2) => email2::demo(args),
-        Some(Demo::Email3) => email3::demo(args),
-        Some(Demo::SWEAgent) => sweagent::demo(args).expect("sweagent query to be prepared"),
-        Some(Demo::GSM8k) => gsm8k::demo(args).expect("gsm8k query to be prepared"),
+    let program = plan(&match args.builtin {
+        Some(Builtin::Chat) => chat::query(args),
+        Some(Builtin::Email) => email::query(args),
+        Some(Builtin::Email2) => email2::query(args),
+        Some(Builtin::Email3) => email3::query(args),
+        Some(Builtin::SWEAgent) => sweagent::query(args).expect("query to be prepared"),
+        Some(Builtin::GSM8k) => gsm8k::query(args).expect("query to be prepared"),
         #[cfg(feature = "rag")]
-        Some(Demo::Rag) => rag::demo(args).expect("rag demo to be prepared"),
+        Some(Builtin::Rag) => rag::query(args).expect("queryto be prepared"),
         #[cfg(feature = "spnl-api")]
-        Some(Demo::Spans) => spans::demo(args).expect("spans demo to be prepared"),
+        Some(Builtin::Spans) => spans::query(args).expect("query to be prepared"),
         None => {
             use std::io::prelude::*;
             let file = ::std::fs::File::open(args.file.clone().unwrap())?;

@@ -13,7 +13,7 @@ pub mod spans;
 
 #[derive(clap::ValueEnum, Clone, Debug, serde::Serialize)]
 #[clap(rename_all = "lowercase")]
-pub enum Demo {
+pub enum Builtin {
     Chat,
     Email,
     Email2,

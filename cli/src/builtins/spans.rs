@@ -1,4 +1,4 @@
-pub fn demo(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error::Error>> {
+pub fn query(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::error::Error>> {
     let crate::args::Args {
         n,
         reverse,

@@ -1,7 +1,7 @@
 use crate::args::Args;
 use spnl::{Query, spnl};
 
-pub fn demo(args: Args) -> Result<Query, Box<dyn ::std::error::Error>> {
+pub fn query(args: Args) -> Result<Query, Box<dyn ::std::error::Error>> {
     let Args {
         model,
         n,
