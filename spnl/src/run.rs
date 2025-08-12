@@ -47,7 +47,7 @@ async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
 
 pub async fn run(query: &Query, rp: &RunParameters) -> SpnlResult {
     #[cfg(feature = "rag")]
-    crate::run::with::index(query, rp.vecdb_uri.as_str(), rp.vecdb_table.as_str()).await?;
+    crate::run::with::index::run(query, rp.vecdb_uri.as_str(), rp.vecdb_table.as_str()).await?;
 
     run_subtree(query, rp, None).await
 }
