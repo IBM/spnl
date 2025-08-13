@@ -242,6 +242,6 @@ async fn main() -> Result<(), SpnlError> {
             println!("{model} {temperature} {num_documents} {length} {precision} {recall}");
             Ok(())
         }
-        x => Err(Box::from(format!("Unexpected non-string response {x}"))),
+        x => Err(anyhow::anyhow!("Unexpected non-string response {x}")),
     }
 }

@@ -78,7 +78,7 @@ async fn index(
     db_uri: &str,
     table_name_base: &str,
     m: &MultiProgress,
-) -> Result<(), SpnlError> {
+) -> anyhow::Result<()> {
     let (filename, content) = &a.doc;
     let window_size = match content {
         Document::Text(_) => 1,
@@ -107,9 +107,9 @@ async fn index(
             (Document::Text(content), Some("txt")) => windowed_text(content),
             (Document::Text(content), Some("jsonl")) => windowed_jsonl(content),
             (Document::Binary(content), Some("pdf")) => windowed_pdf(content, window_size),
-            _ => Err(Box::from(format!(
+            _ => Err(anyhow::anyhow!(
                 "Unsupported `with` binary document {filename}"
-            ))),
+            )),
         }?;
         let key = doc_content.as_slice();
 
@@ -122,7 +122,7 @@ async fn index(
                 .with_message(
                     ::std::path::Path::new(filename)
                         .file_name()
-                        .ok_or("Could not determine base name")?
+                        .ok_or(anyhow::anyhow!("Could not determine base name"))?
                         .display()
                         .to_string(),
                 ),

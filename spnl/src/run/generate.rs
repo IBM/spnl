@@ -1,35 +1,10 @@
-use ::std::fmt;
 use indicatif::MultiProgress;
 
 use crate::{Query, run::result::SpnlResult};
 
+#[derive(thiserror::Error, Debug)]
+#[error("Model not found")]
 pub struct ModelNotFoundError;
-
-// Implement StdError for ModelNotFoundError
-impl ::std::error::Error for ModelNotFoundError {
-    fn description(&self) -> &str {
-        "Model not found"
-    }
-}
-
-// Implement std::fmt::Display for ModelNotFoundError
-impl fmt::Display for ModelNotFoundError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Model not found") // user-facing output
-    }
-}
-
-// Implement std::fmt::Debug for ModelNotFoundError
-impl fmt::Debug for ModelNotFoundError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Model not found {{ file: {}, line: {} }}",
-            file!(),
-            line!()
-        ) // programmer-facing output
-    }
-}
 
 pub async fn generate(
     model: &str,
@@ -101,6 +76,6 @@ pub async fn generate(
             crate::run::backend::spnl::generate(&m[5..], input, max_tokens, temp, mp, prepare).await
         }
 
-        _ => Err(Box::from(ModelNotFoundError)),
+        _ => Err(ModelNotFoundError.into()),
     }
 }

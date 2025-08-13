@@ -3,15 +3,6 @@ use fs4::fs_std::FileExt;
 
 use crate::{Generate, Query};
 
-/* pub async fn pull_if_needed_from_path(
-    source_file_path: &str,
-) -> Result<(), Box<dyn ::std::error::Error + Send + Sync>> {
-    let program = parse_file(&::std::path::PathBuf::from(source_file_path))?;
-    pull_if_needed(&program)
-        .await
-        .map_err(|e| Box::from(e.to_string()))
-} */
-
 /// Pull models (in parallel) from the program in the given filepath.
 pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
     futures::future::try_join_all(

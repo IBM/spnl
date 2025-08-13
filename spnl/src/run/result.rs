@@ -1,2 +1,2 @@
-pub type SpnlError = Box<dyn ::std::error::Error + Send + Sync>;
-pub type SpnlResult = Result<crate::Query, SpnlError>;
+pub type SpnlError = anyhow::Error;
+pub type SpnlResult = anyhow::Result<crate::Query>;
