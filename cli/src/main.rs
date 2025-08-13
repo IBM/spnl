@@ -4,7 +4,12 @@ use crate::args::Args;
 use crate::builtins::*;
 use spnl::{
     from_str, pretty_print,
-    run::{RunParameters, plan::plan, result::SpnlError, run},
+    run::{
+        RunParameters,
+        plan::{PlanOptions, plan},
+        result::SpnlError,
+        run,
+    },
 };
 
 mod args;
@@ -18,6 +23,9 @@ async fn main() -> Result<(), SpnlError> {
 
     let rp = RunParameters {
         prepare: Some(args.prepare),
+    };
+
+    let plan_options = PlanOptions {
         vecdb_uri: args.vecdb_uri.clone(),
         vecdb_table: args
             .builtin
@@ -32,30 +40,34 @@ async fn main() -> Result<(), SpnlError> {
         None
     };
 
-    let program = plan(&match args.builtin {
-        Some(Builtin::Chat) => chat::query(args),
-        Some(Builtin::Email) => email::query(args),
-        Some(Builtin::Email2) => email2::query(args),
-        Some(Builtin::Email3) => email3::query(args),
-        Some(Builtin::SWEAgent) => sweagent::query(args).expect("query to be prepared"),
-        Some(Builtin::GSM8k) => gsm8k::query(args).expect("query to be prepared"),
-        #[cfg(feature = "rag")]
-        Some(Builtin::Rag) => rag::query(args).expect("queryto be prepared"),
-        #[cfg(feature = "spnl-api")]
-        Some(Builtin::Spans) => spans::query(args).expect("query to be prepared"),
-        None => {
-            use std::io::prelude::*;
-            let file = ::std::fs::File::open(args.file.clone().unwrap())?;
-            let mut buf_reader = ::std::io::BufReader::new(file);
-            let mut contents = String::new();
-            buf_reader.read_to_string(&mut contents)?;
+    let program = plan(
+        &match args.builtin {
+            Some(Builtin::Chat) => chat::query(args),
+            Some(Builtin::Email) => email::query(args),
+            Some(Builtin::Email2) => email2::query(args),
+            Some(Builtin::Email3) => email3::query(args),
+            Some(Builtin::SWEAgent) => sweagent::query(args).expect("query to be prepared"),
+            Some(Builtin::GSM8k) => gsm8k::query(args).expect("query to be prepared"),
+            #[cfg(feature = "rag")]
+            Some(Builtin::Rag) => rag::query(args).expect("queryto be prepared"),
+            #[cfg(feature = "spnl-api")]
+            Some(Builtin::Spans) => spans::query(args).expect("query to be prepared"),
+            None => {
+                use std::io::prelude::*;
+                let file = ::std::fs::File::open(args.file.clone().unwrap())?;
+                let mut buf_reader = ::std::io::BufReader::new(file);
+                let mut contents = String::new();
+                buf_reader.read_to_string(&mut contents)?;
 
-            let mut tt = tinytemplate::TinyTemplate::new();
-            tt.add_template("file", contents.as_str())?;
-            let rendered = tt.render("file", &args)?;
-            from_str(rendered.as_str())?
-        }
-    });
+                let mut tt = tinytemplate::TinyTemplate::new();
+                tt.add_template("file", contents.as_str())?;
+                let rendered = tt.render("file", &args)?;
+                from_str(rendered.as_str())?
+            }
+        },
+        &plan_options,
+    )
+    .await?;
 
     if show_only {
         pretty_print(&program)?;

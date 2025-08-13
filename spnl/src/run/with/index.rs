@@ -1,21 +1,18 @@
-use futures::future::try_join_all;
+use anyhow::anyhow;
 use indicatif::{MultiProgress, ProgressBar};
 
 use crate::{
     Document, Query,
-    run::{
-        result::SpnlError,
-        with::{
-            embed::{EmbedData, embed},
-            storage,
-        },
+    run::with::{
+        embed::{EmbedData, embed},
+        storage,
     },
 };
 
 /// This fragments and windows the lines in the given PDF content. For
 /// example if bytes="a\nb\nc\nd" and window_width=2, this will
 /// produce ["a\nb", "b\nc", "c\nd"]
-fn windowed_pdf(bytes: &[u8], window_width: usize) -> Result<Vec<String>, SpnlError> {
+fn windowed_pdf(bytes: &[u8], window_width: usize) -> anyhow::Result<Vec<String>> {
     Ok(pdf_extract::extract_text_from_mem(bytes)?
         .lines()
         .filter(|s| !s.is_empty())
@@ -28,7 +25,7 @@ fn windowed_pdf(bytes: &[u8], window_width: usize) -> Result<Vec<String>, SpnlEr
 
 /// This treats every line of text as a separate document, with no
 /// need for windowing or sub-fragmentation.
-fn windowed_text(s: &str) -> Result<Vec<String>, SpnlError> {
+fn windowed_text(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(s.lines().map(|s| s.to_string()).collect())
 }
 
@@ -39,7 +36,7 @@ struct JsonlText {
 
 /// This treats every jsonl line as a separate document, with no need
 /// for windowing or sub-fragmentation.
-fn windowed_jsonl(s: &str) -> Result<Vec<String>, SpnlError> {
+fn windowed_jsonl(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(serde_json::Deserializer::from_str(s)
         .into_iter::<JsonlText>()
         .filter_map(|line| match line {
@@ -61,9 +58,9 @@ fn extract_augments(query: &Query) -> Vec<crate::Augment> {
     }
 }
 
-pub async fn run(query: &Query, db_uri: &str, table_name_base: &str) -> Result<(), SpnlError> {
+pub async fn run(query: &Query, db_uri: &str, table_name_base: &str) -> anyhow::Result<()> {
     let m = MultiProgress::new();
-    let _ = try_join_all(
+    let _ = futures::future::try_join_all(
         extract_augments(query)
             .into_iter()
             .map(|augmentation| index(augmentation, db_uri, table_name_base, &m)),
@@ -107,9 +104,7 @@ async fn index(
             (Document::Text(content), Some("txt")) => windowed_text(content),
             (Document::Text(content), Some("jsonl")) => windowed_jsonl(content),
             (Document::Binary(content), Some("pdf")) => windowed_pdf(content, window_size),
-            _ => Err(anyhow::anyhow!(
-                "Unsupported `with` binary document {filename}"
-            )),
+            _ => Err(anyhow!("Unsupported `with` binary document {filename}")),
         }?;
         let key = doc_content.as_slice();
 
@@ -122,7 +117,7 @@ async fn index(
                 .with_message(
                     ::std::path::Path::new(filename)
                         .file_name()
-                        .ok_or(anyhow::anyhow!("Could not determine base name"))?
+                        .ok_or(anyhow!("Could not determine base name"))?
                         .display()
                         .to_string(),
                 ),

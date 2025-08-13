@@ -182,16 +182,7 @@ async fn main() -> Result<(), SpnlError> {
         return Ok(());
     }
 
-    match run(
-        &program,
-        &RunParameters {
-            prepare: None,
-            vecdb_uri: "".to_string(),
-            vecdb_table: "".to_string(),
-        },
-    )
-    .await?
-    {
+    match run(&program, &RunParameters { prepare: None }).await? {
         Query::User(ss) => {
             // oof, be gracious here. sometimes the model wraps the
             // requested json array with markdown even though we asked

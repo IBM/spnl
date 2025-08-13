@@ -1,12 +1,11 @@
 use crate::Query;
-use crate::run::result::SpnlError;
 
 pub enum EmbedData {
     Query(Query),
     Vec(Vec<String>),
 }
 
-pub async fn embed(embedding_model: &String, data: EmbedData) -> Result<Vec<Vec<f32>>, SpnlError> {
+pub async fn embed(embedding_model: &String, data: EmbedData) -> anyhow::Result<Vec<Vec<f32>>> {
     match embedding_model {
         #[cfg(feature = "ollama")]
         m if m.starts_with("ollama/") => {

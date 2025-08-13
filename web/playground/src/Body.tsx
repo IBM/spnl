@@ -49,13 +49,15 @@ export default function Body(props: BodyProps) {
 
   useEffect(() => setQuery(initialQuery), [initialQuery, setQuery])
   useEffect(() => {
-    try {
+    const compile = async () => {
       setCompilationError(null)
-      setUnit(JSON.parse(compile_query(query)) as import("./Query").Query)
-    } catch (err) {
+      setUnit(JSON.parse(await compile_query(query)) as import("./Query").Query)
+    }
+
+    compile().catch((err) => {
       console.error(err)
       setCompilationError(err as Error)
-    }
+    })
   }, [query, setUnit])
 
   const onExecuteQuery = useCallback(

@@ -11,13 +11,7 @@ pub use crate::run::generate::ModelNotFoundError;
 use crate::{Generate, Query, run::result::SpnlResult};
 
 pub struct RunParameters {
-    /// URI of vector database. Could be a local filepath.
-    pub vecdb_uri: String,
-
-    /// Name of table to use in vector database.
-    pub vecdb_table: String,
-
-    /// Prepare query
+    /// Prepare query?
     pub prepare: Option<bool>,
 }
 
@@ -46,9 +40,6 @@ async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
 }
 
 pub async fn run(query: &Query, rp: &RunParameters) -> SpnlResult {
-    #[cfg(feature = "rag")]
-    crate::run::with::index::run(query, rp.vecdb_uri.as_str(), rp.vecdb_table.as_str()).await?;
-
     run_subtree(query, rp, None).await
 }
 
@@ -64,22 +55,6 @@ async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>
         }
         Query::User(s) => Ok(Query::User(s.clone())),
         Query::System(s) => Ok(Query::System(s.clone())),
-
-        #[cfg(feature = "rag")]
-        Query::Augment(crate::Augment {
-            embedding_model,
-            body,
-            doc,
-        }) => {
-            crate::run::with::retrieve(
-                embedding_model,
-                body,
-                doc,
-                rp.vecdb_uri.as_str(),
-                rp.vecdb_table.as_str(),
-            )
-            .await
-        }
 
         Query::Cross(u) => cross(u, rp, m).await,
         Query::Plus(u) => plus(u, rp).await,
@@ -141,8 +116,10 @@ async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>
             Ok(Query::User(prompt))
         }
 
-        // should not happen
+        // TODO: should not happen; we need to improve the typing of runnable queries
         Query::Repeat(_) => todo!("repeat"),
+        #[cfg(feature = "rag")]
+        Query::Augment(_) => todo!("augment"),
     }
 }
 
@@ -153,15 +130,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() -> Result<(), SpnlError> {
-        let result = run(
-            &"hello".into(),
-            &RunParameters {
-                prepare: None,
-                vecdb_table: "".into(),
-                vecdb_uri: "".into(),
-            },
-        )
-        .await?;
+        let result = run(&"hello".into(), &RunParameters { prepare: None }).await?;
         assert_eq!(result, Query::User("hello".to_string()));
         Ok(())
     }

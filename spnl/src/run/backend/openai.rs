@@ -169,7 +169,7 @@ pub async fn embed(
     provider: Provider,
     embedding_model: &str,
     data: &crate::run::with::embed::EmbedData,
-) -> Result<Vec<Vec<f32>>, crate::run::result::SpnlError> {
+) -> anyhow::Result<Vec<Vec<f32>>> {
     use async_openai::types::CreateEmbeddingRequestArgs;
 
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));

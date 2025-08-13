@@ -1,6 +1,9 @@
 use wasm_bindgen::prelude::*;
 
-use spnl::{from_yaml_str, run::plan::plan};
+use spnl::{
+    from_yaml_str,
+    run::plan::{PlanOptions, plan},
+};
 
 /*#[wasm_bindgen]
 extern "C" {
@@ -17,8 +20,16 @@ macro_rules! console_log {
 }*/
 
 #[wasm_bindgen]
-pub fn compile_query(query: &str) -> Result<String, JsError> {
-    let program = plan(&from_yaml_str(query)?);
+pub async fn compile_query(query: &str) -> Result<String, JsError> {
+    let program = plan(
+        &from_yaml_str(query)?,
+        &PlanOptions {
+            vecdb_uri: "".into(),
+            vecdb_table: "".into(),
+        },
+    )
+    .await
+    .map_err(|e| JsError::new(e.to_string().as_str()))?;
 
     //Ok(serde_wasm_bindgen::to_value(&program)?)
     Ok(serde_json::to_string(&program)?)

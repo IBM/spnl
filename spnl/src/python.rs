@@ -49,11 +49,7 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
     let rt = tokio::runtime::Runtime::new()?;
     let res = rt.block_on(crate::run::run(
         &query,
-        &crate::run::RunParameters {
-            vecdb_uri: "".into(),
-            vecdb_table: "".into(),
-            prepare: None,
-        },
+        &crate::run::RunParameters { prepare: None },
     ));
 
     res.map(|res| ChatResponse {

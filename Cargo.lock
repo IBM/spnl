@@ -6149,6 +6149,7 @@ dependencies = [
  "serde_json",
  "spnl",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
