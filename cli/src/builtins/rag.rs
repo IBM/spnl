@@ -13,16 +13,13 @@ pub fn query(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::erro
         .unwrap_or_else(|| "Does PDL have a contribute keyword?".into());
 
     // The corpus to mine for augmentations.
-    let docs: Vec<String> = if let Some(docs) = args.document {
+    let docs = if let Some(docs) = args.document {
         docs.into_iter()
             .map(::std::path::absolute)
             .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .map(|doc| doc.into_os_string().into_string().expect("string"))
-            .collect()
     } else {
         // Default value, which is the PDL documentation (see link above)
-        vec!["./rag-doc1.pdf".to_string()]
+        vec![::std::path::PathBuf::from("./rag-doc1.pdf".to_string())]
     };
 
     let system_prompt = r#"

@@ -59,10 +59,11 @@ do cat questions.txt | xargs -P1 -n1 spnl -b rag -u $c --max-tokens 1 -w  >& $c.
 done
 ```
 
-If you wish to use augment each question with all four datasets:
+If you wish to use augment each question with fragments (possibly)
+from all four datasets:
 
 ```shell
-cat questions.txt | xargs -P1 -n1 spnl -b rag -u fiqa.json clapnq.json cloud.json govt.json --max-tokens 1 -w  >& all.out.txt
+gzcat benchmarks/mt-rag/questions.txt.gz | xargs -P1 -n1 spnl -b rag -d fiqa.jsonl -d clapnq.jsonl -d cloud.jsonl -d govt.jsonl -p  >& all.out.txt
 ```
 
 ### Downloading full datasets
