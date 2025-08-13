@@ -99,8 +99,8 @@ Arguments:
   [FILE]  File to process
 
 Options:
-  -d, --demo <DEMO>
-          Demo to run [possible values: chat, email, email2, email3, sweagent, gsm8k]
+  -b, --builtin <BUILTIN>
+          Builtin to run [possible values: chat, email, email2, email3, sweagent, gsm8k, rag]
   -m, --model <MODEL>
           Generative Model [default: ollama/granite3.3:2b]
   -e, --embedding-model <EMBEDDING_MODEL>
@@ -117,12 +117,12 @@ Options:
           Vector DB Url [default: data/spnl]
   -r, --reverse
           Reverse order
-  -p, --prepare
+      --prepare
           Prepare query
-  -w, --question <QUESTION>
-          Question to pose [default: "Does PDL have a contribute keyword?"]
-  -u, --document <DOCUMENT>
-          Document that will augment the question [default: ./rag-doc1.pdf]
+  -p, --prompt <PROMPT>
+          Question to pose
+  -d, --document <DOCUMENT>
+          Document that will augment the question
   -s, --show-query
           Re-emit the compiled query
       --time

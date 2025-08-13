@@ -16,17 +16,16 @@ govt. A shortened version of fiqa is included in this repo as
 
 > [!IMPORTANT]
 > Ensure you have enabled the `rag` feature flag, by adding `-F rag`
-> either to your `cargo build` or `cargo run` command lines.
-
-In the following, we will assume you have used `cargo build -F rag` to
-build a `spnl` executable (normally placed in
-`./target/release/spnl`).
+> either to your `cargo build` or `cargo run` command lines.  In the
+> following, we will assume you have used `cargo build -F rag` to
+> build a `spnl` executable (normally placed in
+> `./target/release/spnl`).
 
 ```shell
 spnl \
-  -b rag \
-  -w 'can i use my flexible savings account to pay for health insurance premiums?' \
-  -u fiqa-first100lines.jsonl
+  --builtin rag \
+  --prompt 'can i use my flexible savings account to pay for health insurance premiums?' \
+  --document fiqa-first100lines.jsonl
 ```
 
 Use `-m ollama/granite3.2:2b` to use a specified completion model and

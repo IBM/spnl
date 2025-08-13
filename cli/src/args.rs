@@ -45,15 +45,15 @@ pub struct Args {
     pub reverse: bool,
 
     /// Prepare query
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     pub prepare: bool,
 
     /// Question to pose
-    #[arg(short = 'w', long)]
-    pub question: Option<String>,
+    #[arg(short, long)]
+    pub prompt: Option<String>,
 
     /// Document that will augment the question
-    #[arg(short = 'u', long)]
+    #[arg(short = 'd', long)]
     pub document: Option<Vec<String>>,
 
     /// Re-emit the compiled query

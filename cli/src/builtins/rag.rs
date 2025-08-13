@@ -8,8 +8,8 @@ pub fn query(args: crate::args::Args) -> Result<spnl::Query, Box<dyn ::std::erro
     // The question to augment. We use a default value that pertains
     // to the Prompt Declaration Language (PDL)
     // documentation. https://github.com/IBM/prompt-declaration-language
-    let question = args
-        .question
+    let prompt = args
+        .prompt
         .unwrap_or_else(|| "Does PDL have a contribute keyword?".into());
 
     // The corpus to mine for augmentations.
@@ -35,6 +35,6 @@ question. Include citation to documents used to service the question.
         g model
             (cross
              (system system_prompt)
-             (with embedding_model (user question) docs))
+             (with embedding_model (user prompt) docs))
     ))
 }
