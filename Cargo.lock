@@ -3240,7 +3240,6 @@ checksum = "4adb2ee6ad319a912210a36e56e3623555817bcc877a7e6e8802d1d69c4d8056"
 dependencies = [
  "console",
  "portable-atomic",
- "rayon",
  "unicode-width",
  "unit-prefix",
  "web-time",
@@ -6114,7 +6113,6 @@ dependencies = [
  "pdf-extract",
  "ptree",
  "pyo3",
- "rayon",
  "reqwest",
  "rustyline",
  "serde",

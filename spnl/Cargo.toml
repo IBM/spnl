@@ -11,7 +11,7 @@ ollama = ["openai"]
 openai = ["dep:async-openai","dep:tokio","dep:tokio-stream"]
 gemini = ["openai"]
 openssl-vendored = ["dep:openssl"]
-pull = ["dep:duct","dep:fs4","dep:rayon"]
+pull = ["dep:duct","dep:fs4","dep:reqwest"]
 pypi = ["tok","dep:pyo3","pyo3/extension-module"]
 rag = ["run","dep:anyhow","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arrow-array","dep:itertools","dep:pdf-extract"]
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
@@ -29,8 +29,7 @@ async-recursion = {version = "1.1.1", optional = true }
 duct = { version = "1.0", optional = true }
 fs4 = { version = "0.13.1", optional = true }
 futures = { version = "0.3.31", optional = true }
-indicatif = { version = "0.17.11", features = ["rayon"], optional = true }
-rayon = { version = "1.10.0", optional = true }
+indicatif = { version = "0.17.11", optional = true }
 rustyline = { version = "17.0.0", features = ["with-file-history"], optional = true } 
 tokio = { version = "1.44.1", features = ["io-std"], optional = true }
 tokio-stream = { version = "0.1.17", optional = true }

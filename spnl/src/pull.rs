@@ -1,8 +1,5 @@
-use ::std::io::Error;
-
 use duct::cmd;
 use fs4::fs_std::FileExt;
-use rayon::prelude::*;
 
 use crate::{Generate, Query};
 
@@ -16,49 +13,56 @@ use crate::{Generate, Query};
 } */
 
 /// Pull models (in parallel) from the program in the given filepath.
-pub async fn pull_if_needed(program: &Query) -> Result<(), Error> {
-    #[cfg(feature = "pull")]
-    extract_models(program)
-        .into_par_iter()
-        .try_for_each(|model| match model {
-            m if model.starts_with("ollama/") => ollama_pull_if_needed(&m[7..]),
-            m if model.starts_with("ollama_chat/") => ollama_pull_if_needed(&m[12..]),
-            _ => {
-                // eprintln!("Skipping model pull for {}", model);
-                Ok(())
-            }
-        })
-        .expect("successfully pulled models");
+pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
+    futures::future::try_join_all(
+        extract_models(query)
+            .iter()
+            .filter_map(|model| match model {
+                m if model.starts_with("ollama/") => Some(ollama_pull_if_needed(&m[7..])),
+                m if model.starts_with("ollama_chat/") => Some(ollama_pull_if_needed(&m[12..])),
+                _ => None,
+            }),
+    )
+    .await?;
 
     Ok(())
 }
 
-fn ollama_exists(model: &str) -> bool {
-    cmd!("ollama", "show", model)
-        .stdout_null()
-        .stderr_null()
-        .run()
-        .is_ok()
+#[derive(serde::Deserialize)]
+struct OllamaModel {
+    model: String,
+}
+
+#[derive(serde::Deserialize)]
+struct OllamaTags {
+    models: Vec<OllamaModel>,
+}
+
+async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
+    let tags: OllamaTags = reqwest::get("http://localhost:11434/api/tags")
+        .await?
+        .json()
+        .await?;
+    Ok(tags.models.into_iter().any(|m| m.model == model))
 }
 
 /// The Ollama implementation of a single model pull
-fn ollama_pull_if_needed(model: &str) -> Result<(), Error> {
-    let path = ::std::env::temp_dir().join(format!("ollama-pull-{model}"));
-    let f = ::std::fs::File::create(path)?;
-    f.lock_exclusive()?;
-
+async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
     // don't ? the cmd! so that we can "finally" unlock the file
-    let res = if !ollama_exists(model) {
-        cmd!("ollama", "pull", model)
+    if !ollama_exists(model).await? {
+        let path = ::std::env::temp_dir().join(format!("ollama-pull-{model}"));
+        let f = ::std::fs::File::create(&path)?;
+        f.lock_exclusive()?;
+
+        let pull_res = cmd!("ollama", "pull", model)
             .stdout_to_stderr()
             .run()
-            .map(|_| ())
+            .map(|_| ());
+        FileExt::unlock(&f)?;
+        Ok(pull_res?)
     } else {
         Ok(())
-    };
-
-    FileExt::unlock(&f)?;
-    res
+    }
 }
 
 /// Extract models referenced by the query
