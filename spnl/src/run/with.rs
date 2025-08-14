@@ -32,7 +32,7 @@ pub async fn retrieve(
     let max_matches: usize = atoi::atoi(
         ::std::env::var("SPNL_RAG_MAX_MATCHES")
             .as_deref()
-            .unwrap_or("100")
+            .unwrap_or("10")
             .as_bytes(),
     )
     .ok_or(anyhow::anyhow!("Invalid SPNL_RAG_MAX_MATCHES value"))?;
