@@ -24,6 +24,7 @@ pub async fn compile_query(query: &str) -> Result<String, JsError> {
     let program = plan(
         &from_yaml_str(query)?,
         &PlanOptions {
+            max_aug: Some(10),
             vecdb_uri: "".into(),
             vecdb_table: "".into(),
         },

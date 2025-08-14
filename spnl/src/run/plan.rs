@@ -1,6 +1,9 @@
 use crate::{Generate, Query, Repeat};
 
 pub struct PlanOptions {
+    /// Max augmentations to add to the query
+    pub max_aug: Option<usize>,
+
     /// URI of vector database. Could be a local filepath.
     pub vecdb_uri: String,
 
@@ -8,10 +11,10 @@ pub struct PlanOptions {
     pub vecdb_table: String,
 }
 
-async fn plan_vec_iter(v: &[Query], rp: &PlanOptions) -> anyhow::Result<Vec<Query>> {
+async fn plan_vec_iter(v: &[Query], po: &PlanOptions) -> anyhow::Result<Vec<Query>> {
     // TODO: this can't be the most efficient way to do this
     Ok(
-        futures::future::try_join_all(v.iter().map(|u| plan_iter(u, rp)))
+        futures::future::try_join_all(v.iter().map(|u| plan_iter(u, po)))
             .await?
             .into_iter()
             .flatten()
@@ -27,26 +30,19 @@ fn cross_if_needed(v: Vec<Query>) -> Query {
 }
 
 #[async_recursion::async_recursion]
-async fn plan_iter(query: &Query, rp: &PlanOptions) -> anyhow::Result<Vec<Query>> {
+async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>> {
     // this is probably the wrong place for this, but here we expand any Repeats under Plus or Cross
     match query {
-        Query::Plus(v) => Ok(vec![Query::Plus(plan_vec_iter(v, rp).await?)]),
-        Query::Cross(v) => Ok(vec![Query::Cross(plan_vec_iter(v, rp).await?)]),
+        Query::Plus(v) => Ok(vec![Query::Plus(plan_vec_iter(v, po).await?)]),
+        Query::Cross(v) => Ok(vec![Query::Cross(plan_vec_iter(v, po).await?)]),
 
         #[cfg(feature = "rag")]
         Query::Augment(a) => Ok(vec![
-            crate::run::with::retrieve(
-                &a.embedding_model,
-                &a.body,
-                &a.doc,
-                rp.vecdb_uri.as_str(),
-                rp.vecdb_table.as_str(),
-            )
-            .await?,
+            crate::run::with::retrieve(&a.embedding_model, &a.body, &a.doc, po).await?,
         ]),
 
         Query::Repeat(Repeat { n, query }) => {
-            let q = plan_iter(query, rp).await?;
+            let q = plan_iter(query, po).await?;
             Ok(::std::iter::repeat_n(q, *n).flatten().collect::<Vec<_>>())
         }
 
@@ -58,7 +54,7 @@ async fn plan_iter(query: &Query, rp: &PlanOptions) -> anyhow::Result<Vec<Query>
             accumulate,
         }) => Ok(vec![Query::Generate(Generate {
             model: model.clone(),
-            input: Box::new(cross_if_needed(plan_iter(input, rp).await?)),
+            input: Box::new(cross_if_needed(plan_iter(input, po).await?)),
             max_tokens: *max_tokens,
             temperature: *temperature,
             accumulate: *accumulate,
@@ -68,9 +64,9 @@ async fn plan_iter(query: &Query, rp: &PlanOptions) -> anyhow::Result<Vec<Query>
     }
 }
 
-pub async fn plan(query: &Query, rp: &PlanOptions) -> anyhow::Result<Query> {
+pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
-    crate::run::with::index::run(query, rp.vecdb_uri.as_str(), rp.vecdb_table.as_str()).await?;
+    crate::run::with::index::run(query, po).await?;
 
-    Ok(cross_if_needed(plan_iter(query, rp).await?))
+    Ok(cross_if_needed(plan_iter(query, po).await?))
 }

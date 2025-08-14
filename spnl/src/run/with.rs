@@ -18,8 +18,7 @@ pub async fn retrieve(
     embedding_model: &String,
     body: &Query,
     (filename, content): &(String, Document),
-    db_uri: &str,
-    table_name_base: &str,
+    po: &crate::run::plan::PlanOptions,
 ) -> SpnlResult {
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))
@@ -29,13 +28,7 @@ pub async fn retrieve(
     let now = Instant::now();
 
     // Maximum number of relevant fragments to consider
-    let max_matches: usize = atoi::atoi(
-        ::std::env::var("SPNL_RAG_MAX_MATCHES")
-            .as_deref()
-            .unwrap_or("10")
-            .as_bytes(),
-    )
-    .ok_or(anyhow::anyhow!("Invalid SPNL_RAG_MAX_MATCHES value"))?;
+    let max_matches: usize = po.max_aug.unwrap_or(10);
 
     let window_size = match content {
         Document::Text(_) => 1,
@@ -43,9 +36,13 @@ pub async fn retrieve(
     };
 
     let table_name = storage::VecDB::sanitize_table_name(
-        format!("{table_name_base}.{embedding_model}.{window_size}.{filename}").as_str(),
+        format!(
+            "{}.{embedding_model}.{window_size}.{filename}",
+            po.vecdb_table
+        )
+        .as_str(),
     );
-    let db = storage::VecDB::connect(db_uri, table_name.as_str()).await?;
+    let db = storage::VecDB::connect(&po.vecdb_uri, table_name.as_str()).await?;
 
     if verbose {
         eprintln!("Embedding question {body}");

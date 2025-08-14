@@ -58,12 +58,12 @@ fn extract_augments(query: &Query) -> Vec<crate::Augment> {
     }
 }
 
-pub async fn run(query: &Query, db_uri: &str, table_name_base: &str) -> anyhow::Result<()> {
+pub async fn run(query: &Query, po: &crate::run::plan::PlanOptions) -> anyhow::Result<()> {
     let m = MultiProgress::new();
     let _ = futures::future::try_join_all(
         extract_augments(query)
             .into_iter()
-            .map(|augmentation| index(augmentation, db_uri, table_name_base, &m)),
+            .map(|augmentation| index(augmentation, po, &m)),
     )
     .await?;
 
@@ -72,8 +72,7 @@ pub async fn run(query: &Query, db_uri: &str, table_name_base: &str) -> anyhow::
 
 async fn index(
     a: crate::Augment,
-    db_uri: &str,
-    table_name_base: &str,
+    po: &crate::run::plan::PlanOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
     let (filename, content) = &a.doc;
@@ -86,14 +85,14 @@ async fn index(
 
     let table_name = storage::VecDB::sanitize_table_name(
         format!(
-            "{table_name_base}.{}.{window_size}.{filename}",
-            a.embedding_model
+            "{}.{}.{window_size}.{filename}",
+            po.vecdb_table, a.embedding_model
         )
         .as_str(),
     );
-    let db = storage::VecDB::connect(db_uri, table_name.as_str()).await?;
+    let db = storage::VecDB::connect(&po.vecdb_uri, table_name.as_str()).await?;
 
-    let done_file = ::std::path::PathBuf::from(db_uri).join(format!("{table_name}.ok"));
+    let done_file = ::std::path::PathBuf::from(&po.vecdb_uri).join(format!("{table_name}.ok"));
     if !::std::fs::exists(&done_file)? {
         let doc_content = match (
             content,

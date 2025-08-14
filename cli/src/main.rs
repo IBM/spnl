@@ -26,6 +26,7 @@ async fn main() -> Result<(), SpnlError> {
     };
 
     let plan_options = PlanOptions {
+        max_aug: args.max_aug,
         vecdb_uri: args.vecdb_uri.clone(),
         vecdb_table: args
             .builtin

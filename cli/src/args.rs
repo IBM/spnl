@@ -52,9 +52,13 @@ pub struct Args {
     #[arg(short, long)]
     pub prompt: Option<String>,
 
-    /// Document that will augment the question
+    /// Document(s) that will augment the question
     #[arg(short = 'd', long)]
     pub document: Option<Vec<String>>,
+
+    /// Max augmentations to add to the query
+    #[arg(short = 'x', long, env = "SPNL_RAG_MAX_MATCHES")]
+    pub max_aug: Option<usize>,
 
     /// Re-emit the compiled query
     #[arg(short, long, default_value_t = false)]
