@@ -27,7 +27,15 @@ pub async fn retrieve(
 
     use std::time::Instant;
     let now = Instant::now();
-    let max_matches = 100; // Maximum number of relevant fragments to consider
+
+    // Maximum number of relevant fragments to consider
+    let max_matches: usize = atoi::atoi(
+        ::std::env::var("SPNL_RAG_MAX_MATCHES")
+            .as_deref()
+            .unwrap_or("100")
+            .as_bytes(),
+    )
+    .ok_or(anyhow::anyhow!("Invalid SPNL_RAG_MAX_MATCHES value"))?;
 
     let window_size = match content {
         Document::Text(_) => 1,
@@ -126,9 +134,11 @@ pub async fn retrieve(
     }
 
     let d = matching_docs
+        .into_iter()
+        .rev() // reverse so that we can present the most relevant closest to the query (at the end)
         .enumerate()
-        .map(|(idx, doc)| Query::User(format!("Relevant document {idx}: {doc}")))
-        .collect::<Vec<_>>();
+        .map(|(idx, doc)| Query::User(format!("Relevant Document {idx}: {doc}")))
+        .collect();
 
     if verbose {
         eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());

@@ -23,9 +23,10 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
     };
 
     let system_prompt = r#"
-Respond with either "UNANSWERABLE" or "ANSWERABLE" depending
-on whether or not the given documents are sufficient to answer the
-question. Include citation to documents used to service the question.
+Respond with either "UNANSWERABLE" or "ANSWERABLE" depending on
+whether or not the given documents are sufficient to answer the
+question and cite the Relevant
+Documents used to answer the question. Do not rely on your pre-trained knowledge. 
 "#;
 
     Ok(spnl::spnl!(

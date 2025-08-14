@@ -6102,6 +6102,7 @@ dependencies = [
  "arrow-schema",
  "async-openai",
  "async-recursion",
+ "atoi",
  "derive_builder",
  "duct",
  "fs4 0.13.1",
