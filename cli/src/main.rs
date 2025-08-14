@@ -41,7 +41,7 @@ async fn main() -> Result<(), SpnlError> {
         None
     };
 
-    let program = plan(
+    let query = plan(
         &match args.builtin {
             Some(Builtin::Chat) => chat::query(args),
             Some(Builtin::Email) => email::query(args),
@@ -71,13 +71,13 @@ async fn main() -> Result<(), SpnlError> {
     .await?;
 
     if show_only {
-        pretty_print(&program)?;
+        pretty_print(&query)?;
         return Ok(());
     } else if verbose {
-        ptree::write_tree(&program, ::std::io::stderr())?;
+        ptree::write_tree(&query, ::std::io::stderr())?;
     }
 
-    let res = run(&program, &rp).await.map(|res| {
+    let res = run(&query, &rp).await.map(|res| {
         if !res.to_string().is_empty() {
             println!("{res}");
         }

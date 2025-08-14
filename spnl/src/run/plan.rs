@@ -25,7 +25,7 @@ async fn plan_vec_iter(v: &[Query], po: &PlanOptions) -> anyhow::Result<Vec<Quer
 fn cross_if_needed(v: Vec<Query>) -> Query {
     match &v[..] {
         [query] => query.clone(),
-        _ => Query::Cross(v.to_vec()),
+        _ => Query::Cross(v),
     }
 }
 
@@ -64,9 +64,47 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
     }
 }
 
+/// This tries to remove some unnecessary syntactic complexities,
+/// e.g. Plus-of-Plus or Cross with a tail Cross.
+fn simplify(query: &Query) -> Query {
+    match query {
+        Query::Plus(v) => Query::Plus(match &v[..] {
+            // Plus of Plus
+            [Query::Plus(v2)] => v2.iter().map(simplify).collect(),
+
+            otherwise => otherwise.iter().map(simplify).collect(),
+        }),
+        Query::Cross(v) => Query::Cross(match &v[..] {
+            // Cross of tail Cross
+            [.., Query::Cross(v2)] => v
+                .iter()
+                .take(v.len() - 1)
+                .chain(v2.iter())
+                .map(simplify)
+                .collect(),
+
+            otherwise => otherwise.iter().map(simplify).collect(),
+        }),
+        Query::Generate(Generate {
+            model,
+            input,
+            max_tokens,
+            temperature,
+            accumulate,
+        }) => Query::Generate(Generate {
+            model: model.clone(),
+            input: Box::new(simplify(input)),
+            max_tokens: *max_tokens,
+            temperature: *temperature,
+            accumulate: *accumulate,
+        }),
+        otherwise => otherwise.clone(),
+    }
+}
+
 pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
     crate::run::with::index::run(query, po).await?;
 
-    Ok(cross_if_needed(plan_iter(query, po).await?))
+    Ok(simplify(&cross_if_needed(plan_iter(query, po).await?)))
 }
