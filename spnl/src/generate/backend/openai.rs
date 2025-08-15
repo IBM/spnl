@@ -10,7 +10,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
 
-use crate::{Generate, Query, run::result::SpnlResult};
+use crate::{Generate, Query, SpnlResult};
 
 #[cfg(feature = "rag")]
 use crate::augment::embed::EmbedData;

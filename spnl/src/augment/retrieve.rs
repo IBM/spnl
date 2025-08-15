@@ -3,19 +3,18 @@ use itertools::Itertools;
 use sha2::Digest;
 
 use crate::{
-    Document, Query,
+    Document, PlanOptions, Query, SpnlResult,
     augment::{
         embed::{EmbedData, embed},
         storage,
     },
-    run::result::SpnlResult,
 };
 
 pub async fn retrieve(
     embedding_model: &String,
     body: &Query,
     (filename, content): &(String, Document),
-    po: &crate::run::plan::PlanOptions,
+    po: &PlanOptions,
 ) -> SpnlResult {
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))

@@ -2,11 +2,21 @@ mod query;
 pub use query::*;
 
 #[cfg(feature = "run")]
-pub mod run;
+mod execute;
+#[cfg(feature = "run")]
+pub use execute::*;
 
 // TODO generate feature?
 #[cfg(feature = "run")]
 mod generate;
+
+// TODO plan feature?
+#[cfg(feature = "run")]
+mod plan;
+
+// TODO plan feature?
+#[cfg(feature = "run")]
+pub use plan::*;
 
 #[cfg(feature = "rag")]
 mod augment;

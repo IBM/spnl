@@ -1,16 +1,15 @@
-pub mod plan;
-pub mod result;
-
+use crate::{Generate, Query};
 use indicatif::MultiProgress;
 
-use crate::{Generate, Query, run::result::SpnlResult};
-
-pub struct RunParameters {
+pub struct ExecuteOptions {
     /// Prepare query?
     pub prepare: Option<bool>,
 }
 
-async fn cross(units: &[Query], rp: &RunParameters, mm: Option<&MultiProgress>) -> SpnlResult {
+pub type SpnlError = anyhow::Error;
+pub type SpnlResult = anyhow::Result<crate::Query>;
+
+async fn cross(units: &[Query], rp: &ExecuteOptions, mm: Option<&MultiProgress>) -> SpnlResult {
     let mym = MultiProgress::new();
     let m = if let Some(m) = mm { m } else { &mym };
 
@@ -22,7 +21,7 @@ async fn cross(units: &[Query], rp: &RunParameters, mm: Option<&MultiProgress>) 
     Ok(Query::Cross(evaluated))
 }
 
-async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
+async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
     let m = MultiProgress::new();
     let evaluated =
         futures::future::try_join_all(units.iter().map(|u| run_subtree(u, rp, Some(&m)))).await?;
@@ -34,12 +33,12 @@ async fn plus(units: &[Query], rp: &RunParameters) -> SpnlResult {
     }
 }
 
-pub async fn run(query: &Query, rp: &RunParameters) -> SpnlResult {
+pub async fn execute(query: &Query, rp: &ExecuteOptions) -> SpnlResult {
     run_subtree(query, rp, None).await
 }
 
 #[async_recursion::async_recursion]
-async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>) -> SpnlResult {
+async fn run_subtree(unit: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
     #[cfg(feature = "pull")]
     crate::pull::pull_if_needed(unit).await?;
 
@@ -121,11 +120,10 @@ async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::run::result::SpnlError;
 
     #[tokio::test]
     async fn it_works() -> Result<(), SpnlError> {
-        let result = run(&"hello".into(), &RunParameters { prepare: None }).await?;
+        let result = execute(&"hello".into(), &ExecuteOptions { prepare: None }).await?;
         assert_eq!(result, Query::User("hello".to_string()));
         Ok(())
     }

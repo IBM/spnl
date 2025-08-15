@@ -1,7 +1,7 @@
 use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};
 
-use crate::{Generate, Query, run::result::SpnlResult, to_string};
+use crate::{Generate, Query, SpnlResult, to_string};
 
 #[derive(serde::Deserialize)]
 struct Message {

@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 #[cfg(feature = "run_py")]
-fn handle_run_err(e: crate::run::result::SpnlError) -> PyErr {
+fn handle_run_err(e: crate::SpnlError) -> PyErr {
     pyo3::exceptions::PyOSError::new_err(format!("{e}"))
 }
 
@@ -47,9 +47,9 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
     let query: crate::Query = serde_json::from_str(q.as_str()).map_err(handle_serde_err)?;
 
     let rt = tokio::runtime::Runtime::new()?;
-    let res = rt.block_on(crate::run::run(
+    let res = rt.block_on(crate::execute(
         &query,
-        &crate::run::RunParameters { prepare: None },
+        &crate::ExecuteOptions { prepare: None },
     ));
 
     res.map(|res| ChatResponse {

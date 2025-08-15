@@ -2,15 +2,7 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{
-    from_str, pretty_print,
-    run::{
-        RunParameters,
-        plan::{PlanOptions, plan},
-        result::SpnlError,
-        run,
-    },
-};
+use spnl::{ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan, pretty_print};
 
 mod args;
 mod builtins;
@@ -21,7 +13,7 @@ async fn main() -> Result<(), SpnlError> {
     let verbose = args.verbose;
     let show_only = args.show_query;
 
-    let rp = RunParameters {
+    let rp = ExecuteOptions {
         prepare: Some(args.prepare),
     };
 
@@ -77,7 +69,7 @@ async fn main() -> Result<(), SpnlError> {
         ptree::write_tree(&query, ::std::io::stderr())?;
     }
 
-    let res = run(&query, &rp).await.map(|res| {
+    let res = execute(&query, &rp).await.map(|res| {
         if !res.to_string().is_empty() {
             println!("{res}");
         }

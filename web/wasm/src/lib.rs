@@ -1,9 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use spnl::{
-    from_yaml_str,
-    run::plan::{PlanOptions, plan},
-};
+use spnl::{PlanOptions, from_yaml_str, plan};
 
 /*#[wasm_bindgen]
 extern "C" {
