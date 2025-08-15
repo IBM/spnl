@@ -1,5 +1,3 @@
-use indicatif::MultiProgress;
-
 use crate::{Query, run::result::SpnlResult};
 
 #[derive(thiserror::Error, Debug)]
@@ -11,7 +9,7 @@ pub async fn generate(
     input: &Query,
     max_tokens: &Option<i32>,
     temp: &Option<f32>,
-    mp: Option<&MultiProgress>,
+    mp: Option<&indicatif::MultiProgress>,
     prepare: bool,
 ) -> SpnlResult {
     match model {

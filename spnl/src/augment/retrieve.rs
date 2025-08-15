@@ -4,15 +4,12 @@ use sha2::Digest;
 
 use crate::{
     Document, Query,
-    run::{
-        result::SpnlResult,
-        with::embed::{EmbedData, embed},
+    augment::{
+        embed::{EmbedData, embed},
+        storage,
     },
+    run::result::SpnlResult,
 };
-
-pub mod embed;
-pub mod index;
-mod storage;
 
 pub async fn retrieve(
     embedding_model: &String,

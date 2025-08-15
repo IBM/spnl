@@ -4,6 +4,9 @@ pub use query::*;
 #[cfg(feature = "run")]
 pub mod run;
 
+#[cfg(feature = "rag")]
+mod augment;
+
 #[cfg(feature = "pull")]
 pub mod pull;
 

@@ -3,7 +3,7 @@ use indicatif::{MultiProgress, ProgressBar};
 
 use crate::{
     Document, Query,
-    run::with::{
+    augment::{
         embed::{EmbedData, embed},
         storage,
     },
@@ -58,19 +58,19 @@ fn extract_augments(query: &Query) -> Vec<crate::Augment> {
     }
 }
 
-pub async fn run(query: &Query, po: &crate::run::plan::PlanOptions) -> anyhow::Result<()> {
+pub async fn index(query: &Query, po: &crate::run::plan::PlanOptions) -> anyhow::Result<()> {
     let m = MultiProgress::new();
     let _ = futures::future::try_join_all(
         extract_augments(query)
             .into_iter()
-            .map(|augmentation| index(augmentation, po, &m)),
+            .map(|augmentation| index_document(augmentation, po, &m)),
     )
     .await?;
 
     Ok(())
 }
 
-async fn index(
+async fn index_document(
     a: crate::Augment,
     po: &crate::run::plan::PlanOptions,
     m: &MultiProgress,

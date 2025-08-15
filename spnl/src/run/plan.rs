@@ -38,7 +38,7 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
 
         #[cfg(feature = "rag")]
         Query::Augment(a) => Ok(vec![
-            crate::run::with::retrieve(&a.embedding_model, &a.body, &a.doc, po).await?,
+            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, po).await?,
         ]),
 
         Query::Repeat(Repeat { n, query }) => {
@@ -104,7 +104,7 @@ fn simplify(query: &Query) -> Query {
 
 pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
-    crate::run::with::index::run(query, po).await?;
+    crate::augment::index(query, po).await?;
 
     Ok(simplify(&cross_if_needed(plan_iter(query, po).await?)))
 }

@@ -10,7 +10,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
 
-use crate::{Generate, Query, run::result::SpnlResult};
+use crate::{Generate, Query, augment::embed::EmbedData, run::result::SpnlResult};
 
 pub enum Provider {
     OpenAI,
@@ -168,15 +168,15 @@ pub fn contentify(input: &Query) -> Vec<String> {
 pub async fn embed(
     provider: Provider,
     embedding_model: &str,
-    data: &crate::run::with::embed::EmbedData,
+    data: &EmbedData,
 ) -> anyhow::Result<Vec<Vec<f32>>> {
     use async_openai::types::CreateEmbeddingRequestArgs;
 
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
 
     let docs = match data {
-        crate::run::with::embed::EmbedData::Vec(v) => v,
-        crate::run::with::embed::EmbedData::Query(u) => &contentify(u),
+        EmbedData::Vec(v) => v,
+        EmbedData::Query(u) => &contentify(u),
     };
 
     let request = CreateEmbeddingRequestArgs::default()

@@ -1,9 +1,7 @@
-mod backend;
+pub mod backend;
 mod generate;
 pub mod plan;
 pub mod result;
-#[cfg(feature = "rag")]
-mod with;
 
 use indicatif::MultiProgress;
 
