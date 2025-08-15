@@ -25,7 +25,7 @@ mod augment;
 pub mod pull;
 
 #[cfg(feature = "tok")]
-pub mod tokenizer;
+pub mod tokenize;
 
 #[cfg(feature = "pypi")]
 mod python;
