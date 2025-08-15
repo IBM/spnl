@@ -20,6 +20,8 @@ pub use plan::*;
 
 #[cfg(feature = "rag")]
 mod augment;
+#[cfg(feature = "rag")]
+pub use augment::AugmentOptions;
 
 #[cfg(feature = "pull")]
 pub mod pull;

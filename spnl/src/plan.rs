@@ -1,14 +1,9 @@
 use crate::{Generate, Query, Repeat};
 
+#[derive(Default)]
 pub struct PlanOptions {
-    /// Max augmentations to add to the query
-    pub max_aug: Option<usize>,
-
-    /// URI of vector database. Could be a local filepath.
-    pub vecdb_uri: String,
-
-    /// Name of table to use in vector database.
-    pub vecdb_table: String,
+    #[cfg(feature = "rag")]
+    pub aug: crate::augment::AugmentOptions,
 }
 
 async fn plan_vec_iter(v: &[Query], po: &PlanOptions) -> anyhow::Result<Vec<Query>> {
@@ -38,7 +33,7 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
 
         #[cfg(feature = "rag")]
         Query::Augment(a) => Ok(vec![
-            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, po).await?,
+            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, &po.aug).await?,
         ]),
 
         Query::Repeat(Repeat { n, query }) => {
@@ -104,7 +99,7 @@ fn simplify(query: &Query) -> Query {
 
 pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
-    crate::augment::index(query, po).await?;
+    crate::augment::index(query, &po.aug).await?;
 
     Ok(simplify(&cross_if_needed(plan_iter(query, po).await?)))
 }

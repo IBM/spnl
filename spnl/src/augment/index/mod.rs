@@ -1,53 +1,17 @@
 use anyhow::anyhow;
 use indicatif::{MultiProgress, ProgressBar};
 
+mod windowing;
+pub use windowing::*;
+
 use crate::{
-    Document, PlanOptions, Query,
+    Document, Query,
     augment::{
+        AugmentOptions,
         embed::{EmbedData, embed},
         storage,
     },
 };
-
-/// This fragments and windows the lines in the given PDF content. For
-/// example if bytes="a\nb\nc\nd" and window_width=2, this will
-/// produce ["a\nb", "b\nc", "c\nd"]
-fn windowed_pdf(bytes: &[u8], window_width: usize) -> anyhow::Result<Vec<String>> {
-    Ok(pdf_extract::extract_text_from_mem(bytes)?
-        .lines()
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .windows(window_width)
-        .step_by(2)
-        .map(|s| s.join("\n"))
-        .collect())
-}
-
-/// This treats every line of text as a separate document, with no
-/// need for windowing or sub-fragmentation.
-fn windowed_text(s: &str) -> anyhow::Result<Vec<String>> {
-    Ok(s.lines().map(|s| s.to_string()).collect())
-}
-
-#[derive(serde::Deserialize)]
-struct JsonlText {
-    text: String,
-}
-
-/// This treats every jsonl line as a separate document, with no need
-/// for windowing or sub-fragmentation.
-fn windowed_jsonl(s: &str) -> anyhow::Result<Vec<String>> {
-    Ok(serde_json::Deserializer::from_str(s)
-        .into_iter::<JsonlText>()
-        .filter_map(|line| match line {
-            Ok(JsonlText { text }) => Some(text),
-            Err(s) => {
-                eprintln!("Error parsing jsonl line {s}");
-                None
-            }
-        })
-        .collect())
-}
 
 fn extract_augments(query: &Query) -> Vec<crate::Augment> {
     match query {
@@ -58,12 +22,12 @@ fn extract_augments(query: &Query) -> Vec<crate::Augment> {
     }
 }
 
-pub async fn index(query: &Query, po: &PlanOptions) -> anyhow::Result<()> {
+pub async fn index(query: &Query, options: &AugmentOptions) -> anyhow::Result<()> {
     let m = MultiProgress::new();
     let _ = futures::future::try_join_all(
         extract_augments(query)
             .into_iter()
-            .map(|augmentation| index_document(augmentation, po, &m)),
+            .map(|augmentation| index_document(augmentation, options, &m)),
     )
     .await?;
 
@@ -72,7 +36,7 @@ pub async fn index(query: &Query, po: &PlanOptions) -> anyhow::Result<()> {
 
 async fn index_document(
     a: crate::Augment,
-    po: &PlanOptions,
+    options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
     let (filename, content) = &a.doc;
@@ -86,13 +50,13 @@ async fn index_document(
     let table_name = storage::VecDB::sanitize_table_name(
         format!(
             "{}.{}.{window_size}.{filename}",
-            po.vecdb_table, a.embedding_model
+            options.vecdb_table, a.embedding_model
         )
         .as_str(),
     );
-    let db = storage::VecDB::connect(&po.vecdb_uri, table_name.as_str()).await?;
+    let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
 
-    let done_file = ::std::path::PathBuf::from(&po.vecdb_uri).join(format!("{table_name}.ok"));
+    let done_file = ::std::path::PathBuf::from(&options.vecdb_uri).join(format!("{table_name}.ok"));
     if !::std::fs::exists(&done_file)? {
         let doc_content = match (
             content,

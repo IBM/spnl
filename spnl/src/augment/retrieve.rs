@@ -3,8 +3,9 @@ use itertools::Itertools;
 use sha2::Digest;
 
 use crate::{
-    Document, PlanOptions, Query, SpnlResult,
+    Document, Query, SpnlResult,
     augment::{
+        AugmentOptions,
         embed::{EmbedData, embed},
         storage,
     },
@@ -14,7 +15,7 @@ pub async fn retrieve(
     embedding_model: &String,
     body: &Query,
     (filename, content): &(String, Document),
-    po: &PlanOptions,
+    options: &AugmentOptions,
 ) -> SpnlResult {
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))
@@ -24,7 +25,7 @@ pub async fn retrieve(
     let now = Instant::now();
 
     // Maximum number of relevant fragments to consider
-    let max_matches: usize = po.max_aug.unwrap_or(10);
+    let max_matches: usize = options.max_aug.unwrap_or(10);
 
     let window_size = match content {
         Document::Text(_) => 1,
@@ -34,11 +35,11 @@ pub async fn retrieve(
     let table_name = storage::VecDB::sanitize_table_name(
         format!(
             "{}.{embedding_model}.{window_size}.{filename}",
-            po.vecdb_table
+            options.vecdb_table
         )
         .as_str(),
     );
-    let db = storage::VecDB::connect(&po.vecdb_uri, table_name.as_str()).await?;
+    let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
 
     if verbose {
         eprintln!("Embedding question {body}");
