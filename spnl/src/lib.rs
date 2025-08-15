@@ -4,6 +4,10 @@ pub use query::*;
 #[cfg(feature = "run")]
 pub mod run;
 
+// TODO generate feature?
+#[cfg(feature = "run")]
+mod generate;
+
 #[cfg(feature = "rag")]
 mod augment;
 

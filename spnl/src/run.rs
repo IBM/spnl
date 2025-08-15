@@ -1,11 +1,8 @@
-pub mod backend;
-mod generate;
 pub mod plan;
 pub mod result;
 
 use indicatif::MultiProgress;
 
-pub use crate::run::generate::ModelNotFoundError;
 use crate::{Generate, Query, run::result::SpnlResult};
 
 pub struct RunParameters {
@@ -64,7 +61,7 @@ async fn run_subtree(unit: &Query, rp: &RunParameters, m: Option<&MultiProgress>
             accumulate,
         }) => match accumulate {
             None | Some(false) => {
-                crate::run::generate::generate(
+                crate::generate::generate(
                     model.as_str(),
                     &run_subtree(input, rp, m).await?,
                     max_tokens,

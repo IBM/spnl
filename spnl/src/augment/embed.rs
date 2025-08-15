@@ -1,5 +1,5 @@
 use crate::Query;
-use crate::run::backend::openai;
+use crate::generate::backend::openai;
 
 pub enum EmbedData {
     Query(Query),
