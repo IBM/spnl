@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 #[cfg(feature = "run_py")]
-fn handle_run_err(e: crate::SpnlError) -> PyErr {
+fn handle_execute_err(e: crate::SpnlError) -> PyErr {
     pyo3::exceptions::PyOSError::new_err(format!("{e}"))
 }
 
@@ -57,7 +57,7 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
         model_id: None,
         usage: None,
     })
-    .map_err(handle_run_err)
+    .map_err(handle_execute_err)
 }
 
 #[pymodule(name = "spnl")]
