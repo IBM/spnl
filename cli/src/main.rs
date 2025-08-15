@@ -2,7 +2,9 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan, pretty_print};
+use spnl::{
+    AugmentOptions, ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan, pretty_print,
+};
 
 mod args;
 mod builtins;
@@ -18,13 +20,15 @@ async fn main() -> Result<(), SpnlError> {
     };
 
     let plan_options = PlanOptions {
-        max_aug: args.max_aug,
-        vecdb_uri: args.vecdb_uri.clone(),
-        vecdb_table: args
-            .builtin
-            .clone()
-            .map(|builtin| format!("builtin.{builtin:?}"))
-            .unwrap_or_else(|| args.file.clone().unwrap_or("default".to_string())),
+        aug: AugmentOptions {
+            max_aug: args.max_aug,
+            vecdb_uri: args.vecdb_uri.clone(),
+            vecdb_table: args
+                .builtin
+                .clone()
+                .map(|builtin| format!("builtin.{builtin:?}"))
+                .unwrap_or_else(|| args.file.clone().unwrap_or("default".to_string())),
+        },
     };
 
     let time = if args.time {
