@@ -29,7 +29,7 @@ async-recursion = {version = "1.1.1", optional = true }
 duct = { version = "1.0", optional = true }
 fs4 = { version = "0.13.1", optional = true }
 futures = { version = "0.3.31", optional = true }
-indicatif = { version = "0.17.11", optional = true }
+indicatif = { version = "0.18.0", optional = true }
 rustyline = { version = "17.0.0", features = ["with-file-history"], optional = true } 
 tokio = { version = "1.44.1", features = ["io-std"], optional = true }
 tokio-stream = { version = "0.1.17", optional = true }

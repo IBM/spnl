@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.37", features = ["derive"] }
-indicatif = "0.17.11"
+indicatif = "0.18.0"
 lipsum = "0.9.1"
 petname = "2.0.2"
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"] }
