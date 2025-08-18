@@ -60,6 +60,10 @@ pub struct Args {
     #[arg(short = 'x', long, env = "SPNL_RAG_MAX_MATCHES")]
     pub max_aug: Option<usize>,
 
+    /// The RAG indexing scheme
+    #[arg(value_enum, short, long)]
+    pub indexer: Option<spnl::Indexer>,
+
     /// Re-emit the compiled query
     #[arg(short, long, default_value_t = false)]
     pub show_query: bool,
