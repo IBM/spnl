@@ -1,4 +1,4 @@
-use super::layer1::layer1;
+use super::layer1::process_corpora;
 
 /// Index using the RAPTOR algorithm https://github.com/parthsarthi03/raptor
 pub async fn index(
@@ -6,6 +6,8 @@ pub async fn index(
     options: &crate::augment::AugmentOptions,
     m: &indicatif::MultiProgress,
 ) -> anyhow::Result<()> {
-    layer1(a, options, m).await?;
+    // first, index the documents
+    process_corpora(a, options, m).await?;
+
     Ok(())
 }

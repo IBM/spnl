@@ -6,7 +6,10 @@ pub enum EmbedData {
     Vec(Vec<String>),
 }
 
-pub async fn embed(embedding_model: &String, data: EmbedData) -> anyhow::Result<Vec<Vec<f32>>> {
+pub async fn embed(
+    embedding_model: &String,
+    data: EmbedData,
+) -> anyhow::Result<impl Iterator<Item = Vec<f32>>> {
     match embedding_model {
         #[cfg(feature = "ollama")]
         m if m.starts_with("ollama/") => {

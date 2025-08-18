@@ -32,9 +32,12 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
         Query::Cross(v) => Ok(vec![Query::Cross(plan_vec_iter(v, po).await?)]),
 
         #[cfg(feature = "rag")]
-        Query::Augment(a) => Ok(vec![
-            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, &po.aug).await?,
-        ]),
+        Query::Augment(a) => Ok(vec![Query::Plus(
+            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, &po.aug)
+                .await?
+                .map(Query::User)
+                .collect(),
+        )]),
 
         Query::Repeat(Repeat { n, query }) => {
             let q = plan_iter(query, po).await?;

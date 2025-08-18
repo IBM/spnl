@@ -172,7 +172,7 @@ pub async fn embed(
     provider: Provider,
     embedding_model: &str,
     data: &EmbedData,
-) -> anyhow::Result<Vec<Vec<f32>>> {
+) -> anyhow::Result<impl Iterator<Item = Vec<f32>> + use<>> {
     use async_openai::types::CreateEmbeddingRequestArgs;
 
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
@@ -193,6 +193,5 @@ pub async fn embed(
         .await?
         .data
         .into_iter()
-        .map(|e| e.embedding)
-        .collect())
+        .map(|e| e.embedding))
 }

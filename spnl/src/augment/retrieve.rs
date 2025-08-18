@@ -1,9 +1,8 @@
-use futures::future::try_join_all;
+// for .unique()
 use itertools::Itertools;
-use sha2::Digest;
 
 use crate::{
-    Document, Query, SpnlResult,
+    Document, Query,
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
@@ -11,18 +10,20 @@ use crate::{
     },
 };
 
+/// Retrieve relevant
 pub async fn retrieve(
     embedding_model: &String,
     body: &Query,
     (filename, content): &(String, Document),
     options: &AugmentOptions,
-) -> SpnlResult {
+) -> anyhow::Result<impl Iterator<Item = String>> {
+    #[cfg(feature = "rag_deep_debug")]
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))
         .unwrap_or(false);
 
-    use std::time::Instant;
-    let now = Instant::now();
+    #[cfg(feature = "rag_deep_debug")]
+    let now = ::std::time::Instant::now();
 
     // Maximum number of relevant fragments to consider
     let max_matches: usize = options.max_aug.unwrap_or(10);
@@ -41,12 +42,13 @@ pub async fn retrieve(
     );
     let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
 
+    #[cfg(feature = "rag_deep_debug")]
     if verbose {
         eprintln!("Embedding question {body}");
     }
+
     let body_vectors = embed(embedding_model, EmbedData::Query(body.clone()))
         .await?
-        .into_iter()
         .map(|v| {
             if v.len() < 1024 {
                 let mut vv = v.clone();
@@ -55,13 +57,14 @@ pub async fn retrieve(
             } else {
                 v
             }
-        })
-        .collect::<Vec<_>>();
+        });
 
+    #[cfg(feature = "rag_deep_debug")]
     if verbose {
         eprintln!("Matching question to document");
     }
-    let matching_docs = try_join_all(
+
+    let matching_docs = futures::future::try_join_all(
         body_vectors
             .into_iter()
             .map(|v| db.find_similar(v, max_matches)),
@@ -89,7 +92,9 @@ pub async fn retrieve(
     .flatten()
     .unique();
 
+    #[cfg(feature = "rag_deep_debug")]
     if verbose {
+        use sha2::Digest;
         eprintln!(
             "RAGSizes {}",
             matching_docs.clone().map(|doc| doc.len()).join(" ")
@@ -105,14 +110,12 @@ pub async fn retrieve(
                 })
                 .join(" ")
         );
-    }
 
-    let len1 = match content {
-        Document::Text(c) => c.len(),
-        Document::Binary(b) => b.len(),
-    } as f64;
-    let len2 = matching_docs.clone().map(|doc| doc.len()).sum::<usize>() as f64;
-    if verbose {
+        let len1 = match content {
+            Document::Text(c) => c.len(),
+            Document::Binary(b) => b.len(),
+        } as f64;
+        let len2 = matching_docs.clone().map(|doc| doc.len()).sum::<usize>() as f64;
         eprintln!(
             "RAG fragments total_fragments {} relevant_fragments {}",
             match content {
@@ -131,11 +134,12 @@ pub async fn retrieve(
         .into_iter()
         .rev() // reverse so that we can present the most relevant closest to the query (at the end)
         .enumerate()
-        .map(|(idx, doc)| Query::User(format!("Relevant Document {idx}: {doc}")))
-        .collect();
+        .map(|(idx, doc)| format!("Relevant Document {idx}: {doc}"));
 
+    #[cfg(feature = "rag_deep_debug")]
     if verbose {
         eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());
     }
-    Ok(Query::Plus(d))
+
+    Ok(d)
 }
