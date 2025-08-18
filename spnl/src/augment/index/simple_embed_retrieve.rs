@@ -1,4 +1,4 @@
-use super::layer1::layer1;
+use super::layer1::process_corpora;
 
 /// Index by embedding only
 pub async fn index(
@@ -6,5 +6,5 @@ pub async fn index(
     options: &crate::augment::AugmentOptions,
     m: &indicatif::MultiProgress,
 ) -> anyhow::Result<()> {
-    layer1(a, options, m).await
+    process_corpora(a, options, m).await
 }

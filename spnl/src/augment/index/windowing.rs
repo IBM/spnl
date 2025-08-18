@@ -1,7 +1,7 @@
 /// This fragments and windows the lines in the given PDF content. For
 /// example if bytes="a\nb\nc\nd" and window_width=2, this will
 /// produce ["a\nb", "b\nc", "c\nd"]
-pub fn windowed_pdf(bytes: &[u8], window_width: usize) -> anyhow::Result<Vec<String>> {
+pub fn pdf(bytes: &[u8], window_width: usize) -> anyhow::Result<Vec<String>> {
     Ok(pdf_extract::extract_text_from_mem(bytes)?
         .lines()
         .filter(|s| !s.is_empty())
@@ -14,7 +14,7 @@ pub fn windowed_pdf(bytes: &[u8], window_width: usize) -> anyhow::Result<Vec<Str
 
 /// This treats every line of text as a separate document, with no
 /// need for windowing or sub-fragmentation.
-pub fn windowed_text(s: &str) -> anyhow::Result<Vec<String>> {
+pub fn text(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(s.lines().map(|s| s.to_string()).collect())
 }
 
@@ -25,7 +25,7 @@ struct JsonlText {
 
 /// This treats every jsonl line as a separate document, with no need
 /// for windowing or sub-fragmentation.
-pub fn windowed_jsonl(s: &str) -> anyhow::Result<Vec<String>> {
+pub fn jsonl(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(serde_json::Deserializer::from_str(s)
         .into_iter::<JsonlText>()
         .filter_map(|line| match line {
