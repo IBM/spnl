@@ -101,26 +101,26 @@ fn encode_plus_part(
     }
 }
 
-fn extract_up_to_plus(q: &Query) -> Vec<String> {
+fn extract_up_to_plus(q: &Query) -> Box<dyn Iterator<Item = String> + '_> {
     match q {
-        Query::Cross(v) => v.iter().flat_map(extract_up_to_plus).collect(),
-        Query::Plus(_) => vec![],
-        Query::User(m) => vec![user(m)],
-        Query::System(m) => vec![system(m)],
-        _ => vec![],
+        Query::Cross(v) => Box::new(v.iter().flat_map(extract_up_to_plus)),
+        Query::Plus(_) => Box::new(std::iter::empty()),
+        Query::User(m) => Box::new(std::iter::once(user(m))),
+        Query::System(m) => Box::new(std::iter::once(system(m))),
+        _ => Box::new(std::iter::empty()),
     }
 }
 
-fn extract_parts(q: &Query, in_plus: bool) -> Vec<String> {
+fn extract_parts(q: &Query, in_plus: bool) -> Box<dyn Iterator<Item = String> + '_> {
     match (q, in_plus) {
-        (Query::Cross(v), _) => v.iter().flat_map(|qq| extract_parts(qq, in_plus)).collect(),
-        (Query::Plus(v), _) => v
-            .iter()
-            .map(|qq| extract_parts(qq, true).join(""))
-            .collect(),
-        (Query::User(m), true) => vec![user(m)],
-        (Query::System(m), true) => vec![system(m)],
-        _ => vec![],
+        (Query::Cross(v), _) => Box::new(v.iter().flat_map(move |qq| extract_parts(qq, in_plus))),
+        (Query::Plus(v), _) => Box::new(
+            v.iter()
+                .map(|qq| extract_parts(qq, true).collect::<Vec<_>>().join("")),
+        ),
+        (Query::User(m), true) => Box::new(std::iter::once(user(m))),
+        (Query::System(m), true) => Box::new(std::iter::once(system(m))),
+        _ => Box::new(std::iter::empty()),
     }
 }
 
@@ -143,7 +143,6 @@ fn tokenize_part(
             .collect::<Result<_, _>>(),
         Query::Plus(_) => {
             let parts = extract_parts(input, false)
-                .into_iter()
                 .map(|part| encode_plus_part(&part, tok, pad_token, plus_token, block_size))
                 .flat_map(|result| match result {
                     Ok(vec) => vec.into_iter().map(Ok).collect(),
@@ -302,14 +301,12 @@ pub fn tokenize_prepare(
             );
 
             let parts = extract_parts(&input, false)
-                .into_iter()
                 .map(|part| encode_plus_part(&part, &tok, pad_token, plus_token, block_size));
 
             if collect_prefix_too {
                 parts
                     .chain(
                         extract_up_to_plus(&input)
-                            .into_iter()
                             .map(|part| encode_nonplus_part(&part, &tok, pad_token, block_size)),
                     )
                     .collect::<Result<_, _>>()
