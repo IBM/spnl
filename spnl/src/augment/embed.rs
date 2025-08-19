@@ -2,6 +2,7 @@ use crate::Query;
 use crate::generate::backend::openai;
 
 pub enum EmbedData {
+    String(String),
     Query(Query),
     Vec(Vec<String>),
 }

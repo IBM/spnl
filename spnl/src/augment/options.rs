@@ -23,4 +23,8 @@ pub struct AugmentOptions {
     /// Scheme to use for indexing the corpus
     #[builder(default)]
     pub indexer: Indexer,
+
+    /// Scheme to use for indexing the corpus
+    #[builder(default)]
+    pub verbose: bool,
 }

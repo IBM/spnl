@@ -5,7 +5,7 @@ use async_openai::types::{
 };
 
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
@@ -65,23 +65,28 @@ pub async fn generate(
         }
     } */
 
+    // Extract a max tokens
+    let mt = max_tokens.map(|mt| mt as u32).unwrap_or(10000);
+
     let request = CreateChatCompletionRequestArgs::default()
         .model(model)
         .messages(input_messages)
         .temperature(temp.unwrap_or_default())
-        .max_completion_tokens(if let Some(max_tokens) = max_tokens {
-            *max_tokens as u32
-        } else {
-            10000
-        })
+        .max_tokens(mt) // yes, this is deprecated, but... for ollama https://github.com/ollama/ollama/issues/7125
+        .max_completion_tokens(mt)
         .build()?;
 
+    let style = ProgressStyle::with_template(
+        "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
+    )?;
     let mut pb = m.map(|m| {
-        m.add(if let Some(max_tokens) = max_tokens {
-            ProgressBar::new(*max_tokens as u64)
-        } else {
-            ProgressBar::no_length()
-        })
+        m.add(
+            max_tokens
+                .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
+                .unwrap_or_else(ProgressBar::no_length)
+                .with_style(style)
+                .with_message("Generating"),
+        )
     });
 
     // println!("A {:?}", client.models().list().await?);
@@ -178,6 +183,7 @@ pub async fn embed(
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
 
     let docs = match data {
+        EmbedData::String(s) => &vec![s.clone()],
         EmbedData::Vec(v) => v,
         EmbedData::Query(u) => &contentify(u),
     };

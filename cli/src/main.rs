@@ -22,6 +22,7 @@ async fn main() -> Result<(), SpnlError> {
 
     let plan_options = PlanOptions {
         aug: AugmentOptionsBuilder::default()
+            .verbose(args.verbose)
             .max_aug(args.max_aug)
             .vecdb_uri(args.vecdb_uri.clone())
             .vecdb_table(

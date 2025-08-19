@@ -2,9 +2,10 @@ use super::layer1::process_corpora;
 
 /// Index by embedding only
 pub async fn index(
-    a: &[crate::Augment],
+    a: &[(String, crate::Augment)], // (enclosing_model, Augment)
     options: &crate::augment::AugmentOptions,
     m: &indicatif::MultiProgress,
 ) -> anyhow::Result<()> {
-    process_corpora(a, options, m).await
+    let _ = process_corpora(a, options, m).await?;
+    Ok(())
 }
