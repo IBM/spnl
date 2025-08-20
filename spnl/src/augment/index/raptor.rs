@@ -1,5 +1,6 @@
+use futures::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use itertools::Itertools; // for .unique()
+use itertools::Itertools; // for .unique() // for .buffer_unordered() and try_concat(), respectively
 
 use super::layer1::{Fragments, process_corpora};
 use crate::augment::storage;
@@ -12,18 +13,23 @@ use crate::{
     generate::generate,
 };
 
+// TODO how do we determine the best concurrency limit?
+const CONCURRENCY_LIMIT: usize = 32;
+
 /// Index using the RAPTOR algorithm https://github.com/parthsarthi03/raptor
 pub async fn index(
     a: &[(String, Augment)], // (enclosing_model, Augment)
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
-    futures::future::try_join_all(
-        process_corpora(a, options, m) // this will generate one Fragments struct per corpus
-            .await?
-            .map(|f| cross_index(f, options, m)), // then iterate over each Fragments struct to "cross index" it
-    )
-    .await?;
+    let futures = process_corpora(a, options, m) // this will generate one Fragments struct per corpus
+        .await?
+        .map(|f| cross_index(f, options, m)); // then iterate over each Fragments struct to "cross index" it
+
+    // Create a buffered stream that will execute up to N futures in parallel
+    // (without preserving the order of the results)
+    let mut stream = futures::stream::iter(futures).buffer_unordered(CONCURRENCY_LIMIT);
+    while (stream.try_next().await?).is_some() {} // TODO there must be a better way of doing this?
 
     Ok(())
 }
@@ -59,7 +65,7 @@ async fn cross_index(
     );
     pb.tick(); // to get it to show up right away
 
-    futures::future::try_join_all(fragments.into_iter().enumerate().map(|(idx, f)| {
+    let futures = fragments.into_iter().enumerate().map(|(idx, f)| {
         cross_index_fragment(
             idx,
             file_base_name.to_string(),
@@ -71,8 +77,12 @@ async fn cross_index(
             &pb,
             m,
         )
-    }))
-    .await?;
+    });
+
+    // Create a buffered stream that will execute up to N futures in parallel
+    // (without preserving the order of the results)
+    let mut stream = futures::stream::iter(futures).buffer_unordered(CONCURRENCY_LIMIT);
+    while (stream.try_next().await?).is_some() {} // TODO there must be a better way of doing this?
 
     Ok(())
 }
