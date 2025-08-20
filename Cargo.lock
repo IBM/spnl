@@ -6143,6 +6143,7 @@ dependencies = [
  "pdf-extract",
  "ptree",
  "pyo3",
+ "regex",
  "reqwest",
  "rustyline",
  "serde",

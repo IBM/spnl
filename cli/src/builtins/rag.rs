@@ -23,11 +23,9 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
     };
 
     let system_prompt = r#"
-Respond with either "UNANSWERABLE" or "ANSWERABLE" depending on
-whether or not the given documents are sufficient to answer the
-question and cite the Relevant Documents used to answer the
-question. Do not rely on your pre-trained knowledge.
-"#;
+Your answer questions using this response format
+
+**Relevant Documents**: a, b, c (where a, b, and c are Relevant Documents that answer the question)"#;
 
     Ok(spnl::spnl!(
         g model

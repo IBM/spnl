@@ -35,8 +35,8 @@ pub async fn retrieve(
 
     let table_name = storage::VecDB::sanitize_table_name(
         format!(
-            "{}.{embedding_model}.{window_size}.{filename}",
-            options.vecdb_table
+            "{}.{embedding_model}.{window_size}.{filename}.{:?}",
+            options.vecdb_table, options.indexer
         )
         .as_str(),
     );
@@ -133,8 +133,7 @@ pub async fn retrieve(
     let d = matching_docs
         .into_iter()
         .rev() // reverse so that we can present the most relevant closest to the query (at the end)
-        .enumerate()
-        .map(|(idx, doc)| format!("Relevant Document {idx}: {doc}"));
+        .map(|doc| format!("Relevant Document {doc}"));
 
     #[cfg(feature = "rag_deep_debug")]
     if verbose {

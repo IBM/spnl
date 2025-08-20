@@ -60,10 +60,14 @@ async fn process_document(
         Document::Binary(_) => 8,
     };
 
+    let file_base_name = ::std::path::Path::new(filename)
+        .file_name()
+        .ok_or(anyhow!("Could not determine base name"))?
+        .display();
     let table_name = storage::VecDB::sanitize_table_name(
         format!(
-            "{}.{}.{window_size}.{filename}",
-            options.vecdb_table, a.embedding_model
+            "{}.{}.{window_size}.{filename}.{:?}",
+            options.vecdb_table, a.embedding_model, options.indexer,
         )
         .as_str(),
     );
@@ -89,13 +93,7 @@ async fn process_document(
                 .with_style(ProgressStyle::with_template(
                     "{msg} {wide_bar:.cyan/blue} {pos:>7}/{len:7} [{elapsed_precise}]",
                 )?)
-                .with_message(format!(
-                    "Indexing {}",
-                    ::std::path::Path::new(filename)
-                        .file_name()
-                        .ok_or(anyhow!("Could not determine base name"))?
-                        .display()
-                )),
+                .with_message(format!("Indexing {}", file_base_name,)),
         );
 
         // Needed to render the progress bar immediately (it will show
@@ -131,13 +129,25 @@ async fn process_document(
         let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
 
         if options.verbose {
-            eprintln!("Inserting document embeddings {}", vector_embeddings.len());
+            m.println(format!(
+                "Inserting document embeddings {}",
+                vector_embeddings.len()
+            ))?;
         }
 
         // Recall that `fragments` and `vector_embeddings` have been
         // constructed as parallel arrays.
-        db.add_vector(fragments.as_slice(), vector_embeddings.clone(), 1024)
-            .await?;
+        db.add_vector(
+            fragments
+                .iter()
+                .enumerate()
+                .map(|(idx, fragment)| format!("@base-{}-{idx}: {fragment}", file_base_name))
+                .collect::<Vec<_>>()
+                .as_slice(),
+            vector_embeddings.clone(),
+            1024,
+        )
+        .await?;
 
         // mark this filename as done
         ::std::fs::OpenOptions::new()

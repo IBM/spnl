@@ -45,31 +45,43 @@ async fn cross_index(
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
+    let file_base_name = ::std::path::Path::new(&filename)
+        .file_name()
+        .ok_or(anyhow::anyhow!("Could not determine base name"))?
+        .display();
     let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
     let pb = m.add(
         ProgressBar::new(fragments.len() as u64)
             .with_style(ProgressStyle::with_template(
                 "{msg} {wide_bar:.gray/green} {pos:>7}/{len:7} [{elapsed_precise}]",
             )?)
-            .with_message(format!(
-                "Cross-indexing {}",
-                ::std::path::Path::new(&filename)
-                    .file_name()
-                    .ok_or(anyhow::anyhow!("Could not determine base name"))?
-                    .display()
-            )),
+            .with_message(format!("Cross-indexing {}", file_base_name,)),
     );
-    pb.inc(0); // to get it to show up right away
+    pb.tick(); // to get it to show up right away
 
-    futures::future::try_join_all(fragments.into_iter().map(|f| {
-        cross_index_fragment(f, &embedding_model, &enclosing_model, &db, options, &pb, m)
+    futures::future::try_join_all(fragments.into_iter().enumerate().map(|(idx, f)| {
+        cross_index_fragment(
+            idx,
+            file_base_name.to_string(),
+            f,
+            &embedding_model,
+            &enclosing_model,
+            &db,
+            options,
+            &pb,
+            m,
+        )
     }))
     .await?;
 
     Ok(())
 }
 
+// TODO fix this allow
+#[allow(clippy::too_many_arguments)]
 async fn cross_index_fragment(
+    idx: usize,
+    file_base_name: String,
     fragment: (String, Vec<f32>),
     embedding_model: &String,
     enclosing_model: &str,
@@ -80,6 +92,8 @@ async fn cross_index_fragment(
 ) -> anyhow::Result<()> {
     // Maximum number of relevant fragments to consider
     let max_matches: usize = options.max_aug.unwrap_or(10);
+
+    let re = ::regex::Regex::new("^@base.+: ")?;
 
     // TODO, this shares logic with retrieve.rs
     let input = db
@@ -105,8 +119,8 @@ async fn cross_index_fragment(
         })
         .flatten()
         .unique()
-        .map(|s| Query::User(format!("Detail Document: {s}")))
-        .chain([Query::User(format!("Main Document: {}", fragment.0))])
+        .map(|s| Query::User(re.replace(&s, "").to_string()))
+        //.chain([Query::User(format!("Main Document: {}", fragment.0))])
         .collect::<Vec<_>>();
 
     let num_fragments = input.len() - 1;
@@ -118,13 +132,19 @@ async fn cross_index_fragment(
         })
         .sum::<usize>();
 
-    let max_tokens = &Some(100); // TODO
+    // TODO: hard-coded
+    let max_tokens = &Some(100);
     let temp = &Some(0.2);
 
     let summary = match generate(
         enclosing_model,
         &Query::Cross(vec![
-            Query::System("Your job is to extract term definitions from Detail Documents in order to create very short summaries that substantiate the Main Document".into()),
+            //Query::System("You create concise summaries by extracting key concepts and term definitions".into()),
+            Query::System("You are a helpful assistant.".into()), // copied from raptor python code
+            Query::User(
+                "Write a summary of the following, including as many key details as possible:"
+                    .into(),
+            ), // copied from raptor python code
             Query::Plus(input),
         ]),
         max_tokens,
@@ -132,16 +152,17 @@ async fn cross_index_fragment(
         Some(m),
         false,
     )
-        .await? {
-            Query::User(s) => s,
-            _ => "".into(),
-        };
+    .await?
+    {
+        Query::User(s) => s,
+        _ => "".into(),
+    };
 
     if options.verbose {
         let summarized_length = summary.len();
-        eprintln!(
-            "Raptor summary of {num_fragments} fragments {original_length} -> {summarized_length}: '{summary}'"
-        );
+        m.println(
+            format!("Raptor summary fragments={num_fragments} original={original_length} summarized={summarized_length} \x1b[2m{summary}")
+        )?;
     }
 
     // Now embed and then insert the summary into the vector db (TODO?
@@ -149,7 +170,12 @@ async fn cross_index_fragment(
     let vector_embedding = embed(embedding_model, EmbedData::String(summary.clone()))
         .await?
         .collect();
-    db.add_vector(&[summary], vector_embedding, 1024).await?;
+    db.add_vector(
+        &[format!("@raptor-{file_base_name}-{idx}: {summary}")],
+        vector_embedding,
+        1024,
+    )
+    .await?;
 
     pb.inc(1);
     Ok(())

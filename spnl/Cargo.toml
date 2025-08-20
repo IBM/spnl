@@ -13,7 +13,7 @@ gemini = ["openai"]
 openssl-vendored = ["dep:openssl"]
 pull = ["dep:duct","dep:fs4","dep:reqwest"]
 pypi = ["tok","dep:pyo3","pyo3/extension-module"]
-rag = ["run","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arrow-array","dep:itertools","dep:pdf-extract","dep:async-recursion"]
+rag = ["run","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arrow-array","dep:itertools","dep:pdf-extract","dep:async-recursion","dep:regex"]
 rag_deep_debug = []
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
 run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini","dep:tokio","tokio/rt-multi-thread"]
@@ -53,3 +53,4 @@ openssl = { version = "0.10", features = ["vendored"], optional = true }
 thiserror = "2.0.14"
 atoi = "2.0.0"
 clap = { version = "4.5.45", features = ["env"] }
+regex = { version = "1.11.1", optional = true }
