@@ -167,11 +167,9 @@ async fn cross_index_fragment(
 
     // Now embed and then insert the summary into the vector db (TODO?
     // batch these up?)
-    let vector_embedding = embed(embedding_model, EmbedData::String(summary.clone()))
-        .await?
-        .collect();
+    let vector_embedding = embed(embedding_model, EmbedData::String(summary.clone())).await?;
     db.add_vector(
-        &[format!("@raptor-{file_base_name}-{idx}: {summary}")],
+        [format!("@raptor-{file_base_name}-{idx}: {summary}")],
         vector_embedding,
         1024,
     )

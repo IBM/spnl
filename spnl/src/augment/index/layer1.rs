@@ -141,9 +141,7 @@ async fn process_document(
             fragments
                 .iter()
                 .enumerate()
-                .map(|(idx, fragment)| format!("@base-{}-{idx}: {fragment}", file_base_name))
-                .collect::<Vec<_>>()
-                .as_slice(),
+                .map(|(idx, fragment)| format!("@base-{}-{idx}: {fragment}", file_base_name)),
             vector_embeddings.clone(),
             1024,
         )

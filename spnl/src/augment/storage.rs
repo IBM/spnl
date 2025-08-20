@@ -74,12 +74,16 @@ impl VecDB {
         ]))
     }
 
-    pub async fn add_vector(
+    pub async fn add_vector<I1, I2>(
         &self,
-        filenames: &[String],
-        vectors: Vec<Vec<f32>>,
+        filenames: I1,
+        vectors: I2,
         vec_dim: i32,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        I1: IntoIterator<Item = String>,
+        I2: IntoIterator<Item = Vec<f32>>,
+    {
         let schema = self.default_table.schema().await?;
         let key_array = StringArray::from_iter_values(filenames);
         let vectors_array = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
