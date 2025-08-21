@@ -129,8 +129,8 @@ async fn cross_index_fragment(
         })
         .flatten()
         .unique()
+        .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
         .map(|s| Query::User(re.replace(&s, "").to_string()))
-        //.chain([Query::User(format!("Main Document: {}", fragment.0))])
         .collect::<Vec<_>>();
 
     let num_fragments = input.len() - 1;
