@@ -1,6 +1,5 @@
 use futures::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use itertools::Itertools; // for .unique() // for .buffer_unordered() and try_concat(), respectively
 
 use super::layer1::{Fragments, process_corpora};
 use crate::augment::storage;
@@ -107,28 +106,8 @@ async fn cross_index_fragment(
 
     // TODO, this shares logic with retrieve.rs
     let input = db
-        .find_similar(fragment.1, max_matches)
+        .find_similar_keys("filename", fragment.1, max_matches)
         .await?
-        .into_iter()
-        .filter_map(|record_batch| {
-            if let Some(files_array) = record_batch.column_by_name("filename")
-                && let Some(files) = files_array
-                    .as_any()
-                    .downcast_ref::<arrow_array::StringArray>()
-            {
-                // Here are the fragments that are near to the given fragment
-                Some(
-                    files
-                        .iter()
-                        .filter_map(|b| b.map(|b| b.to_string()))
-                        .collect::<Vec<_>>(),
-                )
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .unique()
         .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
         .map(|s| Query::User(re.replace(&s, "").to_string()))
         .collect::<Vec<_>>();

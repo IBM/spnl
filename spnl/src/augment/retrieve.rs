@@ -64,6 +64,10 @@ pub async fn retrieve(
         eprintln!("Matching question to document");
     }
 
+    // TODO find a way to use db.find_similar_keys() to avoid
+    // replicating the filter_map logic below. Blocker: `db` is shared
+    // across the asyncs because find_similar_keys() returns an
+    // Iterator whereas find_similar() returns a vector.
     let matching_docs = futures::future::try_join_all(
         body_vectors
             .into_iter()

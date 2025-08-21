@@ -42,6 +42,38 @@ impl VecDB {
         })
     }
 
+    pub async fn find_similar_keys(
+        &self,
+        key: &str,
+        vector: Vec<f32>,
+        n: usize,
+    ) -> anyhow::Result<impl DoubleEndedIterator<Item = String>> {
+        use itertools::Itertools; // for .unique()
+        Ok(self
+            .find_similar(vector, n)
+            .await?
+            .into_iter()
+            .filter_map(|record_batch| {
+                if let Some(files_array) = record_batch.column_by_name(key)
+                    && let Some(files) = files_array
+                        .as_any()
+                        .downcast_ref::<arrow_array::StringArray>()
+                {
+                    return Some(
+                        files
+                            .iter()
+                            .filter_map(|b| b.map(|b| b.to_string()))
+                            .collect::<Vec<String>>(),
+                    );
+                }
+
+                // no matching docs for this body vector
+                None
+            })
+            .flatten()
+            .unique())
+    }
+
     pub async fn find_similar(
         &self,
         vector: Vec<f32>,
