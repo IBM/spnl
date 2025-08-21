@@ -8,9 +8,11 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
     // The question to augment. We use a default value that pertains
     // to the Prompt Declaration Language (PDL)
     // documentation. https://github.com/IBM/prompt-declaration-language
-    let prompt = args
-        .prompt
-        .unwrap_or_else(|| "Does PDL have a contribute keyword?".into());
+    let prompt = format!(
+        "Question: {}",
+        args.prompt
+            .unwrap_or_else(|| "Does PDL have a contribute keyword?".into())
+    );
 
     // The corpus to mine for augmentations.
     let docs = if let Some(docs) = args.document {
@@ -23,9 +25,16 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
     };
 
     let system_prompt = r#"
-Your answer questions using this response format
+Your answer questions using information from the given Relevant Documents, and cite them. For example:
 
-**Relevant Documents**: a, b, c (where a, b, and c are Relevant Documents that answer the question)"#;
+Question: How do trees grow?
+Answer: Via carbon dioxide.
+Citations: @base-foo-37, @raptor-bar-52
+
+Question: How does hair grow?
+Answer: Slowly.
+Citations: @base-baz-2, @raptor-glam-8
+"#;
 
     Ok(spnl::spnl!(
         g model
