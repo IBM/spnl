@@ -10,7 +10,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
 
-use crate::{Generate, Query, SpnlResult};
+use crate::{Query, SpnlResult};
 
 #[cfg(feature = "rag")]
 use crate::augment::embed::EmbedData;
@@ -116,17 +116,7 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    if m.is_some() {
-        Ok(Query::User(response_string))
-    } else {
-        Ok(Query::Generate(Generate {
-            model: format!("openai/{model}"),
-            input: Box::new(Query::User(response_string)),
-            max_tokens: *max_tokens,
-            temperature: *temp,
-            accumulate: None,
-        }))
-    }
+    Ok(Query::Assistant(response_string))
 }
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {

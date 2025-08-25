@@ -38,17 +38,16 @@ pub async fn execute(query: &Query, rp: &ExecuteOptions) -> SpnlResult {
 }
 
 #[async_recursion::async_recursion]
-async fn run_subtree(unit: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
+async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
     #[cfg(feature = "pull")]
-    crate::pull::pull_if_needed(unit).await?;
+    crate::pull::pull_if_needed(query).await?;
 
-    match unit {
+    match query {
         Query::Print(m) => {
             println!("{m}");
-            Ok(Query::Print(m.clone()))
+            Ok(query.clone())
         }
-        Query::User(s) => Ok(Query::User(s.clone())),
-        Query::System(s) => Ok(Query::System(s.clone())),
+        Query::Assistant(_) | Query::User(_) | Query::System(_) => Ok(query.clone()),
 
         Query::Cross(u) => cross(u, rp, m).await,
         Query::Plus(u) => plus(u, rp).await,

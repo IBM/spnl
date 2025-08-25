@@ -38,6 +38,9 @@ pub struct Augment {
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Query {
+    /// Assistant output
+    Assistant(String),
+
     /// User prompt
     User(String),
 
@@ -98,6 +101,8 @@ impl ptree::TreeItem for Query {
             f,
             "{}",
             match self {
+                Query::Assistant(s) =>
+                    style.paint(format!("\x1b[32mAssistant\x1b[0m {}", trim(s, 700))),
                 Query::User(s) => style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
                 Query::System(s) => style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
@@ -118,7 +123,11 @@ impl ptree::TreeItem for Query {
     }
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
-            Query::Ask(_) | Query::User(_) | Query::System(_) | Query::Print(_) => vec![],
+            Query::Ask(_)
+            | Query::Assistant(_)
+            | Query::User(_)
+            | Query::System(_)
+            | Query::Print(_) => vec![],
             Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Repeat(Repeat { query, .. }) => vec![*query.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
