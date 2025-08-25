@@ -28,8 +28,8 @@ pub struct Fragments {
     /// The model to be used to generate over these fragments
     pub embedding_model: String,
 
-    /// A list of pairs (fragment, vector_embedding)
-    pub fragments: Vec<(String, Vec<f32>)>,
+    /// A list of vector embeddings
+    pub fragments: Vec<Vec<f32>>,
 }
 
 /// Fragment, embed, and index the corpora implied by the given
@@ -159,10 +159,7 @@ async fn process_document(
             table_name,
             enclosing_model: enclosing_model.clone(),
             embedding_model: a.embedding_model.clone(),
-            fragments: fragments
-                .into_iter()
-                .zip(vector_embeddings.into_iter())
-                .collect(),
+            fragments: vector_embeddings,
         }));
     }
 

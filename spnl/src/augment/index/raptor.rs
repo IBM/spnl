@@ -99,7 +99,7 @@ async fn cross_index(
 async fn cross_index_fragment(
     idx: usize,
     file_base_name: String,
-    fragment: (String, Vec<f32>),
+    fragment: Vec<f32>,
     embedding_model: &String,
     enclosing_model: &str,
     db: &storage::VecDB,
@@ -114,9 +114,9 @@ async fn cross_index_fragment(
 
     // TODO, this shares logic with retrieve.rs
     let input = db
-        .find_similar_keys("filename", fragment.1, max_matches, None, None)
+        .find_similar_keys("filename", fragment, max_matches, None, None)
         .await?
-        .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
+        // .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
         .map(|s| Query::User(re.replace(&s, "").to_string()))
         .collect::<Vec<_>>();
 
