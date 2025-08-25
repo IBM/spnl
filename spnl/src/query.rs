@@ -63,8 +63,8 @@ pub enum Query {
     /// Ask with a given message
     Ask(String),
 
-    /// (embedding_model, question, docs): Incorporate information relevant to the
-    /// question gathered from the given docs
+    /// Incorporate information relevant to the question gathered from
+    /// the given docs
     #[cfg(feature = "rag")]
     Augment(Augment),
 }
