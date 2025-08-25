@@ -58,8 +58,6 @@ async fn cross_index(
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
-    let dbf = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str());
-
     let file_base_name = ::std::path::Path::new(&filename)
         .file_name()
         .ok_or(anyhow::anyhow!("Could not determine base name"))?
@@ -73,7 +71,7 @@ async fn cross_index(
     );
     pb.tick(); // to get it to show up right away
 
-    let db = dbf.await?;
+    let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
     let futures = fragments.into_iter().enumerate().map(|(idx, f)| {
         cross_index_fragment(
             idx,
