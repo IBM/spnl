@@ -71,7 +71,7 @@ pub async fn retrieve(
     let matching_docs = futures::future::try_join_all(
         body_vectors
             .into_iter()
-            .map(|v| db.find_similar(v, max_matches)),
+            .map(|v| db.find_similar(v, max_matches, None, None)),
     )
     .await?
     .into_iter()

@@ -12,22 +12,30 @@ use crate::{
     generate::generate,
 };
 
+/// Maximum concurrent calls to llm generate for summarization.
 // TODO how do we determine the best concurrency limit?
 const CONCURRENCY_LIMIT: usize = 32;
 
 /// Index using the RAPTOR algorithm https://github.com/parthsarthi03/raptor
 pub async fn index(
+    query: &Query,
     a: &[(String, Augment)], // (enclosing_model, Augment)
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
-    let futures = process_corpora(a, options, m) // this will generate one Fragments struct per corpus
+    // TODO if we really want the pulls to be done in parallel with
+    // the process_corpora, we'll need something fancier...
+    #[cfg(feature = "pull")]
+    crate::pull::pull_if_needed(query).await?;
+
+    // This will generate one Fragments struct per corpus, and then iterate over each Fragments struct to "cross index" it
+    let cross_index_futures = process_corpora(a, options, m)
         .await?
-        .map(|f| cross_index(f, options, m)); // then iterate over each Fragments struct to "cross index" it
+        .map(|f| cross_index(f, options, m));
 
     // Create a buffered stream that will execute up to N futures in parallel
     // (without preserving the order of the results)
-    let mut stream = futures::stream::iter(futures).buffer_unordered(CONCURRENCY_LIMIT);
+    let mut stream = futures::stream::iter(cross_index_futures).buffer_unordered(CONCURRENCY_LIMIT);
     while (stream.try_next().await?).is_some() {} // TODO there must be a better way of doing this?
 
     Ok(())
@@ -50,11 +58,12 @@ async fn cross_index(
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
+    let dbf = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str());
+
     let file_base_name = ::std::path::Path::new(&filename)
         .file_name()
         .ok_or(anyhow::anyhow!("Could not determine base name"))?
         .display();
-    let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
     let pb = m.add(
         ProgressBar::new(fragments.len() as u64)
             .with_style(ProgressStyle::with_template(
@@ -64,6 +73,7 @@ async fn cross_index(
     );
     pb.tick(); // to get it to show up right away
 
+    let db = dbf.await?;
     let futures = fragments.into_iter().enumerate().map(|(idx, f)| {
         cross_index_fragment(
             idx,
@@ -106,7 +116,7 @@ async fn cross_index_fragment(
 
     // TODO, this shares logic with retrieve.rs
     let input = db
-        .find_similar_keys("filename", fragment.1, max_matches)
+        .find_similar_keys("filename", fragment.1, max_matches, None, None)
         .await?
         .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
         .map(|s| Query::User(re.replace(&s, "").to_string()))

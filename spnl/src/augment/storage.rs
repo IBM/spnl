@@ -47,10 +47,12 @@ impl VecDB {
         key: &str,
         vector: Vec<f32>,
         n: usize,
+        range_min: Option<f32>,
+        range_max: Option<f32>,
     ) -> anyhow::Result<impl DoubleEndedIterator<Item = String>> {
         use itertools::Itertools; // for .unique()
         Ok(self
-            .find_similar(vector, n)
+            .find_similar(vector, n, range_min, range_max)
             .await?
             .into_iter()
             .filter_map(|record_batch| {
@@ -78,12 +80,14 @@ impl VecDB {
         &self,
         vector: Vec<f32>,
         n: usize,
+        range_min: Option<f32>,
+        range_max: Option<f32>,
     ) -> anyhow::Result<Vec<RecordBatch>> {
         Ok(self
             .default_table
             .query()
             .nearest_to(vector)?
-            .distance_range(None, Some(1.0))
+            .distance_range(range_min, range_max.or(Some(1.0)))
             .limit(n)
             .execute()
             .await?

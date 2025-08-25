@@ -3,20 +3,26 @@ use fs4::fs_std::FileExt;
 
 use crate::{Generate, Query};
 
-/// Pull models (in parallel) from the program in the given filepath.
+/// Pull models (in parallel, if needed) used by the given query
 pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
     futures::future::try_join_all(
         extract_models(query)
             .iter()
-            .filter_map(|model| match model {
-                m if model.starts_with("ollama/") => Some(ollama_pull_if_needed(&m[7..])),
-                m if model.starts_with("ollama_chat/") => Some(ollama_pull_if_needed(&m[12..])),
-                _ => None,
-            }),
+            .map(String::as_str)
+            .map(pull_model_if_needed),
     )
     .await?;
 
     Ok(())
+}
+
+/// Pull the given model, if needed
+async fn pull_model_if_needed(model: &str) -> anyhow::Result<()> {
+    match model {
+        m if model.starts_with("ollama/") => ollama_pull_if_needed(&m[7..]).await,
+        m if model.starts_with("ollama_chat/") => ollama_pull_if_needed(&m[12..]).await,
+        _ => Ok(()),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -43,17 +49,19 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
     if !ollama_exists(model).await? {
         let path = ::std::env::temp_dir().join(format!("ollama-pull-{model}"));
         let f = ::std::fs::File::create(&path)?;
-        f.lock_exclusive()?;
-
-        let pull_res = cmd!("ollama", "pull", model)
-            .stdout_to_stderr()
-            .run()
-            .map(|_| ());
-        FileExt::unlock(&f)?;
-        Ok(pull_res?)
-    } else {
-        Ok(())
+        /*f.lock_exclusive()?;
+        if !ollama_exists(model).await?*/
+        {
+            let pull_res = cmd!("ollama", "pull", model)
+                .stdout_to_stderr()
+                .run()
+                .map(|_| ());
+            FileExt::unlock(&f)?;
+            return Ok(pull_res?);
+        }
     }
+
+    Ok(())
 }
 
 /// Extract models referenced by the query
