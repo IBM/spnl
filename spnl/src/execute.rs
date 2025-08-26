@@ -43,10 +43,6 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
     crate::pull::pull_if_needed(query).await?;
 
     match query {
-        Query::Print(m) => {
-            println!("{m}");
-            Ok(query.clone())
-        }
         Query::Assistant(_) | Query::User(_) | Query::System(_) => Ok(query.clone()),
 
         Query::Cross(u) => cross(u, rp, m).await,
@@ -56,40 +52,27 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
             input,
             max_tokens,
             temperature,
-            accumulate,
-        }) => match accumulate {
-            None | Some(false) => {
-                crate::generate::generate(
-                    model.as_str(),
-                    &run_subtree(input, rp, m).await?,
-                    max_tokens,
-                    temperature,
-                    m,
-                    rp.prepare.unwrap_or_default(),
-                )
-                .await
-            }
-            Some(true) => {
-                let mut accum = match &**input {
-                    Query::Cross(v) => v.clone(),
-                    _ => vec![*input.clone()],
-                };
-                loop {
-                    let program = Query::Generate(Generate {
-                        model: model.clone(),
-                        input: Box::new(Query::Cross(accum.clone())),
-                        max_tokens: *max_tokens,
-                        temperature: *temperature,
-                        accumulate: None,
-                    });
-                    let out = run_subtree(&program, rp, m).await?;
-                    accum.push(out.clone());
-                }
-            }
-        },
+        }) => {
+            crate::generate::generate(
+                model.as_str(),
+                &run_subtree(input, rp, m).await?,
+                max_tokens,
+                temperature,
+                m,
+                rp.prepare.unwrap_or_default(),
+            )
+            .await
+        }
 
         #[cfg(not(feature = "cli_support"))]
-        Query::Ask(_message) => todo!("ask"),
+        Query::Print(_) => todo!("Print capability is not enabled"),
+        #[cfg(feature = "cli_support")]
+        Query::Print(m) => {
+            println!("{m}");
+            Ok(Query::User(m.clone()))
+        }
+        #[cfg(not(feature = "cli_support"))]
+        Query::Ask(_) => todo!("Ask capability is not enabled"),
         #[cfg(feature = "cli_support")]
         Query::Ask(message) => {
             use rustyline::error::ReadlineError;

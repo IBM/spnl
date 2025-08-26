@@ -43,7 +43,6 @@ async fn main() -> Result<(), SpnlError> {
 
     let query = plan(
         &match args.builtin {
-            Some(Builtin::Chat) => chat::query(args),
             Some(Builtin::Email) => email::query(args),
             Some(Builtin::Email2) => email2::query(args),
             Some(Builtin::Email3) => email3::query(args),

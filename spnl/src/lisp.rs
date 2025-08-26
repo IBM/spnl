@@ -8,26 +8,14 @@ macro_rules! spnl {
     (g $model:tt $input:tt $temp:tt) => ($crate::spnl!(g $model $input $temp 0));
 
     // Core: Generate text given $input using $model with temperature $temp and $max_tokens
-    (g $model:tt $input:tt $temp:tt $max_tokens:tt) => ($crate::spnl!(g $model $input $temp $max_tokens false));
-
-    (g $model:tt $input:tt $temp:tt $max_tokens:tt $accumulate:tt) => (
+    (g $model:tt $input:tt $temp:tt $max_tokens:tt) => (
         $crate::Query::Generate($crate::Generate {
             model: $crate::spnl_arg!($model).to_string(),
             input: Box::new($crate::spnl_arg!($input).into()),
             max_tokens: Some($crate::spnl_arg!($max_tokens)),
             temperature: Some($crate::spnl_arg!($temp)),
-            accumulate: Some($crate::spnl_arg!($accumulate)),
         })
     );
-
-    // Core: Generate with accumulation
-    (gx $model:tt $input:tt) => ($crate::spnl!(g $model $input 0.0 0 true));
-
-    // Core: Generate with accumulation with temperature $temp
-    (gx $model:tt $input:tt $temp:tt) => ($crate::spnl!(g $model $input $temp 0 true));
-
-    // Core: Generate with accumulation with temperature $temp and $max_tokens
-    (gx $model:tt $input:tt $temp:tt $max_tokens:tt) => ($create::spnl!(g $model $input $temp $max_tokens true));
 
     // Core: Dependent/needs-attention
     (cross $( $e:tt )+) => ( $crate::Query::Cross(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
@@ -287,7 +275,6 @@ mod tests {
                     .input(Box::new(Query::User("hello".to_string())))
                     .max_tokens(Some(0))
                     .temperature(Some(0.0))
-                    .accumulate(Some(false))
                     .build()?
             )
         );

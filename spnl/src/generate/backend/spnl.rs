@@ -35,7 +35,6 @@ pub async fn generate(
         input: Box::new(input.clone()),
         max_tokens: *max_tokens,
         temperature: *temp,
-        accumulate: None,
     });
     // eprintln!("Sending query {:?}", to_string(&query)?);
 
@@ -71,7 +70,6 @@ pub async fn generate(
             input: Box::new(Query::User(response_string)),
             max_tokens: *max_tokens,
             temperature: *temp,
-            accumulate: None,
         }))
     }
 }

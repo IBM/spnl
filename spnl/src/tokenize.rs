@@ -224,7 +224,6 @@ impl From<SimpleQuery> for Query {
             input: Box::new(q.g.input.clone().into()),
             max_tokens: q.g.max_tokens,
             temperature: q.g.temperature,
-            accumulate: None,
         })
     }
 }

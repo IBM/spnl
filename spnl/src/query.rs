@@ -16,9 +16,6 @@ pub struct Generate {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub accumulate: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -59,7 +56,7 @@ pub enum Query {
     /// Helpful for repeating an operation n times in a Plus
     Repeat(Repeat),
 
-    /// (model, input, max_tokens, temperature, accumulate?)
+    /// Generate new content via a given model
     #[serde(rename = "g")]
     Generate(Generate),
 
@@ -107,12 +104,8 @@ impl ptree::TreeItem for Query {
                 Query::System(s) => style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
-                Query::Generate(Generate {
-                    model, accumulate, ..
-                }) => style.paint(format!(
-                    "\x1b[31;1mGenerate\x1b[0m \x1b[2m{model}\x1b[0m accumulate?={}",
-                    accumulate.unwrap_or_default()
-                )),
+                Query::Generate(Generate { model, .. }) =>
+                    style.paint(format!("\x1b[31;1mGenerate\x1b[0m \x1b[2m{model}\x1b[0m",)),
                 Query::Repeat(Repeat { n, .. }) => style.paint(format!("Repeat {n}")),
                 Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
@@ -321,7 +314,6 @@ mod tests {
                     .input(Query::User("hello".to_string()).into())
                     .max_tokens(None)
                     .temperature(None)
-                    .accumulate(None)
                     .build()?
             )
         );

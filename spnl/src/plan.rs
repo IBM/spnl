@@ -49,13 +49,11 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
             input,
             max_tokens,
             temperature,
-            accumulate,
         }) => Ok(vec![Query::Generate(Generate {
             model: model.clone(),
             input: Box::new(cross_if_needed(plan_iter(input, po).await?)),
             max_tokens: *max_tokens,
             temperature: *temperature,
-            accumulate: *accumulate,
         })]),
 
         otherwise => Ok(vec![otherwise.clone()]),
@@ -88,13 +86,11 @@ fn simplify(query: &Query) -> Query {
             input,
             max_tokens,
             temperature,
-            accumulate,
         }) => Query::Generate(Generate {
             model: model.clone(),
             input: Box::new(simplify(input)),
             max_tokens: *max_tokens,
             temperature: *temperature,
-            accumulate: *accumulate,
         }),
         otherwise => otherwise.clone(),
     }
