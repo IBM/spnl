@@ -37,6 +37,7 @@ pub struct Args {
     pub chunk_size: usize,
 
     /// Vector DB Url
+    #[cfg(feature = "rag")]
     #[arg(long, default_value = "data/spnl")]
     pub vecdb_uri: String,
 
@@ -53,14 +54,17 @@ pub struct Args {
     pub prompt: Option<String>,
 
     /// Document(s) that will augment the question
+    #[cfg(feature = "rag")]
     #[arg(short = 'd', long)]
     pub document: Option<Vec<String>>,
 
     /// Max augmentations to add to the query
+    #[cfg(feature = "rag")]
     #[arg(short = 'x', long, env = "SPNL_RAG_MAX_MATCHES")]
     pub max_aug: Option<usize>,
 
     /// The RAG indexing scheme
+    #[cfg(feature = "rag")]
     #[arg(value_enum, short, long)]
     pub indexer: Option<spnl::Indexer>,
 

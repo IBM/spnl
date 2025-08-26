@@ -44,9 +44,6 @@ pub enum Query {
     /// System prompt
     System(String),
 
-    /// Print a helpful message to the console
-    Print(String),
-
     /// Reduce
     Cross(Vec<Query>),
 
@@ -60,13 +57,18 @@ pub enum Query {
     #[serde(rename = "g")]
     Generate(Generate),
 
-    /// Ask with a given message
-    Ask(String),
-
     /// Incorporate information relevant to the question gathered from
     /// the given docs
     #[cfg(feature = "rag")]
     Augment(Augment),
+
+    /// Ask with a given message
+    #[cfg(feature = "cli_support")]
+    Ask(String),
+
+    /// Print a helpful message to the console
+    #[cfg(feature = "cli_support")]
+    Print(String),
 }
 
 #[cfg(feature = "cli_support")]

@@ -27,7 +27,8 @@ async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
         futures::future::try_join_all(units.iter().map(|u| run_subtree(u, rp, Some(&m)))).await?;
 
     if evaluated.len() == 1 {
-        Ok(evaluated[0].clone())
+        // the unwrap() is safe here, due to the len() == 1 guard
+        Ok(evaluated.into_iter().next().unwrap())
     } else {
         Ok(Query::Plus(evaluated))
     }
@@ -47,6 +48,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
 
         Query::Cross(u) => cross(u, rp, m).await,
         Query::Plus(u) => plus(u, rp).await,
+
         Query::Generate(Generate {
             model,
             input,
@@ -64,15 +66,11 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
             .await
         }
 
-        #[cfg(not(feature = "cli_support"))]
-        Query::Print(_) => todo!("Print capability is not enabled"),
         #[cfg(feature = "cli_support")]
         Query::Print(m) => {
             println!("{m}");
             Ok(Query::User(m.clone()))
         }
-        #[cfg(not(feature = "cli_support"))]
-        Query::Ask(_) => todo!("Ask capability is not enabled"),
         #[cfg(feature = "cli_support")]
         Query::Ask(message) => {
             use rustyline::error::ReadlineError;

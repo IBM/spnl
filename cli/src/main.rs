@@ -2,10 +2,10 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{
-    AugmentOptionsBuilder, ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan,
-    pretty_print,
-};
+use spnl::{ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan, pretty_print};
+
+#[cfg(feature = "rag")]
+use spnl::AugmentOptionsBuilder;
 
 mod args;
 mod builtins;
@@ -21,6 +21,7 @@ async fn main() -> Result<(), SpnlError> {
     };
 
     let plan_options = PlanOptions {
+        #[cfg(feature = "rag")]
         aug: AugmentOptionsBuilder::default()
             .indexer(args.indexer.clone().unwrap_or_default())
             .verbose(args.verbose)
