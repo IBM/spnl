@@ -6,14 +6,8 @@
 name: publish_pypi
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - '*'
-  pull_request:
-  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -32,8 +26,8 @@ jobs:
             target: aarch64
           - runner: ubuntu-22.04
             target: armv7
-          - runner: ubuntu-22.04
-            target: s390x
+          #- runner: ubuntu-22.04
+          #  target: s390x
           - runner: ubuntu-22.04
             target: ppc64le
     steps:
