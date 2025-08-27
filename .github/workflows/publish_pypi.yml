@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci -m spnl/Cargo.toml github
 #
-name: CI
+name: publish_pypi
 
 on:
   push:
@@ -23,12 +23,6 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
-        python-version:
-          - 3.9
-          - "3.10"
-          - 3.11
-          - 3.12
-          - 3.13
         platform:
           - runner: ubuntu-22.04
             target: x86_64
@@ -43,57 +37,58 @@ jobs:
           - runner: ubuntu-22.04
             target: ppc64le
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.x
       - name: Download maturin-action
-        run: mkdir -p maturin-action/dist && cd maturin-action/dist && wget https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js
+        run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build wheels
         uses: ./maturin-action #PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter --manifest-path spnl/Cargo.toml --no-default-features -F tok,run_py
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
+          manylinux: 2_28
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
 
-  musllinux:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
-            target: aarch64
-          - runner: ubuntu-22.04
-            target: armv7
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Download maturin-action
-        run: mkdir -p maturin-action/dist && cd maturin-action/dist && wget https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js
-      - name: Build wheels
-        uses: ./maturin-action #PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path spnl/Cargo.toml
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: musllinux_1_2
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-musllinux-${{ matrix.platform.target }}
-          path: dist
+  # TODO: get openssl
+  # musllinux:
+  #   runs-on: ${{ matrix.platform.runner }}
+  #   strategy:
+  #     matrix:
+  #       platform:
+  #         - runner: ubuntu-22.04
+  #           target: x86_64
+  #         - runner: ubuntu-22.04
+  #           target: x86
+  #         - runner: ubuntu-22.04
+  #           target: aarch64
+  #         - runner: ubuntu-22.04
+  #           target: armv7
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: 3.x
+  #     - name: Download maturin-action
+  #       run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
+  #     - name: Build wheels
+  #       uses: ./maturin-action #PyO3/maturin-action@v1
+  #       with:
+  #         target: ${{ matrix.platform.target }}
+  #         args: --release --out dist --find-interpreter --manifest-path spnl/Cargo.toml
+  #         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  #         manylinux: auto #musllinux_1_2
+  #     - name: Upload wheels
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheels-musllinux-${{ matrix.platform.target }}
+  #         path: dist
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -104,16 +99,16 @@ jobs:
             target: x64
           - runner: windows-latest
             target: x86
-          - runner: windows-latest
-            target: aarch64
+          #- runner: windows-latest # <-- cannot install python, and no pythons are found in the hosted tool cache
+          #  target: arm64 # Note: not aarch64 unlike linux and macos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.x
           architecture: ${{ matrix.platform.target }}
       - name: Download maturin-action
-        run: mkdir -p maturin-action/dist && cd maturin-action/dist && wget https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js
+        run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build wheels
         uses: ./maturin-action #PyO3/maturin-action@v1
         with:
@@ -136,12 +131,12 @@ jobs:
           - runner: macos-14
             target: aarch64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.x
       - name: Download maturin-action
-        run: mkdir -p maturin-action/dist && cd maturin-action/dist && wget https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js
+        run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build wheels
         uses: ./maturin-action #PyO3/maturin-action@v1
         with:
@@ -157,14 +152,14 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Download maturin-action
-        run: mkdir -p maturin-action/dist && cd maturin-action/dist && wget https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js
+        run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build sdist
         uses: ./maturin-action #PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist --manifest-path spnl/Cargo.toml --no-default-features -F tok,run_py
+          args: --out dist --manifest-path spnl/Cargo.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
@@ -175,7 +170,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [linux, windows, macos, sdist] # musllinux
     permissions:
       # Use to sign the release artifacts
       id-token: write
@@ -192,11 +187,11 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'wheels-*/*'
+      - name: Download maturin-action
+        run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Publish to PyPI
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        uses: ./maturin-action #PyO3/maturin-action@v1
         with:
           command: upload
           args: --non-interactive --skip-existing wheels-*/*
