@@ -2,6 +2,10 @@
 name = "spnl"
 version = "0.4.0"
 edition = "2024"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/IBM/spnl"
+description = "A Span Query is a declarative way to specify which portions of a generative AI (GenAI) program should be run directly on model serving components."
 
 [features]
 default = ["cli_support","lisp","run","ollama","openai","gemini","pull","yaml"]
