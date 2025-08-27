@@ -182,7 +182,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/spnl
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
