@@ -41,6 +41,7 @@ pub fn query(args: Args) -> Query {
     spnl!(g model (cross
                    (print "Evaluating candidate emails")
                    (system (file "email3-evaluate-system-prompt.txt"))
-                   (print "Generate candidate emails in parallel")
-                   candidate_emails))
+                   candidate_emails
+                   (print "Generate candidate emails in parallel"))
+    )
 }
