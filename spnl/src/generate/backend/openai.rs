@@ -116,7 +116,13 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    Ok(Query::Assistant(response_string))
+    // Note: it seems dangerous to return Query::Assistant
+    // here. E.g. for the email2 builtin (cli/src/builtins/email2.rs),
+    // which has an "inner-outer" pattern of nested generation, if the
+    // inner generations return Assistant, the outer generation seems
+    // to produce output that pretty much ignores the inner generated
+    // text (granite3.3:8b)
+    Ok(Query::User(response_string))
 }
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
