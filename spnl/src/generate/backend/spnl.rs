@@ -62,14 +62,5 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    if quiet {
-        Ok(Query::User(response_string))
-    } else {
-        Ok(Query::Generate(Generate {
-            model: format!("spnl/{model}"),
-            input: Box::new(Query::User(response_string)),
-            max_tokens: *max_tokens,
-            temperature: *temp,
-        }))
-    }
+    Ok(Query::User(response_string))
 }
