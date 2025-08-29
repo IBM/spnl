@@ -69,7 +69,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
         #[cfg(feature = "cli_support")]
         Query::Print(m) => {
             println!("{m}");
-            Ok(Query::User(m.clone()))
+            Ok(Query::User("".into()))
         }
         #[cfg(feature = "cli_support")]
         Query::Ask(message) => {
