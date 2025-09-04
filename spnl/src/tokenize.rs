@@ -61,14 +61,21 @@ fn pad(pad_token: u32, block_size: usize, toklist: Vec<u32>) -> Vec<u32> {
 }
 
 fn user(m: &String) -> String {
-    format!("\n<|user|>\n{m}")
+    format!("\n<|user|>\n{m}") // TODO this doesn't work for general models
 }
 fn usertok(m: &String, tok: &Tokenizer) -> tokenizers::tokenizer::Result<Vec<u32>> {
     Ok(tok.encode_fast(user(m), false)?.get_ids().to_vec())
 }
 
+fn assistant(m: &String) -> String {
+    format!("\n<|assistant|>\n{m}") // TODO this doesn't work for general models
+}
+fn assistanttok(m: &String, tok: &Tokenizer) -> tokenizers::tokenizer::Result<Vec<u32>> {
+    Ok(tok.encode_fast(assistant(m), false)?.get_ids().to_vec())
+}
+
 fn system(m: &String) -> String {
-    format!("\n<|system|>\n{m}")
+    format!("\n<|system|>\n{m}") // TODO this doesn't work for general models
 }
 fn systemtok(m: &String, tok: &Tokenizer) -> tokenizers::tokenizer::Result<Vec<u32>> {
     Ok(tok.encode_fast(system(m), false)?.get_ids().to_vec())
@@ -86,14 +93,11 @@ fn encode_nonplus_part(
 }
 
 fn encode_plus_part(
-    part: &str,
-    tok: &Tokenizer,
+    toks: &[u32],
     pad_token: u32,
     plus_token: Option<u32>,
     block_size: usize,
 ) -> tokenizers::tokenizer::Result<Vec<u32>> {
-    let encoded = tok.encode_fast(part, false)?;
-    let toks = encoded.get_ids();
     if let Some(plus_token) = plus_token {
         Ok(pad(pad_token, block_size, [&[plus_token], toks].concat()))
     } else {
@@ -141,10 +145,18 @@ fn tokenize_part(
                 Err(er) => vec![Err(er)],
             })
             .collect::<Result<_, _>>(),
-        Query::Plus(_) => {
-            let parts = extract_parts(input, false)
-                .into_iter()
-                .map(|part| encode_plus_part(&part, tok, pad_token, plus_token, block_size))
+        Query::Plus(v) => {
+            let parts = v
+                .iter()
+                .map(|part| {
+                    encode_plus_part(
+                        tokenize_part(part, tok, pad_token, cross_token, plus_token, block_size)?
+                            .as_slice(),
+                        pad_token,
+                        plus_token,
+                        block_size,
+                    )
+                })
                 .flat_map(|result| match result {
                     Ok(vec) => vec.into_iter().map(Ok).collect(),
                     Err(er) => vec![Err(er)],
@@ -160,6 +172,7 @@ fn tokenize_part(
 
         // TODO... we may over-pad here. We could collapse consecutive
         // System/User messages into one padded section
+        Query::Assistant(m) => Ok(pad(pad_token, block_size, assistanttok(m, tok)?)),
         Query::User(m) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
         Query::System(m) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
         _ => {
@@ -185,6 +198,7 @@ pub fn handle_serde_err(e: serde_json::Error) -> PyErr {
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NonGenerateInput {
+    Assistant(String),
     User(String),
     System(String),
     Plus(Vec<NonGenerateInput>),
@@ -209,6 +223,7 @@ pub struct SimpleQuery {
 impl From<NonGenerateInput> for Query {
     fn from(input: NonGenerateInput) -> Self {
         match input {
+            NonGenerateInput::Assistant(m) => Query::Assistant(m.clone()),
             NonGenerateInput::User(m) => Query::User(m.clone()),
             NonGenerateInput::System(m) => Query::System(m.clone()),
             NonGenerateInput::Plus(v) => Query::Plus(v.into_iter().map(|m| m.into()).collect()),
@@ -253,7 +268,7 @@ pub fn tokenize_query(
                 "Spnl tokenize_query from pretrained {model}. Loaded in {:?}",
                 s.elapsed()
             );
-            let messages =
+            let messages: Vec<u32> =
                 tokenize_part(&input, &tok, pad_token, cross_token, plus_token, block_size)
                     .map_err(handle_err)?
                     .into_iter()
@@ -265,6 +280,10 @@ pub fn tokenize_query(
                             .copied(),
                     )
                     .collect();
+
+            /* if let Ok(s) = tok.decode(&messages, false) {
+                eprintln!("Reverse de-tokenized message (for debugging): {s}");
+            } */
 
             TokenizedQuery {
                 model: model.clone(),
@@ -300,9 +319,14 @@ pub fn tokenize_prepare(
                 s.elapsed()
             );
 
-            let parts = extract_parts(&input, false)
-                .into_iter()
-                .map(|part| encode_plus_part(&part, &tok, pad_token, plus_token, block_size));
+            let parts = extract_parts(&input, false).into_iter().map(|part| {
+                encode_plus_part(
+                    tok.encode_fast(part, false)?.get_ids(),
+                    pad_token,
+                    plus_token,
+                    block_size,
+                )
+            });
 
             if collect_prefix_too {
                 parts
