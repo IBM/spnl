@@ -1,4 +1,5 @@
 use async_openai::types::{
+    ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
     ChatCompletionRequestUserMessageContent,
@@ -66,7 +67,12 @@ pub async fn generate(
     } */
 
     // Extract a max tokens
-    let mt = max_tokens.map(|mt| mt as u32).unwrap_or(10000);
+    let mt = max_tokens
+        .map(|mt| match mt {
+            0 => 2048_u32, // vllm 400's if given 0
+            _ => mt as u32,
+        })
+        .unwrap_or(2048);
 
     let request = CreateChatCompletionRequestArgs::default()
         .model(model)
@@ -97,32 +103,32 @@ pub async fn generate(
     }
 
     let mut stream = client.chat().create_stream(request).await?;
-    while let Some(Ok(res)) = stream.next().await {
-        for chat_choice in res.choices.iter() {
-            if let Some(ref content) = chat_choice.delta.content {
-                if !quiet {
-                    stdout.write_all(b"\x1b[32m").await?; // green
-                    stdout.write_all(content.as_bytes()).await?;
-                    stdout.flush().await?;
-                    stdout.write_all(b"\x1b[0m").await?; // reset color
-                } else if let Some(pb) = pb.as_mut() {
-                    pb.inc(content.len() as u64)
+    loop {
+        match stream.next().await {
+            Some(Ok(res)) => {
+                for chat_choice in res.choices.iter() {
+                    if let Some(ref content) = chat_choice.delta.content {
+                        if !quiet {
+                            stdout.write_all(b"\x1b[32m").await?; // green
+                            stdout.write_all(content.as_bytes()).await?;
+                            stdout.flush().await?;
+                            stdout.write_all(b"\x1b[0m").await?; // reset color
+                        } else if let Some(pb) = pb.as_mut() {
+                            pb.inc(content.len() as u64)
+                        }
+                        response_string += content.as_str();
+                    }
                 }
-                response_string += content.as_str();
             }
+            Some(Err(err)) => return Err(err.into()),
+            None => break,
         }
     }
     if !quiet {
         stdout.write_all(b"\n").await?;
     }
 
-    // Note: it seems dangerous to return Query::Assistant
-    // here. E.g. for the email2 builtin (cli/src/builtins/email2.rs),
-    // which has an "inner-outer" pattern of nested generation, if the
-    // inner generations return Assistant, the outer generation seems
-    // to produce output that pretty much ignores the inner generated
-    // text (granite3.3:8b)
-    Ok(Query::User(response_string))
+    Ok(Query::Assistant(response_string))
 }
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
@@ -133,6 +139,19 @@ pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
             ChatCompletionRequestSystemMessage {
                 name: None,
                 content: ChatCompletionRequestSystemMessageContent::Text(s.clone()),
+            },
+        )],
+        Query::Assistant(s) => vec![ChatCompletionRequestMessage::Assistant(
+            ChatCompletionRequestAssistantMessage {
+                name: None,
+                refusal: None,
+                audio: None,
+                tool_calls: None,
+                #[allow(deprecated)]
+                function_call: None,
+                content: Some(ChatCompletionRequestAssistantMessageContent::Text(
+                    s.clone(),
+                )),
             },
         )],
         o => {
@@ -156,7 +175,7 @@ pub fn contentify(input: &Query) -> Vec<String> {
     match input {
         Query::Cross(v) => v.iter().flat_map(contentify).collect(),
         Query::Plus(v) => v.iter().flat_map(contentify).collect(),
-        Query::System(s) => vec![s.clone()],
+        Query::Assistant(s) | Query::System(s) => vec![s.clone()],
         o => {
             let s = o.to_string();
             if s.is_empty() {

@@ -62,5 +62,5 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    Ok(Query::User(response_string))
+    Ok(Query::Assistant(response_string))
 }
