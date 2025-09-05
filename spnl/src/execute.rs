@@ -1,4 +1,4 @@
-use crate::{Generate, Query};
+use crate::{Generate, Message::*, Query};
 use indicatif::MultiProgress;
 
 pub struct ExecuteOptions {
@@ -44,7 +44,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
     crate::pull::pull_if_needed(query).await?;
 
     match query {
-        Query::Assistant(_) | Query::User(_) | Query::System(_) => Ok(query.clone()),
+        Query::Message(_) => Ok(query.clone()),
 
         Query::Cross(u) => cross(u, rp, m).await,
         Query::Plus(u) => plus(u, rp).await,
@@ -69,7 +69,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
         #[cfg(feature = "cli_support")]
         Query::Print(m) => {
             println!("{m}");
-            Ok(Query::User("".into()))
+            Ok(Query::Message(User("".into())))
         }
         #[cfg(feature = "cli_support")]
         Query::Ask(message) => {
@@ -87,7 +87,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
                 Err(err) => panic!("{}", err), // TODO this only works in a CLI
             };
             rl.append_history("history.txt").unwrap();
-            Ok(Query::User(prompt))
+            Ok(Query::Message(User(prompt)))
         }
 
         // TODO: should not happen; we need to improve the typing of runnable queries
@@ -104,7 +104,7 @@ mod tests {
     #[tokio::test]
     async fn it_works() -> Result<(), SpnlError> {
         let result = execute(&"hello".into(), &ExecuteOptions { prepare: None }).await?;
-        assert_eq!(result, Query::User("hello".to_string()));
+        assert_eq!(result, Query::Message(User("hello".to_string())));
         Ok(())
     }
 }

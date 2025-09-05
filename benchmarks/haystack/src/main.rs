@@ -1,6 +1,6 @@
 use clap::Parser;
 use petname::Generator; // Trait needs to be in scope for `iter`.
-use spnl::{ExecuteOptions, Query, SpnlError, execute, spnl};
+use spnl::{ExecuteOptions, Message::User, Query, SpnlError, execute, spnl};
 
 type GeneratedNames = Vec<String>;
 #[derive(serde::Deserialize)]
@@ -179,7 +179,7 @@ async fn main() -> Result<(), SpnlError> {
     }
 
     match execute(&query, &ExecuteOptions { prepare: None }).await? {
-        Query::User(ss) => {
+        Query::Message(User(ss)) => {
             // oof, be gracious here. sometimes the model wraps the
             // requested json array with markdown even though we asked
             // it not to

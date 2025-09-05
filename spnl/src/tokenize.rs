@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use tokenizers::tokenizer::Tokenizer;
 
-use crate::{Generate, Query};
+use crate::{Generate, Message::*, Query};
 
 #[pyclass]
 pub struct TokenizerState {
@@ -109,8 +109,9 @@ fn extract_up_to_plus(q: &Query) -> Vec<String> {
     match q {
         Query::Cross(v) => v.iter().flat_map(extract_up_to_plus).collect(),
         Query::Plus(_) => vec![],
-        Query::User(m) => vec![user(m)],
-        Query::System(m) => vec![system(m)],
+        Query::Message(Assistant(m)) => vec![assistant(m)],
+        Query::Message(System(m)) => vec![system(m)],
+        Query::Message(User(m)) => vec![user(m)],
         _ => vec![],
     }
 }
@@ -122,8 +123,9 @@ fn extract_parts(q: &Query, in_plus: bool) -> Vec<String> {
             .iter()
             .map(|qq| extract_parts(qq, true).join(""))
             .collect(),
-        (Query::User(m), true) => vec![user(m)],
-        (Query::System(m), true) => vec![system(m)],
+        (Query::Message(Assistant(m)), true) => vec![assistant(m)],
+        (Query::Message(System(m)), true) => vec![system(m)],
+        (Query::Message(User(m)), true) => vec![user(m)],
         _ => vec![],
     }
 }
@@ -172,9 +174,9 @@ fn tokenize_part(
 
         // TODO... we may over-pad here. We could collapse consecutive
         // System/User messages into one padded section
-        Query::Assistant(m) => Ok(pad(pad_token, block_size, assistanttok(m, tok)?)),
-        Query::User(m) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
-        Query::System(m) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
+        Query::Message(Assistant(m)) => Ok(pad(pad_token, block_size, assistanttok(m, tok)?)),
+        Query::Message(System(m)) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
+        Query::Message(User(m)) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
         _ => {
             eprintln!("Warning: Unhandled span query component {input}");
             Ok(vec![])
@@ -223,9 +225,9 @@ pub struct SimpleQuery {
 impl From<NonGenerateInput> for Query {
     fn from(input: NonGenerateInput) -> Self {
         match input {
-            NonGenerateInput::Assistant(m) => Query::Assistant(m.clone()),
-            NonGenerateInput::User(m) => Query::User(m.clone()),
-            NonGenerateInput::System(m) => Query::System(m.clone()),
+            NonGenerateInput::Assistant(m) => Query::Message(Assistant(m.clone())),
+            NonGenerateInput::System(m) => Query::Message(System(m.clone())),
+            NonGenerateInput::User(m) => Query::Message(User(m.clone())),
             NonGenerateInput::Plus(v) => Query::Plus(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Cross(v) => Query::Cross(v.into_iter().map(|m| m.into()).collect()),
         }

@@ -11,7 +11,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
 
-use crate::{Query, SpnlResult};
+use crate::{Message::*, Query, SpnlResult};
 
 #[cfg(feature = "rag")]
 use crate::augment::embed::EmbedData;
@@ -128,20 +128,20 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    Ok(Query::Assistant(response_string))
+    Ok(Query::Message(Assistant(response_string)))
 }
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
     match input {
         Query::Cross(v) => v.iter().flat_map(messagify).collect(),
         Query::Plus(v) => v.iter().flat_map(messagify).collect(),
-        Query::System(s) => vec![ChatCompletionRequestMessage::System(
+        Query::Message(System(s)) => vec![ChatCompletionRequestMessage::System(
             ChatCompletionRequestSystemMessage {
                 name: None,
                 content: ChatCompletionRequestSystemMessageContent::Text(s.clone()),
             },
         )],
-        Query::Assistant(s) => vec![ChatCompletionRequestMessage::Assistant(
+        Query::Message(Assistant(s)) => vec![ChatCompletionRequestMessage::Assistant(
             ChatCompletionRequestAssistantMessage {
                 name: None,
                 refusal: None,
@@ -175,7 +175,7 @@ pub fn contentify(input: &Query) -> Vec<String> {
     match input {
         Query::Cross(v) => v.iter().flat_map(contentify).collect(),
         Query::Plus(v) => v.iter().flat_map(contentify).collect(),
-        Query::Assistant(s) | Query::System(s) => vec![s.clone()],
+        Query::Message(Assistant(s)) | Query::Message(System(s)) => vec![s.clone()],
         o => {
             let s = o.to_string();
             if s.is_empty() {

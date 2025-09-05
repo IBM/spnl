@@ -35,7 +35,7 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
         Query::Augment(a) => Ok(vec![Query::Plus(
             crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, &po.aug)
                 .await?
-                .map(Query::User)
+                .map(|s| Query::Message(crate::Message::User(s)))
                 .collect(),
         )]),
 

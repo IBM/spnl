@@ -34,7 +34,7 @@ pub struct Augment {
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Query {
+pub enum Message {
     /// Assistant output
     Assistant(String),
 
@@ -43,7 +43,25 @@ pub enum Query {
 
     /// System prompt
     System(String),
+}
 
+impl ::std::fmt::Display for Message {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Message::Assistant(s) => s,
+                Message::User(s) => s,
+                Message::System(s) => s,
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Query {
     /// Reduce
     Cross(Vec<Query>),
 
@@ -69,6 +87,10 @@ pub enum Query {
     /// Print a helpful message to the console
     #[cfg(feature = "cli_support")]
     Print(String),
+
+    /// Some sort of message
+    #[serde(untagged)]
+    Message(Message),
 }
 
 #[cfg(feature = "cli_support")]
@@ -100,10 +122,12 @@ impl ptree::TreeItem for Query {
             f,
             "{}",
             match self {
-                Query::Assistant(s) =>
+                Query::Message(Message::Assistant(s)) =>
                     style.paint(format!("\x1b[32mAssistant\x1b[0m {}", trim(s, 700))),
-                Query::User(s) => style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
-                Query::System(s) => style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
+                Query::Message(Message::User(s)) =>
+                    style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
+                Query::Message(Message::System(s)) =>
+                    style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
                 Query::Generate(Generate { model, .. }) =>
@@ -118,11 +142,7 @@ impl ptree::TreeItem for Query {
     }
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
-            Query::Ask(_)
-            | Query::Assistant(_)
-            | Query::User(_)
-            | Query::System(_)
-            | Query::Print(_) => vec![],
+            Query::Ask(_) | Query::Message(_) | Query::Print(_) => vec![],
             Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Repeat(Repeat { query, .. }) => vec![*query.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
@@ -133,7 +153,7 @@ impl ptree::TreeItem for Query {
                 ..
             }) => vec![
                 *body.clone(),
-                Query::User(format!("\x1b[35m<{filename}>\x1b[0m")),
+                Query::Message(Message::User(format!("\x1b[35m<{filename}>\x1b[0m"))),
             ],
         })
     }
@@ -150,7 +170,7 @@ impl ::std::fmt::Display for Query {
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Query::System(s) | Query::User(s) => write!(f, "{s}"),
+            Query::Message(m) => write!(f, "{m}"),
             _ => Ok(()),
         }
     }
@@ -158,20 +178,20 @@ impl ::std::fmt::Display for Query {
 
 impl From<&str> for Query {
     fn from(s: &str) -> Self {
-        Self::User(s.into())
+        Self::Message(Message::User(s.into()))
     }
 }
 
 impl ::std::str::FromStr for Query {
     type Err = Box<dyn ::std::error::Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::User(s.to_string()))
+        Ok(Self::Message(Message::User(s.to_string())))
     }
 }
 
 impl From<&String> for Query {
     fn from(s: &String) -> Self {
-        Self::User(s.clone())
+        Self::Message(Message::User(s.clone()))
     }
 }
 
@@ -243,14 +263,14 @@ mod tests {
     #[test]
     fn serde_user() -> serde_json::Result<()> {
         let result = from_str(r#"{"user": "hello"}"#)?;
-        assert_eq!(result, Query::User("hello".to_string()));
+        assert_eq!(result, Query::Message(Message::User("hello".to_string())));
         Ok(())
     }
 
     #[test]
     fn serde_system() -> serde_json::Result<()> {
         let result = from_str(r#"{"system": "hello"}"#)?;
-        assert_eq!(result, Query::System("hello".to_string()));
+        assert_eq!(result, Query::Message(Message::System("hello".to_string())));
         Ok(())
     }
 
@@ -264,7 +284,10 @@ mod tests {
     #[test]
     fn serde_plus_1() -> serde_json::Result<()> {
         let result = from_str(r#"{"plus": [{"user": "hello"}]}"#)?;
-        assert_eq!(result, Query::Plus(vec![Query::User("hello".to_string())]));
+        assert_eq!(
+            result,
+            Query::Plus(vec![Query::Message(Message::User("hello".to_string()))])
+        );
         Ok(())
     }
 
@@ -274,8 +297,8 @@ mod tests {
         assert_eq!(
             result,
             Query::Plus(vec![
-                Query::User("hello".to_string()),
-                Query::System("world".to_string())
+                Query::Message(Message::User("hello".to_string())),
+                Query::Message(Message::System("world".to_string()))
             ])
         );
         Ok(())
@@ -284,7 +307,10 @@ mod tests {
     #[test]
     fn serde_cross_1() -> serde_json::Result<()> {
         let result = from_str(r#"{"cross": [{"user": "hello"}]}"#)?;
-        assert_eq!(result, Query::Cross(vec![Query::User("hello".to_string())]));
+        assert_eq!(
+            result,
+            Query::Cross(vec![Query::Message(Message::User("hello".to_string()))])
+        );
         Ok(())
     }
 
@@ -296,9 +322,9 @@ mod tests {
         assert_eq!(
             result,
             Query::Cross(vec![
-                Query::User("hello".to_string()),
-                Query::System("world".to_string()),
-                Query::Plus(vec![Query::User("sloop".to_string())])
+                Query::Message(Message::User("hello".to_string())),
+                Query::Message(Message::System("world".to_string())),
+                Query::Plus(vec![Query::Message(Message::User("sloop".to_string()))])
             ])
         );
         Ok(())
@@ -313,7 +339,7 @@ mod tests {
             Query::Generate(
                 GenerateBuilder::default()
                     .model("ollama/granite3.2:2b".into())
-                    .input(Query::User("hello".to_string()).into())
+                    .input(Query::Message(Message::User("hello".to_string())).into())
                     .max_tokens(None)
                     .temperature(None)
                     .build()?

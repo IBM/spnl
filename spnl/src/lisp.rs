@@ -27,10 +27,10 @@ macro_rules! spnl {
     (plus $( $e:tt )+) => ( $crate::Query::Plus(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: A user message
-    (user $e:tt) => ($crate::Query::User($crate::spnl_arg!($e).clone().into()));
+    (user $e:tt) => ($crate::Query::Message($crate::Message::User($crate::spnl_arg!($e).clone().into())));
 
     // Core: A system message
-    (system $e:tt) => ($crate::Query::System($crate::spnl_arg!($e).into()));
+    (system $e:tt) => ($crate::Query::Message($crate::Message::System($crate::spnl_arg!($e).into())));
 
     // Data: incorporate a file at compile time
     (file $f:tt) => (include_str!($crate::spnl_arg!($f)));
@@ -197,18 +197,18 @@ macro_rules! spnl_arg {
 
 #[cfg(test)]
 mod tests {
-    use crate::Query;
+    use crate::{Message::*, Query};
 
     #[test]
     fn macro_user() {
         let result = spnl!(user "hello");
-        assert_eq!(result, Query::User("hello".to_string()));
+        assert_eq!(result, Query::Message(User("hello".to_string())));
     }
 
     #[test]
     fn macro_system() {
         let result = spnl!(system "hello");
-        assert_eq!(result, Query::System("hello".to_string()));
+        assert_eq!(result, Query::Message(System("hello".to_string())));
     }
 
     #[test]
@@ -223,8 +223,8 @@ mod tests {
         assert_eq!(
             result,
             Query::Plus(vec![
-                Query::User("hello".to_string()),
-                Query::User("world".to_string())
+                Query::Message(User("hello".to_string())),
+                Query::Message(User("world".to_string()))
             ])
         );
     }
@@ -235,8 +235,8 @@ mod tests {
         assert_eq!(
             result,
             Query::Plus(vec![
-                Query::User("hello".to_string()),
-                Query::System("world".to_string())
+                Query::Message(User("hello".to_string())),
+                Query::Message(System("world".to_string()))
             ])
         );
     }
@@ -244,7 +244,10 @@ mod tests {
     #[test]
     fn macro_cross_1() {
         let result = spnl!(cross (user "hello"));
-        assert_eq!(result, Query::Cross(vec![Query::User("hello".to_string())]));
+        assert_eq!(
+            result,
+            Query::Cross(vec![Query::Message(User("hello".to_string()))])
+        );
     }
 
     #[test]
@@ -254,11 +257,11 @@ mod tests {
         assert_eq!(
             result,
             Query::Cross(vec![
-                Query::User("hello".to_string()),
-                Query::System("world".to_string()),
+                Query::Message(User("hello".to_string())),
+                Query::Message(System("world".to_string())),
                 Query::Plus(vec![
-                    Query::User("sloop".to_string()),
-                    Query::User("boop".to_string())
+                    Query::Message(User("sloop".to_string())),
+                    Query::Message(User("boop".to_string()))
                 ])
             ])
         );
@@ -272,7 +275,7 @@ mod tests {
             Query::Generate(
                 crate::GenerateBuilder::default()
                     .model("ollama/granite3.2:2b".to_string())
-                    .input(Box::new(Query::User("hello".to_string())))
+                    .input(Box::new(Query::Message(User("hello".to_string()))))
                     .max_tokens(Some(0))
                     .temperature(Some(0.0))
                     .build()?

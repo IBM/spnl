@@ -4,7 +4,9 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use super::layer1::{Fragments, process_corpora};
 use crate::augment::storage;
 use crate::{
-    Augment, Query,
+    Augment,
+    Message::*,
+    Query,
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
@@ -117,14 +119,14 @@ async fn cross_index_fragment(
         .find_similar_keys("filename", fragment, max_matches, None, None)
         .await?
         // .filter(|s| *s != fragment.0) // don't raptor-ize the very fragment we are tryign to summarize
-        .map(|s| Query::User(re.replace(&s, "").to_string()))
+        .map(|s| Query::Message(User(re.replace(&s, "").to_string())))
         .collect::<Vec<_>>();
 
     let num_fragments = input.len() - 1;
     let original_length = input
         .iter()
         .map(|q| match q {
-            Query::User(s) => s.len(),
+            Query::Message(User(s)) => s.len(),
             _ => 0,
         })
         .sum::<usize>();
@@ -137,11 +139,11 @@ async fn cross_index_fragment(
         enclosing_model,
         &Query::Cross(vec![
             //Query::System("You create concise summaries by extracting key concepts and term definitions".into()),
-            Query::System("You are a helpful assistant.".into()), // copied from raptor python code
-            Query::User(
+            Query::Message(System("You are a helpful assistant.".into())), // copied from raptor python code
+            Query::Message(User(
                 "Write a summary of the following, including as many key details as possible:"
                     .into(),
-            ), // copied from raptor python code
+            )), // copied from raptor python code
             Query::Plus(input),
         ]),
         max_tokens,
@@ -151,7 +153,7 @@ async fn cross_index_fragment(
     )
     .await?
     {
-        Query::User(s) => s,
+        Query::Message(User(s)) => s,
         _ => "".into(),
     };
 
