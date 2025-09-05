@@ -9,7 +9,11 @@ pub struct ExecuteOptions {
 pub type SpnlError = anyhow::Error;
 pub type SpnlResult = anyhow::Result<crate::Query>;
 
-async fn cross(units: &[Query], rp: &ExecuteOptions, mm: Option<&MultiProgress>) -> SpnlResult {
+async fn seq(
+    units: &[Query],
+    rp: &ExecuteOptions,
+    mm: Option<&MultiProgress>,
+) -> anyhow::Result<Vec<Query>> {
     let mym = MultiProgress::new();
     let m = if let Some(m) = mm { m } else { &mym };
 
@@ -18,7 +22,7 @@ async fn cross(units: &[Query], rp: &ExecuteOptions, mm: Option<&MultiProgress>)
         evaluated.push(run_subtree(u, rp, Some(m)).await?);
     }
 
-    Ok(Query::Cross(evaluated))
+    Ok(evaluated)
 }
 
 async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
@@ -46,7 +50,8 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
     match query {
         Query::Message(_) => Ok(query.clone()),
 
-        Query::Cross(u) => cross(u, rp, m).await,
+        Query::Seq(u) => Ok(Query::Seq(seq(u, rp, m).await?)),
+        Query::Cross(u) => Ok(Query::Cross(seq(u, rp, m).await?)),
         Query::Plus(u) => plus(u, rp).await,
 
         Query::Generate(Generate {

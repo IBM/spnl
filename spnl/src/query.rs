@@ -62,6 +62,9 @@ impl ::std::fmt::Display for Message {
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Query {
+    /// Execute in sequence
+    Seq(Vec<Query>),
+
     /// Reduce
     Cross(Vec<Query>),
 
@@ -128,6 +131,7 @@ impl ptree::TreeItem for Query {
                     style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
                 Query::Message(Message::System(s)) =>
                     style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
+                Query::Seq(_) => style.paint("\x1b[31;1mSequence\x1b[0m".to_string()),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
                 Query::Generate(Generate { model, .. }) =>
@@ -143,7 +147,7 @@ impl ptree::TreeItem for Query {
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
             Query::Ask(_) | Query::Message(_) | Query::Print(_) => vec![],
-            Query::Plus(v) | Query::Cross(v) => v.clone(),
+            Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Repeat(Repeat { query, .. }) => vec![*query.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]

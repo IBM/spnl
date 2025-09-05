@@ -133,8 +133,7 @@ pub async fn generate(
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
     match input {
-        Query::Cross(v) => v.iter().flat_map(messagify).collect(),
-        Query::Plus(v) => v.iter().flat_map(messagify).collect(),
+        Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.iter().flat_map(messagify).collect(),
         Query::Message(System(s)) => vec![ChatCompletionRequestMessage::System(
             ChatCompletionRequestSystemMessage {
                 name: None,
@@ -173,8 +172,7 @@ pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
 #[cfg(feature = "rag")]
 pub fn contentify(input: &Query) -> Vec<String> {
     match input {
-        Query::Cross(v) => v.iter().flat_map(contentify).collect(),
-        Query::Plus(v) => v.iter().flat_map(contentify).collect(),
+        Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.iter().flat_map(contentify).collect(),
         Query::Message(Assistant(s)) | Query::Message(System(s)) => vec![s.clone()],
         o => {
             let s = o.to_string();

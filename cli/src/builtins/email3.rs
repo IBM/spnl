@@ -30,7 +30,7 @@ pub fn query(args: Args) -> Query {
     let candidate_emails = spnl!(
         plus
             (repeat n
-             (g model (cross
+             (g model (seq
                        (system (file "email3-generate-system-prompt.txt"))
                        (user prompt))
 
@@ -38,7 +38,7 @@ pub fn query(args: Args) -> Query {
             )
     );
 
-    spnl!(g model (cross
+    spnl!(g model (seq
                    (print "Evaluating candidate emails")
                    (system (file "email3-evaluate-system-prompt.txt"))
                    candidate_emails

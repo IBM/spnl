@@ -15,7 +15,7 @@ pub fn query(args: Args) -> anyhow::Result<Query> {
                     (lambda (parts)
                      (extract model (length parts)
                       (g model
-                       (cross
+                       (seq
                         (system "You are an AI that reasons about math word problems")
                         (plus parts)))))))
     ))

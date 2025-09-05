@@ -111,7 +111,7 @@ fn encode_plus_part(
 
 fn extract_up_to_plus(q: &Query) -> Vec<String> {
     match q {
-        Query::Cross(v) => v.iter().flat_map(extract_up_to_plus).collect(),
+        Query::Seq(v) | Query::Cross(v) => v.iter().flat_map(extract_up_to_plus).collect(),
         Query::Plus(_) => vec![],
         Query::Message(Assistant(m)) => vec![assistant(m)],
         Query::Message(System(m)) => vec![system(m)],
@@ -122,7 +122,9 @@ fn extract_up_to_plus(q: &Query) -> Vec<String> {
 
 fn extract_parts(q: &Query, in_plus: bool) -> Vec<String> {
     match (q, in_plus) {
-        (Query::Cross(v), _) => v.iter().flat_map(|qq| extract_parts(qq, in_plus)).collect(),
+        (Query::Seq(v), _) | (Query::Cross(v), _) => {
+            v.iter().flat_map(|qq| extract_parts(qq, in_plus)).collect()
+        }
         (Query::Plus(v), _) => v
             .iter()
             .map(|qq| extract_parts(qq, true).join(""))
@@ -143,7 +145,7 @@ fn tokenize_part(
     block_size: usize,
 ) -> tokenizers::tokenizer::Result<Vec<u32>> {
     match input {
-        NonGenerateInput::Cross(v) => v
+        NonGenerateInput::Seq(v) | NonGenerateInput::Cross(v) => v
             .iter()
             .map(|u| tokenize_part(u, tok, pad_token, cross_token, plus_token, block_size))
             .flat_map(|result| match result {
@@ -208,6 +210,9 @@ pub enum NonGenerateInput {
     /// Map
     Cross(Vec<NonGenerateInput>),
 
+    /// Execute serially
+    Seq(Vec<NonGenerateInput>),
+
     /// Some sort of message
     #[serde(untagged)]
     Message(Message),
@@ -234,6 +239,7 @@ impl From<NonGenerateInput> for Query {
             NonGenerateInput::Message(m) => Query::Message(m),
             NonGenerateInput::Plus(v) => Query::Plus(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Cross(v) => Query::Cross(v.into_iter().map(|m| m.into()).collect()),
+            NonGenerateInput::Seq(v) => Query::Seq(v.into_iter().map(|m| m.into()).collect()),
         }
     }
 }
