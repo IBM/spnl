@@ -1,7 +1,11 @@
 use pyo3::prelude::*;
 use tokenizers::tokenizer::Tokenizer;
 
-use crate::{Generate, Message::*, Query};
+use crate::{
+    Generate,
+    Message::{self, *},
+    Query,
+};
 
 #[pyclass]
 pub struct TokenizerState {
@@ -131,7 +135,7 @@ fn extract_parts(q: &Query, in_plus: bool) -> Vec<String> {
 }
 
 fn tokenize_part(
-    input: &Query,
+    input: &NonGenerateInput,
     tok: &Tokenizer,
     pad_token: u32,
     cross_token: Option<u32>,
@@ -139,7 +143,7 @@ fn tokenize_part(
     block_size: usize,
 ) -> tokenizers::tokenizer::Result<Vec<u32>> {
     match input {
-        Query::Cross(v) => v
+        NonGenerateInput::Cross(v) => v
             .iter()
             .map(|u| tokenize_part(u, tok, pad_token, cross_token, plus_token, block_size))
             .flat_map(|result| match result {
@@ -147,7 +151,7 @@ fn tokenize_part(
                 Err(er) => vec![Err(er)],
             })
             .collect::<Result<_, _>>(),
-        Query::Plus(v) => {
+        NonGenerateInput::Plus(v) => {
             let parts = v
                 .iter()
                 .map(|part| {
@@ -174,13 +178,11 @@ fn tokenize_part(
 
         // TODO... we may over-pad here. We could collapse consecutive
         // System/User messages into one padded section
-        Query::Message(Assistant(m)) => Ok(pad(pad_token, block_size, assistanttok(m, tok)?)),
-        Query::Message(System(m)) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
-        Query::Message(User(m)) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
-        _ => {
-            eprintln!("Warning: Unhandled span query component {input}");
-            Ok(vec![])
+        NonGenerateInput::Message(Assistant(m)) => {
+            Ok(pad(pad_token, block_size, assistanttok(m, tok)?))
         }
+        NonGenerateInput::Message(System(m)) => Ok(pad(pad_token, block_size, systemtok(m, tok)?)),
+        NonGenerateInput::Message(User(m)) => Ok(pad(pad_token, block_size, usertok(m, tok)?)),
     }
 }
 
@@ -200,11 +202,15 @@ pub fn handle_serde_err(e: serde_json::Error) -> PyErr {
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NonGenerateInput {
-    Assistant(String),
-    User(String),
-    System(String),
+    /// Reduce
     Plus(Vec<NonGenerateInput>),
+
+    /// Map
     Cross(Vec<NonGenerateInput>),
+
+    /// Some sort of message
+    #[serde(untagged)]
+    Message(Message),
 }
 
 //#[pyclass]
@@ -218,24 +224,22 @@ pub struct SingleGenerate {
 
 //#[pyclass]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct SimpleQuery {
+pub struct SingleGenerateQuery {
     pub g: SingleGenerate,
 }
 
 impl From<NonGenerateInput> for Query {
     fn from(input: NonGenerateInput) -> Self {
         match input {
-            NonGenerateInput::Assistant(m) => Query::Message(Assistant(m.clone())),
-            NonGenerateInput::System(m) => Query::Message(System(m.clone())),
-            NonGenerateInput::User(m) => Query::Message(User(m.clone())),
+            NonGenerateInput::Message(m) => Query::Message(m),
             NonGenerateInput::Plus(v) => Query::Plus(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Cross(v) => Query::Cross(v.into_iter().map(|m| m.into()).collect()),
         }
     }
 }
 
-impl From<SimpleQuery> for Query {
-    fn from(q: SimpleQuery) -> Self {
+impl From<SingleGenerateQuery> for Query {
+    fn from(q: SingleGenerateQuery) -> Self {
         Self::Generate(Generate {
             model: q.g.model.clone(),
             input: Box::new(q.g.input.clone().into()),
@@ -254,47 +258,42 @@ pub fn tokenize_query(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<TokenizedQuery, PyErr> {
-    let squery: SimpleQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
-    let query: Query = squery.into();
-    Ok(match query {
-        Query::Generate(Generate {
-            model,
-            input,
-            max_tokens,
-            temperature,
-            ..
-        }) => {
-            let s = ::std::time::Instant::now();
-            let tok = state.get_or_create(&model).map_err(handle_arc_err)?;
-            println!(
-                "Spnl tokenize_query from pretrained {model}. Loaded in {:?}",
-                s.elapsed()
-            );
-            let messages: Vec<u32> =
-                tokenize_part(&input, &tok, pad_token, cross_token, plus_token, block_size)
+    let query: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
+    let SingleGenerate {
+        model,
+        input,
+        max_tokens,
+        temperature,
+    } = query.g;
+
+    let s = ::std::time::Instant::now();
+    let tok = state.get_or_create(&model).map_err(handle_arc_err)?;
+    println!(
+        "Spnl tokenize_query from pretrained {model}. Loaded in {:?}",
+        s.elapsed()
+    );
+    let messages: Vec<u32> =
+        tokenize_part(&input, &tok, pad_token, cross_token, plus_token, block_size)
+            .map_err(handle_err)?
+            .into_iter()
+            .chain(
+                tok.encode_fast("\n<|assistant|>\n", false)
                     .map_err(handle_err)?
-                    .into_iter()
-                    .chain(
-                        tok.encode_fast("\n<|assistant|>\n", false)
-                            .map_err(handle_err)?
-                            .get_ids()
-                            .iter()
-                            .copied(),
-                    )
-                    .collect();
+                    .get_ids()
+                    .iter()
+                    .copied(),
+            )
+            .collect();
 
-            /* if let Ok(s) = tok.decode(&messages, false) {
-                eprintln!("Reverse de-tokenized message (for debugging): {s}");
-            } */
+    /* if let Ok(s) = tok.decode(&messages, false) {
+        eprintln!("Reverse de-tokenized message (for debugging): {s}");
+    } */
 
-            TokenizedQuery {
-                model: model.clone(),
-                messages_: messages,
-                max_tokens,
-                temperature,
-            }
-        }
-        _ => todo!(),
+    Ok(TokenizedQuery {
+        model: model.clone(),
+        messages_: messages,
+        max_tokens,
+        temperature,
     })
 }
 
@@ -310,7 +309,7 @@ pub fn tokenize_prepare(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<Vec<Vec<u32>>, PyErr> {
-    let squery: SimpleQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
+    let squery: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
     let query: Query = squery.into();
     match query {
         Query::Generate(Generate { model, input, .. }) => {
