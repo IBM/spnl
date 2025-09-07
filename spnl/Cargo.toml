@@ -21,7 +21,7 @@ rag = ["run","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arr
 rag_deep_debug = []
 run = ["dep:futures","dep:indicatif","dep:async-recursion"]
 run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini","dep:tokio","tokio/rt-multi-thread"]
-tok = ["dep:pyo3","dep:moka","dep:tokenizers"]
+tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
 

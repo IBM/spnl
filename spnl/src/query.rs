@@ -45,6 +45,21 @@ pub enum Message {
     System(String),
 }
 
+impl Message {
+    pub fn role(&self) -> &'static str {
+        match self {
+            Message::Assistant(_) => "assistant",
+            Message::User(_) => "user",
+            Message::System(_) => "system",
+        }
+    }
+    pub fn content(&self) -> String {
+        match self {
+            Message::Assistant(s) | Message::User(s) | Message::System(s) => s.to_string(),
+        }
+    }
+}
+
 impl ::std::fmt::Display for Message {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(

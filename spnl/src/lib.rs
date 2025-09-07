@@ -29,6 +29,9 @@ pub mod pull;
 #[cfg(feature = "tok")]
 pub mod tokenize;
 
+#[cfg(feature = "tok")]
+pub mod chat_template;
+
 #[cfg(feature = "pypi")]
 mod python;
 #[cfg(feature = "pypi")]
