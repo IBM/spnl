@@ -214,6 +214,12 @@ impl From<&String> for Query {
     }
 }
 
+impl From<Vec<Query>> for Query {
+    fn from(v: Vec<Query>) -> Self {
+        Self::Seq(v)
+    }
+}
+
 /// Pretty print a query
 pub fn pretty_print(u: &Query) -> serde_json::Result<()> {
     println!("{}", serde_json::to_string(u)?);
