@@ -95,15 +95,17 @@ impl TokenizedQuery {
 }
 
 fn pad(pad_token: u32, block_size: usize, toklist: Vec<u32>) -> Vec<u32> {
-    toklist[0..toklist.len() - 1]
-        .iter()
-        .copied()
-        .chain(::std::iter::repeat_n(
-            pad_token,
-            block_size - (toklist.len() % block_size),
-        ))
-        .chain(toklist[toklist.len() - 1..].iter().copied())
-        .collect()
+    let n_pads = block_size - (toklist.len() % block_size);
+    if n_pads == block_size {
+        toklist.clone()
+    } else {
+        toklist[0..toklist.len() - 1]
+            .iter()
+            .copied()
+            .chain(::std::iter::repeat_n(pad_token, n_pads))
+            .chain(toklist[toklist.len() - 1..].iter().copied())
+            .collect()
+    }
 }
 
 fn pad_seq(
