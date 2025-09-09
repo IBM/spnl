@@ -25,6 +25,19 @@ async fn seq(
     Ok(evaluated)
 }
 
+async fn par(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
+    let m = MultiProgress::new();
+    let evaluated =
+        futures::future::try_join_all(units.iter().map(|u| run_subtree(u, rp, Some(&m)))).await?;
+
+    if evaluated.len() == 1 {
+        // the unwrap() is safe here, due to the len() == 1 guard
+        Ok(evaluated.into_iter().next().unwrap())
+    } else {
+        Ok(Query::Par(evaluated))
+    }
+}
+
 async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
     let m = MultiProgress::new();
     let evaluated =
@@ -50,6 +63,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
     match query {
         Query::Message(_) => Ok(query.clone()),
 
+        Query::Par(u) => par(u, rp).await,
         Query::Seq(u) => Ok(Query::Seq(seq(u, rp, m).await?)),
         Query::Cross(u) => Ok(Query::Cross(seq(u, rp, m).await?)),
         Query::Plus(u) => plus(u, rp).await,

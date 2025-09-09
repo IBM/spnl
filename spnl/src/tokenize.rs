@@ -160,7 +160,7 @@ fn encode_plus_part(
 
 fn extract_up_to_plus(tok: &Tokenizer, q: &Query) -> Vec<String> {
     match q {
-        Query::Seq(v) | Query::Cross(v) => v
+        Query::Par(v) | Query::Seq(v) | Query::Cross(v) => v
             .iter()
             .flat_map(|qq| extract_up_to_plus(tok, qq))
             .collect(),
@@ -174,7 +174,7 @@ fn extract_up_to_plus(tok: &Tokenizer, q: &Query) -> Vec<String> {
 
 fn extract_parts(tok: &Tokenizer, q: &Query, in_plus: bool) -> Vec<String> {
     match (q, in_plus) {
-        (Query::Seq(v), _) | (Query::Cross(v), _) => v
+        (Query::Par(v), _) | (Query::Seq(v), _) | (Query::Cross(v), _) => v
             .iter()
             .flat_map(|qq| extract_parts(tok, qq, in_plus))
             .collect(),
@@ -198,7 +198,7 @@ fn tokenize_part(
     block_size: usize,
 ) -> tokenizers::tokenizer::Result<Vec<u32>> {
     match input {
-        NonGenerateInput::Seq(v) => v
+        NonGenerateInput::Seq(v) | NonGenerateInput::Par(v) => v
             .iter()
             .map(|u| tokenize_part(u, tok, pad_token, cross_token, plus_token, block_size))
             .flat_map(|result| match result {
@@ -278,6 +278,9 @@ pub enum NonGenerateInput {
     /// Execute serially
     Seq(Vec<NonGenerateInput>),
 
+    /// Execute in parallel
+    Par(Vec<NonGenerateInput>),
+
     /// Some sort of message
     #[serde(untagged)]
     Message(Message),
@@ -305,6 +308,7 @@ impl From<NonGenerateInput> for Query {
             NonGenerateInput::Plus(v) => Query::Plus(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Cross(v) => Query::Cross(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Seq(v) => Query::Seq(v.into_iter().map(|m| m.into()).collect()),
+            NonGenerateInput::Par(v) => Query::Par(v.into_iter().map(|m| m.into()).collect()),
         }
     }
 }
@@ -352,6 +356,22 @@ pub fn tokenize_query(
             .map_err(handle_err)?
             .into_iter()
             .chain(
+                // add a plus token before the final assistant token
+                // if we are in a Plus
+                if let Some(plus_token) = plus_token
+                    && matches!(input, NonGenerateInput::Plus(_))
+                {
+                    Some([plus_token])
+                } else {
+                    None
+                }
+                .into_iter()
+                .flatten(),
+            )
+            .chain(
+                // add the final assistant token. the first `true`
+                // means add this token to the given (empty) list of
+                // tokens, i.e. generate just the assistant token
                 tok.tok
                     .encode_fast(chat_template::apply(tok.tmpl, &[], true), false)
                     .map_err(handle_err)?

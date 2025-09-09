@@ -18,7 +18,12 @@ macro_rules! spnl {
     );
 
     // Core: execute serially
+    (seq $e:tt) => ( $crate::Query::Seq($crate::spnl_arg!( $e )) );
     (seq $( $e:tt )+) => ( $crate::Query::Seq(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
+
+    // Core: execute parallel
+    (par $e:tt) => ( $crate::Query::Par($crate::spnl_arg!( $e )) );
+    (par $( $e:tt )+) => ( $crate::Query::Par(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: Dependent/needs-attention
     (cross $( $e:tt )+) => ( $crate::Query::Cross(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );

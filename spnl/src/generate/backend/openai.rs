@@ -133,7 +133,9 @@ pub async fn generate(
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
     match input {
-        Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.iter().flat_map(messagify).collect(),
+        Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => {
+            v.iter().flat_map(messagify).collect()
+        }
         Query::Message(System(s)) => vec![ChatCompletionRequestMessage::System(
             ChatCompletionRequestSystemMessage {
                 name: None,

@@ -68,11 +68,26 @@ fn simplify(query: &Query) -> Query {
             // One-entry sequence
             [q] => simplify(q),
 
-            otherwise => Query::Seq(otherwise.iter().map(simplify).collect()),
+            otherwise => Query::Seq(
+                otherwise
+                    .iter()
+                    .map(simplify)
+                    .flat_map(|q| match q {
+                        Query::Seq(v) => v, // Seq inside a Seq? flatten
+                        _ => vec![q],
+                    })
+                    .collect(),
+            ),
+        },
+        Query::Par(v) => match &v[..] {
+            // One-entry parallel
+            [q] => simplify(q),
+
+            otherwise => Query::Par(otherwise.iter().map(simplify).collect()),
         },
         Query::Plus(v) => Query::Plus(match &v[..] {
-            // Plus of Plus
-            [Query::Plus(v2)] => v2.iter().map(simplify).collect(),
+            // Plus of Seq or Plus of Plus
+            [Query::Seq(v2)] | [Query::Plus(v2)] => v2.iter().map(simplify).collect(),
 
             otherwise => otherwise.iter().map(simplify).collect(),
         }),
