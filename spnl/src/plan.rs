@@ -64,6 +64,12 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
 /// e.g. Plus-of-Plus or Cross with a tail Cross.
 fn simplify(query: &Query) -> Query {
     match query {
+        Query::Seq(v) => match &v[..] {
+            // One-entry sequence
+            [q] => simplify(q),
+
+            otherwise => Query::Seq(otherwise.iter().map(simplify).collect()),
+        },
         Query::Plus(v) => Query::Plus(match &v[..] {
             // Plus of Plus
             [Query::Plus(v2)] => v2.iter().map(simplify).collect(),
@@ -100,5 +106,8 @@ pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
     crate::augment::index(query, &po.aug).await?;
 
-    Ok(simplify(&cross_if_needed(plan_iter(query, po).await?)))
+    // iterate the simplify a few times
+    Ok(simplify(&simplify(&simplify(&simplify(&simplify(
+        &cross_if_needed(plan_iter(query, po).await?),
+    ))))))
 }
