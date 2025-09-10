@@ -8,6 +8,9 @@ name: publish_pypi
 on:
   release:
     types: [published]
+  # uncomment for debugging:
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -93,14 +96,14 @@ jobs:
             target: x64
           - runner: windows-latest
             target: x86
-          #- runner: windows-latest # <-- cannot install python, and no pythons are found in the hosted tool cache
-          #  target: arm64 # Note: not aarch64 unlike linux and macos
+          - runner: windows-11-arm
+            target: aarch64
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-          architecture: ${{ matrix.platform.target }}
+          architecture: ${{ matrix.platform.target == 'aarch64' && 'arm64' || matrix.platform.target }} # map arm64 target for setup-python
       - name: Download maturin-action
         run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build wheels
