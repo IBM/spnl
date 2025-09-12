@@ -460,3 +460,94 @@ pub fn tokenize_prepare(
         _ => todo!(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use itertools::Itertools;
+
+    const PAD_TOKEN: u32 = 27;
+    const BLOCK_SIZE: usize = 16;
+
+    const MODEL: &str = "ibm-granite/granite-3.3-2b-instruct"; // TODO find smaller model with public tokenizers.json
+    const START_OF_ROLE: u32 = 49152;
+    const END_OF_ROLE: u32 = 49153;
+    const END_OF_TEXT: u32 = 0;
+    const USER: u32 = 496;
+    const ASSISTANT: u32 = 17594;
+    const HELLO: u32 = 7656;
+    const LONGER: u32 = 8928;
+
+    fn tok() -> Result<::std::sync::Arc<Tokenizer>, ::std::sync::Arc<tokenizers::tokenizer::Error>>
+    {
+        init(2).get_or_create(&MODEL.into(), PAD_TOKEN, None, None, BLOCK_SIZE)
+    }
+
+    #[test]
+    fn create_tokenizer() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>> {
+        tok().map(|_| ())
+    }
+
+    #[test]
+    fn user() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>> {
+        assert_eq!(
+            tok().map(|tok| tok.user("hello"))?,
+            "<|start_of_role|>user<|end_of_role|>hello<|end_of_text|>"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn usertok() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>> {
+        let mut tokens = vec![];
+        tok()?.usertok("hello", &mut tokens)?;
+        assert_eq!(
+            tokens,
+            [START_OF_ROLE, USER, END_OF_ROLE, HELLO, END_OF_TEXT]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn assistant() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>> {
+        assert_eq!(
+            tok().map(|tok| tok.assistant("hello"))?,
+            "<|start_of_role|>assistant<|end_of_role|>hello<|end_of_text|>"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn assistanttok_fully_cropped() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>> {
+        let mut tokens = vec![];
+        tok()?.assistanttok("hello", &mut tokens)?;
+        let empty: &[u32] = &[];
+        assert_eq!(tokens, empty);
+        Ok(())
+    }
+
+    #[test]
+    fn assistanttok_partially_cropped() -> Result<(), ::std::sync::Arc<tokenizers::tokenizer::Error>>
+    {
+        let repeat_input = 17; // repeat this many times for the input message
+        let repeat_output = 12; // expect this many repetitions after cropping
+        let mut tokens = vec![];
+        tok()?.assistanttok(
+            format!(
+                "hello {}",
+                ::std::iter::repeat_n("longer", repeat_input).join(" ")
+            )
+            .as_str(),
+            &mut tokens,
+        )?;
+        assert_eq!(
+            tokens,
+            [START_OF_ROLE, ASSISTANT, END_OF_ROLE, HELLO]
+                .into_iter()
+                .chain(::std::iter::repeat_n(LONGER, repeat_output))
+                // .chain([END_OF_TEXT])
+                .collect::<Vec<u32>>(),
+        );
+        Ok(())
+    }
+}
