@@ -11,6 +11,7 @@ use crate::{
         AugmentOptions,
         embed::{EmbedData, embed},
     },
+    execute::TimestampedQuery,
     generate::generate,
 };
 
@@ -153,7 +154,10 @@ async fn cross_index_fragment(
     )
     .await?
     {
-        Query::Message(User(s)) => s,
+        TimestampedQuery {
+            result: Query::Message(User(s)),
+            ..
+        } => s,
         _ => "".into(),
     };
 

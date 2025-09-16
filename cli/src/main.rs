@@ -77,12 +77,15 @@ async fn main() -> Result<(), SpnlError> {
         ptree::write_tree(&query, ::std::io::stderr())?;
     }
 
-    let res = execute(&query, &rp).await.map(|res| {
-        if !res.to_string().is_empty() {
-            println!("{res}");
-        }
-        Ok(())
-    })?;
+    let res = execute(&query, &rp)
+        .await
+        .map(|res| res.result)
+        .map(|res| {
+            if !res.to_string().is_empty() {
+                println!("{res}");
+            }
+            Ok(())
+        })?;
 
     if let Some(time) = time {
         eprintln!("{}", time.elapsed().as_millis());
