@@ -53,7 +53,7 @@ pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
     ));
 
     res.map(|res| ChatResponse {
-        data: res.to_string(),
+        data: res.result.to_string(),
         model_id: None,
         usage: None,
     })
