@@ -14,6 +14,7 @@ struct Tokenizer {
     cross_token: Option<u32>,
     plus_token: Option<u32>,
     block_size: usize,
+    assistant_suffix_num_tokens: usize,
 }
 
 impl Tokenizer {
@@ -33,8 +34,14 @@ impl Tokenizer {
     }
 
     fn assistanttok(&self, m: &str, tokens: &mut Vec<u32>) -> tokenizers::tokenizer::Result<()> {
+        let encoding = self.tok.encode_fast(self.assistant(m), false)?;
+        let extra = encoding.get_ids();
+
         self.extend_crop(
-            self.tok.encode_fast(self.assistant(m), false)?.get_ids(),
+            // TODO: for now, we always drop any assistant suffix. we
+            // will need to figure out how to isolatge these on their
+            // own block
+            &extra[0..extra.len() - self.assistant_suffix_num_tokens],
             tokens,
         );
         Ok(())
@@ -106,13 +113,44 @@ impl TokenizerState {
         block_size: usize,
     ) -> Result<::std::sync::Arc<Tokenizer>, ::std::sync::Arc<tokenizers::tokenizer::Error>> {
         self.cache.try_get_with(model.clone(), || {
+            let tok = tokenizers::tokenizer::Tokenizer::from_pretrained(model, None)?;
+            let tmpl = chat_template::detect(model)?;
+
+            let m = "hello";
+            let binding = tok.encode_fast(
+                chat_template::apply(tmpl, &[Message::Assistant(m.to_owned())], false),
+                false,
+            )?;
+            let binding2 = tok.encode_fast(m, false)?;
+            let with_chat_template = binding.get_ids();
+            let without_chat_template = binding2.get_ids();
+
+            // TODO this is imperfect...
+            let start_of_message_idx = with_chat_template
+                .iter()
+                .position(|t| *t == without_chat_template[0]);
+            let end_of_message_idx = start_of_message_idx
+                .map(|start_of_message_idx| start_of_message_idx + without_chat_template.len());
+            // [pppppmmmmmmmmmss]  <- ppppp are the prefix speical tokens added by chat template; ss suffix special tokens
+            //       ^ start_of_message_idx
+            //                ^ end_of_message_idx
+            let assistant_suffix_num_tokens = if let Some(end_of_message_idx) = end_of_message_idx {
+                with_chat_template.len() - end_of_message_idx
+            } else {
+                eprintln!(
+                    "Warning: could not determine length of end of assistant special token sequence"
+                );
+                0
+            };
+
             Ok(::std::sync::Arc::new(Tokenizer {
-                tmpl: chat_template::detect(model)?,
-                tok: tokenizers::tokenizer::Tokenizer::from_pretrained(model, None)?,
+                tmpl,
+                tok,
                 pad_token,
                 cross_token,
                 plus_token,
                 block_size,
+                assistant_suffix_num_tokens,
             }))
         })
     }
