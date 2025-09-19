@@ -420,15 +420,9 @@ pub fn tokenize_query(
         temperature,
     } = query.g;
 
-    let s = ::std::time::Instant::now();
     let tok = state
         .get_or_create(&model, pad_token, cross_token, plus_token, block_size)
         .map_err(handle_arc_err)?;
-    println!(
-        "Spnl tokenize_query from pretrained {model}. Loaded in {:?}",
-        s.elapsed()
-    );
-
     let mut tokens: Vec<u32> = vec![];
     tokenize_part(&input, &tok, &mut tokens)
         .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
