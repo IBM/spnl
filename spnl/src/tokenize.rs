@@ -82,7 +82,7 @@ impl Tokenizer {
         // `tokens.len()+self.block_size-1`.
         let end = extra.len() + tokens.len();
         let nearest_block_boundary = end / self.block_size * self.block_size;
-        let amount_to_crop = end - nearest_block_boundary;
+        let amount_to_crop = ::std::cmp::min(extra.len(), end - nearest_block_boundary);
         let extra_end = extra.len() - amount_to_crop;
 
         self.extend(&extra[0..extra_end], tokens);
