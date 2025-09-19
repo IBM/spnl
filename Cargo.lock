@@ -2890,7 +2890,7 @@ dependencies = [
 
 [[package]]
 name = "haystack"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -6494,7 +6494,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -6532,7 +6532,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-cli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -6547,7 +6547,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-wasm"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "serde_json",
  "spnl",
