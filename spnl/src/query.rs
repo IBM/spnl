@@ -8,13 +8,17 @@ pub enum Document {
     Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, derive_builder::Builder,
 )]
 pub struct Generate {
+    #[builder(setter(into))]
     pub model: String,
+
     pub input: Box<Query>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(default = Some(0))]
     pub max_tokens: Option<i32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(default = Some(0.6))]
     pub temperature: Option<f32>,
 }
 
@@ -367,7 +371,7 @@ mod tests {
             result,
             Query::Generate(
                 GenerateBuilder::default()
-                    .model("ollama/granite3.2:2b".into())
+                    .model("ollama/granite3.2:2b")
                     .input(Query::Message(Message::User("hello".to_string())).into())
                     .max_tokens(None)
                     .temperature(None)
