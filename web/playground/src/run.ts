@@ -108,6 +108,13 @@ ${x.system
       /* will be expanded by the planner */
       return x
     })
+    .with({ seq: P.array() }, async ({ seq }) => {
+      const results = []
+      for (const c of seq) {
+        results.push(await run(c, props, inPlusOrCross))
+      }
+      return { seq: results }
+    })
     .with({ cross: P.array() }, async ({ cross }) => {
       const results = []
       for (const c of cross) {
@@ -124,6 +131,21 @@ ${x.system
       return {
         plus: await Promise.all(
           plus.map((u) => {
+            const idx = isGenerate(u) ? genIdx++ : -1
+            return run(u, props, idx)
+          }),
+        ),
+      }
+    })
+    .with({ par: P.array() }, async ({ par }) => {
+      const gens = par.filter(isGenerate)
+      if (gens.length > 0) {
+        props.setProgressDoPar(() => [] as InitProgress[])
+      }
+      let genIdx = 0
+      return {
+        par: await Promise.all(
+          par.map((u) => {
             const idx = isGenerate(u) ? genIdx++ : -1
             return run(u, props, idx)
           }),

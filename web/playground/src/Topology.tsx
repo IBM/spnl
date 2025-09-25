@@ -36,6 +36,20 @@ function graphify(unit: import("./Query").Query, id = "root"): Data[] {
         .fill(0)
         .flatMap((_, idx) => graphify(repeat.query, id + "." + idx)),
     )
+    .with({ seq: P.array() }, ({ seq }) => [
+      node(
+        id,
+        "..",
+        seq.flatMap((child, idx) => graphify(child, id + ".X+" + idx)),
+      ),
+    ])
+    .with({ par: P.array() }, ({ par }) => [
+      node(
+        id,
+        "||",
+        par.flatMap((child, idx) => graphify(child, id + ".X+" + idx)),
+      ),
+    ])
     .with({ cross: P.array() }, ({ cross }) => [
       node(
         id,

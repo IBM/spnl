@@ -5,6 +5,8 @@ export type User = { user: string }
 export type System = { system: string }
 export type Assistant = { assistant: string }
 export type Print = { print: string }
+export type Seq = { seq: Query[] }
+export type Par = { par: Query[] }
 export type Plus = { plus: Query[] }
 export type Cross = { cross: Query[] }
 export type Repeat = { repeat: { n: number; query: Query } }
@@ -16,6 +18,8 @@ export type Query =
   | User
   | System
   | Assistant
+  | Seq
+  | Par
   | Plus
   | Cross
   | Repeat

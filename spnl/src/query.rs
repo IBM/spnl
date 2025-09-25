@@ -110,7 +110,7 @@ pub enum Query {
     Ask(String),
 
     /// Print a helpful message to the console
-    #[cfg(feature = "cli_support")]
+    #[cfg(feature = "print")]
     Print(String),
 
     /// Some sort of message
