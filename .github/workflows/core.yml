@@ -67,7 +67,7 @@ jobs:
         run: rustc --version
 
       - name: cargo test
-        run: cargo test --all-features -p spnl -p spnl-cli --workspace
+        run: cargo test --all-features -p spnl -p spnl-cli
         
       - name: rustfmt
         run: cargo fmt --all -- --check
