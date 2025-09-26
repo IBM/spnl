@@ -9,7 +9,7 @@ description = "A Span Query is a declarative way to specify which portions of a 
 
 [features]
 default = ["cli_support","lisp","run","ollama","openai","gemini","pull","yaml"]
-cli_support = ["dep:ptree","dep:rustyline"]
+cli_support = ["print","dep:ptree","dep:rustyline"]
 print = []
 lisp = ["dep:serde-lexpr"]
 ollama = ["openai"]
