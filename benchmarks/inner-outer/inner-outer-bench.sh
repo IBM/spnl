@@ -4,6 +4,7 @@ set -eo pipefail
 
 N_ITERS=500
 N_ITERS_PER_RESET=25
+MODEL=${1-ibm-granite/granite-3.3-8b-instruct}
 
 for api in openai spnl
 do
@@ -11,15 +12,16 @@ do
   else b=email2
   fi
 
-  # repeat e.g. 20 times if we want 500 total iters and 25 iters per reset (20=500/25)
-  for j in $(seq 1 $((N_ITERS / N_ITERS_PER_RESET)))
+  # Sweep over num inner generates $n
+  for n in $(seq 1 32)
   do
-      for n in $(seq 1 32)
+      # Repeat e.g. 20 times if we want 500 total iters and 25 iters per reset (20=500/25)
+      for j in $(seq 1 $((N_ITERS / N_ITERS_PER_RESET)))
       do
           curl -XPOST http://localhost:8000/reset_prefix_cache
           OPENAI_API_BASE=http://localhost:8000/v1 spnl -b $b -m $api/$MODEL -n $n -l 10000
 
-          # repeat this many times before resetting kv cache
+          # Repeat without resetting kv cache
           for i in $(seq 1 $N_ITERS_PER_RESET)
           do
               f=timings.$api.$b.$n.txt
