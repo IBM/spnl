@@ -60,11 +60,17 @@ jobs:
       # - uses: Swatinem/rust-cache@v2
       # - uses: pydantic/ollama-action@v3
 
-      - name: cargo test
-        run: cargo test --all-features --all
+      - name: report cargo version
+        run: cargo --version
 
+      - name: report rustc version
+        run: rustc --version
+
+      - name: cargo test
+        run: cargo test --all-features -p spnl -p spnl-cli --workspace
+        
       - name: rustfmt
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy --all --all-features --tests -- -D warnings
+        run: cargo clippy --workspace --all-features --tests -- -D warnings
