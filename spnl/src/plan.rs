@@ -1,4 +1,4 @@
-use crate::{Generate, Query, Repeat};
+use crate::{Generate, Query, Repeat, generate::is_span_enabled};
 
 #[derive(Default)]
 pub struct PlanOptions {
@@ -48,30 +48,36 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
         }) => {
             let planned_input = plan_iter(input, po).await?;
 
-            let nested_gen_input: Option<Query> = match &planned_input[..] {
-                [Query::Seq(seq)] => match &seq[..] {
-                    [Query::Message(m), Query::Plus(plus)] => {
-                        match plus.iter().all(|q| matches!(q, Query::Generate(_))) {
-                            true => Some(Query::Seq(vec![
-                                Query::Message(m.clone()),
-                                Query::Par(
-                                    plus.iter()
-                                        .filter_map(|q| match q {
-                                            Query::Generate(g) => Some(Query::Plus(vec![
-                                                *g.input.clone(),
-                                                Query::Generate(g.clone()),
-                                            ])),
-                                            _ => None,
-                                        })
-                                        .collect(),
-                                ),
-                            ])),
-                            false => None,
+            let nested_gen_input: Option<Query> = if !is_span_enabled(model) {
+                None
+            } else {
+                match &planned_input[..] {
+                    [Query::Seq(seq)] => match &seq[..] {
+                        [Query::Message(m), Query::Plus(plus)] => {
+                            // Plus of (only) Generates?
+                            match plus.iter().all(|q| matches!(q, Query::Generate(_))) {
+                                // yes, we have a Plus of only Generates
+                                true => Some(Query::Seq(vec![
+                                    Query::Message(m.clone()),
+                                    Query::Par(
+                                        plus.iter()
+                                            .filter_map(|q| match q {
+                                                Query::Generate(g) => Some(Query::Plus(vec![
+                                                    *g.input.clone(),
+                                                    Query::Generate(g.wrap_plus()),
+                                                ])),
+                                                _ => None,
+                                            })
+                                            .collect(),
+                                    ),
+                                ])),
+                                false => None,
+                            }
                         }
-                    }
+                        _ => None,
+                    },
                     _ => None,
-                },
-                _ => None,
+                }
             };
 
             Ok(vec![Query::Generate(Generate {
@@ -160,7 +166,7 @@ pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{GenerateBuilder, Message::*, Query::*, Repeat as Rep};
+    use crate::{Generate as Gen, GenerateBuilder, Message::*, Query::*, Repeat as Rep};
 
     #[test]
     fn simplify1() {
@@ -213,34 +219,52 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test] // <-- needed for async tests
-    async fn nested_gen() -> anyhow::Result<()> {
+    fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Gen, Query, Query, Query)> {
         let s2 = Message(System("outer system".into()));
         let s1 = Message(System("inner system".into()));
         let u1 = Message(User("inner user".into()));
-        let inner_generate = Generate(
-            GenerateBuilder::default()
-                .model("m")
-                .input(Box::new(Seq(vec![s1.clone(), u1.clone()])))
-                .build()?,
-        );
+        let inner_generate = GenerateBuilder::default()
+            .model(model)
+            .input(Box::new(Seq(vec![s1.clone(), u1.clone()])))
+            .build()?;
         let outer_generate = Generate(
             GenerateBuilder::default()
-                .model("m")
+                .model(model)
                 .input(Box::new(Seq(vec![
                     s2.clone(),
-                    Plus(vec![inner_generate.clone()]),
+                    Plus(vec![Generate(inner_generate.clone())]),
                 ])))
                 .build()?,
         );
+
+        Ok((outer_generate, inner_generate, s2, s1, u1))
+    }
+
+    #[tokio::test] // <-- needed for async tests
+    async fn nested_gen_expect_no_span_optimization() -> anyhow::Result<()> {
+        let (outer_generate, _, _, _, _) = nested_gen_query("m")?;
         assert_eq!(
             plan(&outer_generate, &PlanOptions::default()).await?,
-            Generate(
+            outer_generate,
+        );
+        Ok(())
+    }
+
+    #[tokio::test] // <-- needed for async tests
+    async fn nested_gen_expect_span_optimization() -> anyhow::Result<()> {
+        let model = "spnl/m";
+        let (outer_generate, inner_generate, s2, s1, u1) = nested_gen_query(model)?;
+        assert_eq!(
+            plan(&outer_generate, &PlanOptions::default()).await?,
+            simplify(&Generate(
                 GenerateBuilder::default()
-                    .model("m")
-                    .input(Box::new(Seq(vec![s2, Plus(vec![s1, u1, inner_generate])])))
+                    .model(model)
+                    .input(Box::new(Seq(vec![
+                        s2,
+                        Plus(vec![s1, u1, Generate(inner_generate.wrap_plus())])
+                    ])))
                     .build()?
-            )
+            ))
         );
         Ok(())
     }

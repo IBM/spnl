@@ -22,6 +22,20 @@ pub struct Generate {
     pub temperature: Option<f32>,
 }
 
+impl Generate {
+    /// Return self, but with input wrapped according to the given function
+    pub fn wrap(&self, f: fn(Query) -> Query) -> Self {
+        let mut g = self.clone();
+        g.input = Box::new(f(*g.input));
+        g
+    }
+
+    /// Return self, but with input wrapped with a Plus
+    pub fn wrap_plus(&self) -> Self {
+        self.wrap(|input| Query::Plus(vec![input]))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Repeat {
     pub n: usize,

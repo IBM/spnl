@@ -6,6 +6,11 @@ pub mod backend;
 #[error("Model not found")]
 pub struct ModelNotFoundError;
 
+pub fn is_span_enabled(model: &str) -> bool {
+    // for now...
+    model.starts_with("spnl/")
+}
+
 pub async fn generate(
     model: &str,
     input: &Query,
