@@ -37,7 +37,8 @@ fs4 = { version = "0.13.1", optional = true }
 futures = { version = "0.3.31", optional = true }
 indicatif = { version = "0.18.0", optional = true }
 rustyline = { version = "17.0.0", features = ["with-file-history"], optional = true } 
-tokio = { version = "1.44.1", features = ["io-std"], optional = true }
+tokio = { version = "1.44.1", features = ["io-std", "full"], optional = true }
+tokio-util = "0.7.16"
 tokio-stream = { version = "0.1.17", optional = true }
 anyhow = { version = "1.0.98" }
 lancedb = { version = "0.22.0", optional = true }
@@ -53,7 +54,7 @@ pyo3 = { version = "0.26.0", features = ["macros"], optional = true }
 tokenizers = { version = "0.22.0", default-features = false, features = ["onig", "esaxx_fast", "hf-hub", "http"], optional = true }
 derive_builder = "0.20.2"
 moka = { version = "0.12.10", features = ["sync"], optional = true }
-reqwest = { version = "0.12.20", features = ["json"], optional = true }
+reqwest = { version = "0.12.20", features = ["json", "stream"], optional = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 thiserror = "2.0.14"
 atoi = "2.0.0"

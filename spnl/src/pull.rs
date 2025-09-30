@@ -1,5 +1,7 @@
-use duct::cmd;
 use fs4::fs_std::FileExt;
+use futures_util::StreamExt;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use crate::{Generate, Query};
 
@@ -35,6 +37,23 @@ struct OllamaTags {
     models: Vec<OllamaModel>,
 }
 
+// struct to hold request params
+#[derive(serde::Serialize)]
+struct PullRequest {
+    model: String,
+    insecure: Option<bool>,
+    stream: Option<bool>,
+}
+
+// struct to hold response params
+#[derive(Debug, serde::Deserialize)]
+struct PullResponse {
+    status: String,
+    digest: Option<String>,
+    total: Option<u64>,
+    completed: Option<u64>,
+}
+
 async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
     let tags: OllamaTags = reqwest::get("http://localhost:11434/api/tags")
         .await?
@@ -44,6 +63,7 @@ async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
 }
 
 /// The Ollama implementation of a single model pull
+#[tokio::main]
 async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
     // don't ? the cmd! so that we can "finally" unlock the file
     if !ollama_exists(model).await? {
@@ -51,13 +71,79 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
         let f = ::std::fs::File::create(&path)?;
         /*f.lock_exclusive()?;
         if !ollama_exists(model).await?*/
-        {
-            let pull_res = cmd!("ollama", "pull", model)
-                .stdout_to_stderr()
-                .run()
-                .map(|_| ());
-            FileExt::unlock(&f)?;
-            return Ok(pull_res?);
+        if !ollama_exists(model).await? {
+            // create new MultiProgress bar
+            let m = MultiProgress::new();
+            let style = ProgressStyle::with_template(
+                "{msg} {wide_bar:.cyan/blue} {pos:>7}/{len:7} [{elapsed_precise}]",
+            )?;
+
+            // creating client and request body
+            let http_client = reqwest::Client::new();
+            let request_body = PullRequest {
+                model: model.to_string(),
+                insecure: Some(false),
+                stream: Some(true),
+            };
+
+            // receiving response and error handling
+            let response = http_client
+                .post("http://localhost:11434/api/pull")
+                .json(&request_body)
+                .send()
+                .await?;
+            if !response.status().is_success() {
+                eprintln!(
+                    "API request failed with status: {}",
+                    response.status(),
+                );
+                return Err(anyhow::anyhow!("Ollama API request failed"));
+            }
+
+            // creating streaming structure
+            let byte_stream = response.bytes_stream().map(|r| {
+                r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            });
+            let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
+            let buf_reader = BufReader::new(stream_reader);
+            let mut lines = buf_reader.lines();
+
+            let pb = m.add(ProgressBar::new(0));
+            pb.set_style(style);
+
+            while let Some(line) = lines.next_line().await? {
+                // stores in pull response struct
+                let update: PullResponse = match serde_json::from_str(&line) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("Failed to map JSON into PullResponse: {e}");
+                        continue;
+                    }
+                };
+
+                // checks for error or end of stream 
+                if update.status.to_lowercase() == "error"{
+                    pb.finish_and_clear();
+                    return Err(anyhow::anyhow!("Ollama streaming error: "));
+                }
+                else if update.status.to_lowercase() == "success" {
+                    pb.finish_with_message(format!("Model {model} pulled successfully"));
+                    break;
+                }
+
+                // sets progress bar length
+                pb.set_message(format!("{}", update.status.to_lowercase()));
+                if let (Some(total), Some(done)) = (update.total, update.completed) {
+                    if total == done{
+                        pb.set_length(total);
+                        pb.set_position(done);
+                    }
+                    if pb.length().unwrap_or(0) == 0 {
+                        pb.set_length(total);
+                    }
+                    pb.set_position(done);
+                }
+            }
         }
     }
 
