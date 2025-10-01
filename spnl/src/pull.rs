@@ -49,7 +49,6 @@ struct PullRequest {
 #[derive(Debug, serde::Deserialize)]
 struct PullResponse {
     status: String,
-    digest: Option<String>,
     total: Option<u64>,
     completed: Option<u64>,
 }
@@ -62,8 +61,7 @@ async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
     Ok(tags.models.into_iter().any(|m| m.model == model))
 }
 
-/// The Ollama implementation of a single model pull
-#[tokio::main]
+// The Ollama implementation of a single model pull
 async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
     // don't ? the cmd! so that we can "finally" unlock the file
     if !ollama_exists(model).await? {
@@ -124,6 +122,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 // checks for error or end of stream 
                 if update.status.to_lowercase() == "error"{
                     pb.finish_and_clear();
+                    FileExt::unlock(&f)?;
                     return Err(anyhow::anyhow!("Ollama streaming error: "));
                 }
                 else if update.status.to_lowercase() == "success" {
@@ -144,6 +143,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                     pb.set_position(done);
                 }
             }
+            FileExt::unlock(&f)?;
         }
     }
 
@@ -174,5 +174,26 @@ fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
             v.iter().for_each(|vv| extract_models_iter(vv, models));
         }
         _ => {}
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio;
+
+    // testing a valid model pull
+    #[tokio::test]
+    async fn test_pull_local_ollama() {
+        let result = ollama_pull_if_needed("llama2").await;
+        assert!(result.is_ok());
+    }
+
+    // testing invalid model pull
+    #[tokio::test]
+    async fn test_pull_invalid_model() {
+        let result = ollama_pull_if_needed("notamodel").await;
+        assert!(result.is_err());
     }
 }

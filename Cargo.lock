@@ -6542,6 +6542,7 @@ dependencies = [
  "tokenizers",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
 ]
 
@@ -7077,6 +7078,7 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "slab",
