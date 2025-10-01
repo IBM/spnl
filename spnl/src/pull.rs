@@ -1,5 +1,5 @@
 use fs4::fs_std::FileExt;
-use futures_util::StreamExt;
+use futures::stream::StreamExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
