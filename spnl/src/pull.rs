@@ -114,8 +114,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 let update: PullResponse = match serde_json::from_str(&line) {
                     Ok(u) => u,
                     Err(e) => {
-                        eprintln!("Failed to map JSON into PullResponse: {e}");
-                        continue;
+                        return Err(anyhow::anyhow!("Invalid JSON in PullResponse: {e}"));
                     }
                 };
 
@@ -186,7 +185,7 @@ mod tests {
     // testing a valid model pull
     #[tokio::test]
     async fn test_pull_local_ollama() {
-        let result = ollama_pull_if_needed("llama2").await;
+        let result = ollama_pull_if_needed("qwen:0.5b").await;
         assert!(result.is_ok());
     }
 
