@@ -69,7 +69,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
         let f = ::std::fs::File::create(&path)?;
         /*f.lock_exclusive()?;
         if !ollama_exists(model).await?*/
-        if !ollama_exists(model).await? {
+        {
             // create new MultiProgress bar
             let m = MultiProgress::new();
             let style = ProgressStyle::with_template(
