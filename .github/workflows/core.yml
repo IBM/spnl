@@ -66,6 +66,12 @@ jobs:
       - name: report rustc version
         run: rustc --version
 
+      - name: install ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sudo -E sh
+          sleep 2
+          ollama serve &
+
       - name: cargo test
         run: cargo test --all-features -p spnl -p spnl-cli
         
