@@ -98,7 +98,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
             // creating streaming structure
             let byte_stream = response
                 .bytes_stream()
-                .map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
+                .map(|r| r.map_err(|e| std::io::Error::other(e)));
             let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
             let buf_reader = BufReader::new(stream_reader);
             let mut lines = buf_reader.lines();
@@ -126,7 +126,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 }
 
                 // sets progress bar length
-                pb.set_message(format!("{}", update.status.to_lowercase()));
+                pb.set_message(update.status.to_lowercase());
                 if let (Some(total), Some(done)) = (update.total, update.completed) {
                     if total == done {
                         pb.set_length(total);
