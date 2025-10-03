@@ -2,7 +2,7 @@ name: core
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, checkingOSRunner ]
   pull_request:
     branches: [ main ]
 
