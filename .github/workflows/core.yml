@@ -68,9 +68,15 @@ jobs:
 
       - name: install ollama
         run: |
-          curl -fsSL https://ollama.com/install.sh | sudo -E sh
-          sleep 2
-          ollama serve &
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            curl -fsSL https://ollama.com/install.sh | sudo -E sh
+            sleep 2
+            ollama serve &
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            echo "MacOS detected — currently skipping Ollama installation (no headless support)"
+            # If you later find a macOS-compatible install method, put it here
+          fi
+
 
       - name: cargo test
         run: cargo test --all-features -p spnl -p spnl-cli
