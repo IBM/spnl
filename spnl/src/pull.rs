@@ -1,7 +1,7 @@
 use fs4::fs_std::FileExt;
 use futures::stream::StreamExt;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::{Generate, Query};
 
@@ -91,17 +91,14 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 .send()
                 .await?;
             if !response.status().is_success() {
-                eprintln!(
-                    "API request failed with status: {}",
-                    response.status(),
-                );
+                eprintln!("API request failed with status: {}", response.status(),);
                 return Err(anyhow::anyhow!("Ollama API request failed"));
             }
 
             // creating streaming structure
-            let byte_stream = response.bytes_stream().map(|r| {
-                r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-            });
+            let byte_stream = response
+                .bytes_stream()
+                .map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
             let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
             let buf_reader = BufReader::new(stream_reader);
             let mut lines = buf_reader.lines();
@@ -118,13 +115,12 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                     }
                 };
 
-                // checks for error or end of stream 
-                if update.status.to_lowercase() == "error"{
+                // checks for error or end of stream
+                if update.status.to_lowercase() == "error" {
                     pb.finish_and_clear();
                     FileExt::unlock(&f)?;
                     return Err(anyhow::anyhow!("Ollama streaming error: "));
-                }
-                else if update.status.to_lowercase() == "success" {
+                } else if update.status.to_lowercase() == "success" {
                     pb.finish_with_message(format!("Model {model} pulled successfully"));
                     break;
                 }
@@ -132,7 +128,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 // sets progress bar length
                 pb.set_message(format!("{}", update.status.to_lowercase()));
                 if let (Some(total), Some(done)) = (update.total, update.completed) {
-                    if total == done{
+                    if total == done {
                         pb.set_length(total);
                         pb.set_position(done);
                     }
@@ -175,7 +171,6 @@ fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
         _ => {}
     }
 }
-
 
 #[cfg(test)]
 mod tests {
