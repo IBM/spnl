@@ -98,7 +98,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
             // creating streaming structure
             let byte_stream = response
                 .bytes_stream()
-                .map(|r| r.map_err(|e| std::io::Error::other(e)));
+                .map(|r| r.map_err(std::io::Error::other));
             let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
             let buf_reader = BufReader::new(stream_reader);
             let mut lines = buf_reader.lines();
