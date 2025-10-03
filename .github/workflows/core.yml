@@ -73,8 +73,38 @@ jobs:
             sleep 2
             ollama serve &
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            echo "MacOS detected — currently skipping Ollama installation (no headless support)"
-            # If you later find a macOS-compatible install method, put it here
+            if ! command -v brew &> /dev/null
+            then
+                echo "Homebrew not found. Installing Homebrew..."
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    eval "$(/usr/local/bin/brew shellenv)"
+                fi
+                echo "Homebrew installed."
+            else
+                echo "Homebrew is already installed. Updating..."
+                brew update
+            fi
+
+            echo "Installing Ollama..."
+            brew install ollama
+            echo "Starting Ollama server as a background service..."
+            brew services start ollama
+
+            sleep 5
+            echo "Ollama installed and server started."
+
+            echo "Verifying server status..."
+            if curl -s http://localhost:11434/ | grep -q "Ollama is running"; then
+                echo "✅ Ollama server is running successfully."
+                echo ""
+                echo "To run your first model (e.g., Llama 3), use:"
+                echo "ollama run llama3"
+            else
+                echo "❌ Could not verify Ollama server is running. Check 'brew services list' for status."
+            fi
           fi
 
 
