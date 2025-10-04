@@ -1,7 +1,7 @@
 use fs4::fs_std::FileExt;
 use futures::stream::StreamExt;
-use std::collections::HashMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::{Generate, Query};
