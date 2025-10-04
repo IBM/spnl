@@ -66,6 +66,19 @@ jobs:
       - name: report rustc version
         run: rustc --version
 
+      - name: install ollama
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            curl -fsSL https://ollama.com/install.sh | sudo -E sh
+            sleep 2
+            ollama serve &
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            brew update
+            brew install ollama
+            brew services start ollama
+            sleep 5
+          fi
+
       - name: cargo test
         run: cargo test --all-features -p spnl -p spnl-cli
         
