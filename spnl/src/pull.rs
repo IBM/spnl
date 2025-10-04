@@ -1,7 +1,7 @@
 use fs4::fs_std::FileExt;
 use futures::stream::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::{Generate, Query};
@@ -137,11 +137,9 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                         }
                         current_pb.set_position(done);
                     }
-                } else if digests.is_empty() {
-                    // prints out status updates (before download)
+                } else if digests.is_empty() { // prints out status updates (before download)
                     m.println(&my_status).unwrap();
-                } else {
-                    // stores to print out status updates (after download)
+                } else { // stores to print out status updates (after download)
                     final_status_lines.push(my_status.clone());
                 }
 
