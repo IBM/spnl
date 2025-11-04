@@ -1,0 +1,85 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: spnl
+  name: llm-d-spnl-builder
+rules:
+- apiGroups: ["build.openshift.io"]
+  resources: ["builds", "builds/details"]
+  verbs: ["get", "watch", "list", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: llm-d-spnl-builder
+  namespace: spnl
+subjects:
+  - kind: ServiceAccount
+    name: llm-d-spnl-builder
+    namespace: spnl
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: llm-d-spnl-builder # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: llm-d-spnl-builder
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: system:openshift:scc:anyuid # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: spnl-llm-d
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: "DockerImage"
+      name: "quay.io/starpit/llm-d-spnl:latest"
+    pushSecret:
+      name: "quay-starpit"
+#    to:
+#      kind: ImageStreamTag
+#      name: llm-d-spnl:latest
+  # postCommit: {}
+  # resources: {}
+  runPolicy: Serial
+  serviceAccount: llm-d-spnl-builder
+  source:
+    # contextDir: docker
+    git:
+      ref: spnl-build
+      uri: https://github.com/starpit/llm-d.git
+    type: Git
+  strategy:
+    dockerStrategy:
+      dockerfilePath: docker/Dockerfile.cuda
+      buildArgs:
+        - name: TARGETOS
+          value: rhel
+        - name: VLLM_REPO
+          value: "https://github.com/starpit/vllm-ibm.git"
+        - name: VLLM_COMMIT_SHA
+          value: 6c4dd70a2d322d27905f9de24e5bbecdff8399da
+        - name: VLLM_PRECOMPILED_WHEEL_COMMIT
+          value: b8b302cde434df8c9289a2b465406b47ebab1c2d # v0.11.0 $(git show-ref -s v0.11.0 | head -1)
+      env:
+      - name: PIP_NO_CACHE_DIR
+        value: "1"
+      from:
+        kind: DockerImage
+        name: registry.access.redhat.com/ubi9/python-311:latest
+    type: Docker
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - type: ConfigChange

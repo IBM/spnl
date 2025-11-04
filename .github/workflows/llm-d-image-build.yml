@@ -1,0 +1,132 @@
+name: llm-d image build
+
+on:
+#  workflow_run:
+#    workflows: ["publish_pypi"]
+#    branches: [main]
+#    types: 
+#      - completed
+# for debugging
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  
+env:
+  LLMD_VERSION: v0.3.1
+  VLLM_VERSION: v0.11.0
+  QUAY_ORG: spnl
+  RELEASE_VERSION: latest # this may overridden below
+
+jobs:
+  build_and_push:
+    name: build and push
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gpu:
+          - cuda
+    steps:
+      #- uses: actions/checkout@v5
+
+      - name: Aggressive disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
+        run: |
+          # Remove Java (JDKs)
+          sudo rm -rf /usr/lib/jvm &
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet &
+          # Remove Swift toolchain
+          sudo rm -rf /usr/share/swift &
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup &
+          # Remove Julia
+          sudo rm -rf /usr/local/julia* &
+          # Remove Android SDKs
+          sudo rm -rf /usr/local/lib/android &
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium &
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google &
+          # Remove Azure CLI
+          sudo rm -rf /opt/az &
+          # Remove PowerShell
+          sudo rm -rf /usr/local/share/powershell &
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache &
+
+          sudo rm -rf \
+            /usr/local/bin/aliyun \
+            /usr/local/bin/azcopy \
+            /usr/local/bin/bicep \
+            /usr/local/bin/cmake-gui \
+            /usr/local/bin/cpack \
+            /usr/local/bin/helm \
+            /usr/local/bin/hub \
+            /usr/local/bin/kubectl \
+            /usr/local/bin/minikube \
+            /usr/local/bin/node \
+            /usr/local/lib/node_modules \
+            /usr/local/bin/packer \
+            /usr/local/bin/pulumi* \
+            /usr/local/bin/sam \
+            /usr/local/bin/stack \
+            /usr/local/bin/oc \
+            /usr/local/aws-sam-cli \
+            /usr/local/lib/heroku \
+            /usr/local/bin/terraform &
+          wait
+      
+      - name: Extract release tag to RELEASE_VERSION env var
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      - name: Verify RELEASE_VERSION
+        run: echo "RELEASE_VERSION=$RELEASE_VERSION"
+
+      - name: Extract vLLM commit hash for ${{ env.VLLM_VERSION }}
+        run: |
+          git clone https://github.com/vllm-project/vllm.git -b $VLLM_VERSION
+          cd vllm
+          echo "VLLM_PRECOMPILED_WHEEL_COMMIT=$(git show-ref -s v0.11.0 | head -1)" >> $GITHUB_ENV
+          cd ..
+          rm -rf vllm
+      - name: Verify VLLM_PRECOMPILED_WHEEL_COMMIT
+        run: echo "VLLM_PRECOMPILED_WHEEL_COMMIT=$VLLM_PRECOMPILED_WHEEL_COMMIT"
+
+      - name: Clone llm-d
+        run: git clone https://github.com/llm-d/llm-d.git -b $LLMD_VERSION
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # We only need to log in if we are going to push
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          registry: quay.io
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build the Container Image for ${{ matrix.gpu }}
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ startsWith(github.ref, 'refs/tags/') }} # Only push if we are responding to a release
+          cache-from: type=gha                              # Use github action mechanisms to cache layers
+          cache-to: type=gha,mode=max                       # Use github action mechanisms to cache layers
+          context: llm-d                                    # Use the llm-d clone directory as docker context
+          file: llm-d/docker/Dockerfile.${{ matrix.gpu }}
+          tags: quay.io/${{ env.QUAY_ORG }}/llm-d-${{ matrix.gpu }}:${{ env.RELEASE_VERSION }},quay.io/${{ env.QUAY_ORG }}/llm-d-${{ matrix.gpu }}:latest
+          build-args: |
+            TARGETOS=rhel
+            USE_SCCACHE=false
+            VLLM_REPO=https://github.com/starpit/vllm-ibm.git
+            VLLM_COMMIT_SHA=6c4dd70a2d322d27905f9de24e5bbecdff8399da
+            VLLM_PRECOMPILED_WHEEL_COMMIT=${{ env.VLLM_PRECOMPILED_WHEEL_COMMIT }}
