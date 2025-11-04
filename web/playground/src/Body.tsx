@@ -47,7 +47,9 @@ export default function Body(props: BodyProps) {
     [setRunState],
   )
 
-  useEffect(() => setQuery(initialQuery), [initialQuery, setQuery])
+  useEffect(() => {
+    setTimeout(() => setQuery(initialQuery))
+  }, [initialQuery, setQuery])
   useEffect(() => {
     const compile = async () => {
       setCompilationError(null)

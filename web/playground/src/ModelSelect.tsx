@@ -29,9 +29,6 @@ export default function ModelSelect(props: Props) {
     _event: React.MouseEvent<Element, MouseEvent> | undefined,
     value: string | number | undefined,
   ) => {
-    // eslint-disable-next-line no-console
-    console.log("selected", value)
-
     setIsOpen(false)
     navigate({
       to: "/",

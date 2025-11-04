@@ -29,9 +29,6 @@ export default function DemoSelect(props: Props) {
     _event: React.MouseEvent<Element, MouseEvent> | undefined,
     demo: string | number | undefined,
   ) => {
-    // eslint-disable-next-line no-console
-    // console.log("selected", value)
-
     if (typeof demo === "string") {
       setIsOpen(false)
       navigate({ to: "/", search: { demo } })

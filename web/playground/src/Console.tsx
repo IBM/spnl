@@ -76,6 +76,7 @@ export default function Console({
     }
   }, [
     emit,
+    defaultModel,
     query,
     runState,
     setProgressInit,
