@@ -6,7 +6,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/spnl)](https://pypi.org/project/spnl/)
 ![GitHub License](https://img.shields.io/github/license/IBM/spnl)
 
-:rocket: [Playground](https://ibm.github.io/spnl/) **|** [Research Poster](./docs/poster-20250529.pdf)
+:rocket: [Playground](https://ibm.github.io/spnl/) **|** :scroll: [Research Paper](https://arxiv.org/abs/2511.02749)
 
 ## What if we had a way to plan and optimize GenAI like we do for [SQL](https://en.wikipedia.org/wiki/SQL)? 
 
