@@ -36,6 +36,17 @@ impl Generate {
     }
 }
 
+impl From<&Generate> for GenerateBuilder {
+    fn from(other: &Generate) -> Self {
+        GenerateBuilder::default()
+            .model(other.model.clone())
+            .input(other.input.clone())
+            .max_tokens(other.max_tokens)
+            .temperature(other.temperature)
+            .clone()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Repeat {
     pub n: usize,
@@ -236,9 +247,13 @@ impl From<&String> for Query {
     }
 }
 
+/// Turn a list of Query into a Seq
 impl From<Vec<Query>> for Query {
     fn from(v: Vec<Query>) -> Self {
-        Self::Seq(v)
+        match &v[..] {
+            [q] => q.clone(),  // single-entry list doesn't need a Seq
+            _ => Self::Seq(v), // otherwise, Seq is needed
+        }
     }
 }
 

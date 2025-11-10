@@ -9,15 +9,18 @@ pub enum Indexer {
     Raptor,
 }
 
-#[derive(Clone, Default, derive_builder::Builder)]
+#[derive(Clone, Debug, derive_builder::Builder)]
 pub struct AugmentOptions {
     /// Max augmentations to add to the query
+    #[builder(default)]
     pub max_aug: Option<usize>,
 
     /// URI of vector database, which can be a local filepath
+    #[builder(default = "data/spnl".to_string())]
     pub vecdb_uri: String,
 
     /// Name of table to use in vector database
+    #[builder(default = "default".to_string())]
     pub vecdb_table: String,
 
     /// Scheme to use for indexing the corpus
@@ -27,4 +30,10 @@ pub struct AugmentOptions {
     /// Scheme to use for indexing the corpus
     #[builder(default)]
     pub verbose: bool,
+}
+
+impl Default for AugmentOptions {
+    fn default() -> Self {
+        AugmentOptionsBuilder::default().build().unwrap()
+    }
 }

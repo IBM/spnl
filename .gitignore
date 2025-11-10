@@ -1,3 +1,9 @@
 *~
 /target
 history.txt
+
+# vector db for manual testing
+data/
+
+# vector db for unit tests
+spnl/data/

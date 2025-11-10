@@ -54,6 +54,9 @@ async fn process_document(
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<Option<Fragments>> {
+    #[cfg(feature = "pull")]
+    crate::pull::pull_model_if_needed(a.embedding_model.as_str()).await?;
+
     let (filename, content) = &a.doc;
     let window_size = match content {
         Document::Text(_) => 1,
@@ -85,7 +88,7 @@ async fn process_document(
             (Document::Text(content), Some("txt")) => windowing::text(content),
             (Document::Text(content), Some("jsonl")) => windowing::jsonl(content),
             (Document::Binary(content), Some("pdf")) => windowing::pdf(content, window_size),
-            _ => Err(anyhow!("Unsupported `with` binary document {filename}")),
+            _ => Err(anyhow!("Unsupported `index` document type: {filename}")),
         }?;
 
         let pb = m.add(

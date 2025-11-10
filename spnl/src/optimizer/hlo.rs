@@ -1,60 +1,104 @@
-use crate::{Generate, Query, Repeat, generate::is_span_enabled};
+use crate::{Generate, GenerateBuilder, Message::User, Query, Repeat, generate::is_span_enabled};
 
-#[derive(Default)]
+#[cfg(feature = "rag")]
+use crate::augment;
+
+mod simplify;
+use simplify::simplify;
+
+#[derive(Debug, Default)]
 pub struct Options {
     #[cfg(feature = "rag")]
-    pub aug: crate::augment::AugmentOptions,
+    pub aug: augment::AugmentOptions,
+}
+
+#[derive(derive_builder::Builder)]
+struct InheritedAttributes<'a> {
+    #[builder(default)]
+    parent_generate: Option<&'a Generate>,
+
+    options: &'a Options,
+}
+
+impl<'a> From<&'a InheritedAttributes<'a>> for InheritedAttributesBuilder<'a> {
+    fn from(other: &'a InheritedAttributes<'a>) -> Self {
+        InheritedAttributesBuilder::default()
+            .parent_generate(other.parent_generate)
+            .options(other.options)
+            .clone()
+    }
 }
 
 /// Apply `optimize_iter()` across the given list of Query
-async fn optimize_vec_iter(v: &[Query], po: &Options) -> anyhow::Result<Vec<Query>> {
+async fn optimize_vec_iter<'a>(
+    v: &[Query],
+    attrs: &'a InheritedAttributes<'a>,
+) -> anyhow::Result<Vec<Query>> {
     // TODO: this can't be the most efficient way to do this
     Ok(
-        futures::future::try_join_all(v.iter().map(|u| optimize_iter(u, po)))
+        futures::future::try_join_all(v.iter().map(|u| optimize_iter(u, attrs)))
             .await?
             .into_iter()
-            .flatten()
             .collect(),
     )
 }
 
 #[async_recursion::async_recursion]
-async fn optimize_iter(query: &Query, po: &Options) -> anyhow::Result<Vec<Query>> {
+async fn optimize_iter<'a>(
+    query: &Query,
+    attrs: &'a InheritedAttributes<'a>,
+) -> anyhow::Result<Query> {
     match query {
-        Query::Plus(v) => Ok(vec![Query::Plus(optimize_vec_iter(v, po).await?)]),
-        Query::Cross(v) => Ok(vec![Query::Cross(optimize_vec_iter(v, po).await?)]),
+        Query::Plus(v) => Ok(Query::Plus(optimize_vec_iter(v, attrs).await?)),
+        Query::Cross(v) => Ok(Query::Cross(optimize_vec_iter(v, attrs).await?)),
 
         #[cfg(feature = "rag")]
-        // Inline the retrieved fragments
-        Query::Augment(a) => Ok(vec![Query::Plus(
-            crate::augment::retrieve(&a.embedding_model, &a.body, &a.doc, &po.aug)
+        // Inline the retrieved fragments, wrapping them with a 1-token nested generate
+        Query::Augment(a) => Ok(Query::Plus(
+            augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
                 .await?
-                .map(|s| Query::Message(crate::Message::User(s)))
-                .collect(),
-        )]),
+                .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
+                .map(|m| {
+                    if let Some(g) = attrs.parent_generate
+                        && is_span_enabled(&g.model)
+                    {
+                        // wrap a 1-token inner generate around each fragment
+                        Ok(Query::Generate(
+                            GenerateBuilder::from(g)
+                                .input(Box::new(m))
+                                .max_tokens(Some(1))
+                                .build()?,
+                        ))
+                    } else {
+                        // this means we aren't inside an outer generate
+                        Ok(m)
+                    }
+                })
+                .collect::<anyhow::Result<_>>()?,
+        )),
 
-        // Unroll repeats
-        Query::Repeat(Repeat { n, query }) => {
-            let q = optimize_iter(query, po).await?;
-            Ok(::std::iter::repeat_n(q, *n).flatten().collect::<Vec<_>>())
-        }
+        Query::Repeat(Repeat { n, query }) => Ok(Query::Repeat(Repeat {
+            n: *n,
+            query: Box::new(optimize_iter(query, attrs).await?),
+        })),
 
-        // Nothing, except pass-through of the `input` field
-        Query::Generate(Generate {
-            model,
-            input,
-            max_tokens,
-            temperature,
-        }) => {
-            let optimized_input = optimize_iter(input, po).await?;
+        // Optimize for nested generate; Generate(Seq(Message, Plus(Generate, Generate, Generate)))
+        Query::Generate(g) => {
+            let optimized_input = optimize_iter(
+                &g.input,
+                &InheritedAttributesBuilder::from(attrs)
+                    .parent_generate(Some(g))
+                    .build()?,
+            )
+            .await?;
 
-            let nested_gen_input: Option<Query> = if !is_span_enabled(model) {
+            let nested_gen_input: Option<Query> = if !is_span_enabled(&g.model) {
                 None
             } else {
-                match &optimized_input[..] {
-                    [Query::Seq(seq)] => match &seq[..] {
+                match &optimized_input {
+                    Query::Seq(seq) => match &seq[..] {
                         [Query::Message(m), Query::Plus(plus)] => {
-                            // Plus of (only) Generates?
+                            // Plus of (only) Generates? TODO: that's all we handle, at the moment, nested generate where the children are *only* generates
                             match plus.iter().all(|q| matches!(q, Query::Generate(_))) {
                                 // yes, we have a Plus of only Generates
                                 true => Some(Query::Seq(vec![
@@ -80,159 +124,52 @@ async fn optimize_iter(query: &Query, po: &Options) -> anyhow::Result<Vec<Query>
                 }
             };
 
-            Ok(vec![Query::Generate(Generate {
-                model: model.clone(),
-                input: Box::new(nested_gen_input.unwrap_or_else(|| optimized_input.into())),
-                max_tokens: *max_tokens,
-                temperature: *temperature,
-            })])
+            Ok(Query::Generate(Generate {
+                model: g.model.clone(),
+                input: Box::new(nested_gen_input.unwrap_or(optimized_input)),
+                max_tokens: g.max_tokens,
+                temperature: g.temperature,
+            }))
         }
 
-        otherwise => Ok(vec![otherwise.clone()]),
-    }
-}
-
-/// This tries to remove some unnecessary syntactic complexities,
-/// e.g. Plus-of-Plus or Cross with a tail Cross.
-fn simplify(query: &Query) -> Query {
-    match query {
-        Query::Seq(v) => match &v[..] {
-            // One-entry sequence
-            [q] => simplify(q),
-
-            otherwise => Query::Seq(
-                otherwise
-                    .iter()
-                    .map(simplify)
-                    .flat_map(|q| match q {
-                        Query::Seq(v) => v, // Seq inside a Seq? flatten
-                        _ => vec![q],
-                    })
-                    .collect(),
-            ),
-        },
-        Query::Par(v) => match &v[..] {
-            // One-entry parallel
-            [q] => simplify(q),
-
-            otherwise => Query::Par(otherwise.iter().map(simplify).collect()),
-        },
-        Query::Plus(v) => Query::Plus(match &v[..] {
-            // Plus where the first element is either a Seq or
-            // Plus. We can flatten that first element.
-            [Query::Seq(v2), ..] | [Query::Plus(v2), ..] => {
-                v2.iter().chain(&v[1..]).map(simplify).collect()
-            }
-
-            otherwise => otherwise.iter().map(simplify).collect(),
-        }),
-        Query::Cross(v) => Query::Cross(match &v[..] {
-            // Cross of tail Cross
-            [.., Query::Cross(v2)] => v
-                .iter()
-                .take(v.len() - 1)
-                .chain(v2.iter())
-                .map(simplify)
-                .collect(),
-
-            otherwise => otherwise.iter().map(simplify).collect(),
-        }),
-        Query::Generate(Generate {
-            model,
-            input,
-            max_tokens,
-            temperature,
-        }) => Query::Generate(Generate {
-            model: model.clone(),
-            input: Box::new(simplify(input)),
-            max_tokens: *max_tokens,
-            temperature: *temperature,
-        }),
-        otherwise => otherwise.clone(),
+        otherwise => Ok(otherwise.clone()),
     }
 }
 
 pub async fn optimize(query: &Query, po: &Options) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
     // Index the corpus (if needed)
-    crate::augment::index(query, &po.aug).await?;
+    augment::index(query, &po.aug).await?;
 
     // iterate the simplify a few times
     Ok(simplify(&simplify(&simplify(&simplify(&simplify(
-        &optimize_iter(query, po).await?.into(),
+        &optimize_iter(
+            query,
+            &InheritedAttributesBuilder::default().options(po).build()?,
+        )
+        .await?,
     ))))))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Generate as Gen, GenerateBuilder, Message::*, Query::*, Repeat as Rep};
+    use crate::{Augment, Document, Message::*, Query::Message};
 
-    #[test]
-    fn simplify1() {
-        // Message -> Message (i.e. no change)
-        let q = Message(User("hello".into()));
-        assert_eq!(simplify(&q), q);
-    }
-
-    #[test]
-    fn simplify2() {
-        // Seq(a) = a
-        let a = Message(User("a".into()));
-        let q = Seq(vec![a.clone()]);
-        assert_eq!(simplify(&q), a);
-    }
-
-    #[test]
-    fn simplify3() {
-        // Seq(Seq(a)) = a
-        let a = Message(User("a".into()));
-        let qq = Seq(vec![a.clone()]);
-        let q = Seq(vec![qq]);
-        assert_eq!(simplify(&q), a);
-    }
-
-    #[test]
-    fn simplify4() {
-        // Plus(Seq(a,b), c, d) -> Plus(a,b,c,d)
-        let a = Message(User("a".into()));
-        let b = Message(User("b".into()));
-        let c = Message(User("c".into()));
-        let d = Message(User("d".into()));
-        let qq = Seq(vec![a.clone(), b.clone()]);
-        let q = Plus(vec![qq, c.clone(), d.clone()]);
-        assert_eq!(simplify(&q), Plus(vec![a, b, c, d]));
-    }
-
-    #[tokio::test] // <-- needed for async tests
-    async fn hlo_repeat_expansion() -> anyhow::Result<()> {
-        let n = 2;
-        let m = Message(User("hello".into()));
-        let q = Repeat(Rep {
-            n,
-            query: Box::new(m.clone()),
-        });
-        assert_eq!(
-            optimize(&q, &Options::default()).await?,
-            Seq(::std::iter::repeat_n(m, n).collect())
-        );
-        Ok(())
-    }
-
-    fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Gen, Query, Query, Query)> {
+    fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Generate, Query, Query, Query)> {
         let s2 = Message(System("outer system".into()));
         let s1 = Message(System("inner system".into()));
         let u1 = Message(User("inner user".into()));
         let inner_generate = GenerateBuilder::default()
             .model(model)
-            .input(Box::new(Seq(vec![s1.clone(), u1.clone()])))
+            .input(Box::new(Query::Seq(vec![s1.clone(), u1.clone()])))
             .build()?;
-        let outer_generate = Generate(
+        let outer_generate = Query::Generate(
             GenerateBuilder::default()
                 .model(model)
-                .input(Box::new(Seq(vec![
+                .input(Box::new(Query::Seq(vec![
                     s2.clone(),
-                    Plus(vec![Generate(inner_generate.clone())]),
+                    Query::Plus(vec![Query::Generate(inner_generate.clone())]),
                 ])))
                 .build()?,
         );
@@ -256,15 +193,58 @@ mod tests {
         let (outer_generate, inner_generate, s2, s1, u1) = nested_gen_query(model)?;
         assert_eq!(
             optimize(&outer_generate, &Options::default()).await?,
-            simplify(&Generate(
+            simplify(&Query::Generate(
                 GenerateBuilder::default()
                     .model(model)
-                    .input(Box::new(Seq(vec![
+                    .input(Box::new(Query::Seq(vec![
                         s2,
-                        Plus(vec![s1, u1, Generate(inner_generate.wrap_plus())])
+                        Query::Plus(vec![s1, u1, Query::Generate(inner_generate.wrap_plus())])
                     ])))
                     .build()?
             ))
+        );
+        Ok(())
+    }
+
+    #[tokio::test] // <-- needed for async tests
+    async fn retrieve() -> anyhow::Result<()> {
+        let model = "spnl/m"; // This should work, because we use SimpleEmbedRetrieve which won't do any generation
+        let q = Message(User("Hello".to_string()));
+        let d = "I know all about Hello and stuff";
+        let outer_generate = Query::Generate(
+            GenerateBuilder::default()
+                .model(model)
+                .input(Box::new(Query::Augment(Augment {
+                    embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
+                    body: Box::new(q),
+                    doc: ("path/to/doc.txt".to_string(), Document::Text(d.to_string())),
+                })))
+                .build()?,
+        );
+        assert_eq!(
+            optimize(
+                &outer_generate,
+                &Options {
+                    aug: augment::AugmentOptionsBuilder::default()
+                        .indexer(augment::Indexer::SimpleEmbedRetrieve)
+                        .build()?
+                }
+            )
+            .await?,
+            Query::Generate(
+                GenerateBuilder::default()
+                    .model(model)
+                    .input(Box::new(Query::Plus(vec![Query::Generate(
+                        GenerateBuilder::default()
+                            .model(model)
+                            .input(Box::new(Message(User(format!(
+                                "Relevant Document @base-doc.txt-0: {d}"
+                            )))))
+                            .max_tokens(Some(1))
+                            .build()?
+                    )])))
+                    .build()?
+            ),
         );
         Ok(())
     }

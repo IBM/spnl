@@ -20,7 +20,7 @@ pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
 }
 
 /// Pull the given model, if needed
-async fn pull_model_if_needed(model: &str) -> anyhow::Result<()> {
+pub async fn pull_model_if_needed(model: &str) -> anyhow::Result<()> {
     match model {
         m if model.starts_with("ollama/") => ollama_pull_if_needed(&m[7..]).await,
         m if model.starts_with("ollama_chat/") => ollama_pull_if_needed(&m[12..]).await,
