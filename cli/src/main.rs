@@ -15,6 +15,7 @@ async fn main() -> Result<(), SpnlError> {
     let args = Args::parse();
     let verbose = args.verbose;
     let show_only = args.show_query;
+    let dry_run = args.dry_run;
 
     let rp = ExecuteOptions {
         prepare: Some(args.prepare),
@@ -72,9 +73,12 @@ async fn main() -> Result<(), SpnlError> {
 
     if show_only {
         pretty_print(&query)?;
-        return Ok(());
     } else if verbose {
         ptree::write_tree(&query, ::std::io::stderr())?;
+    }
+
+    if show_only || dry_run {
+        return Ok(());
     }
 
     let res = execute(&query, &rp).await.map(|res| {

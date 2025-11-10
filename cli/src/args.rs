@@ -79,4 +79,8 @@ pub struct Args {
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     pub verbose: bool,
+
+    /// Dry run (do not execute query)?
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
