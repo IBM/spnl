@@ -10,13 +10,13 @@ pub use execute::*;
 #[cfg(feature = "run")]
 mod generate;
 
-// TODO plan feature?
+// TODO optimizer feature?
 #[cfg(feature = "run")]
-mod plan;
+mod optimizer;
 
-// TODO plan feature?
+// TODO optimizer feature?
 #[cfg(feature = "run")]
-pub use plan::*;
+pub use optimizer::*;
 
 #[cfg(feature = "rag")]
 mod augment;

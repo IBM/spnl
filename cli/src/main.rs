@@ -2,7 +2,7 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{ExecuteOptions, PlanOptions, SpnlError, execute, from_str, plan, pretty_print};
+use spnl::{ExecuteOptions, SpnlError, execute, from_str, hlo, pretty_print};
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
@@ -20,7 +20,7 @@ async fn main() -> Result<(), SpnlError> {
         prepare: Some(args.prepare),
     };
 
-    let plan_options = PlanOptions {
+    let hlo_options = hlo::Options {
         #[cfg(feature = "rag")]
         aug: AugmentOptionsBuilder::default()
             .indexer(args.indexer.clone().unwrap_or_default())
@@ -42,7 +42,7 @@ async fn main() -> Result<(), SpnlError> {
         None
     };
 
-    let query = plan(
+    let query = hlo::optimize(
         &match args.builtin {
             Some(Builtin::Email) => email::query(args),
             Some(Builtin::Email2) => email2::query(args),
@@ -66,7 +66,7 @@ async fn main() -> Result<(), SpnlError> {
                 from_str(rendered.as_str())?
             }
         },
-        &plan_options,
+        &hlo_options,
     )
     .await?;
 

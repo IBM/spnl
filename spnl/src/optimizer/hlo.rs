@@ -1,16 +1,16 @@
 use crate::{Generate, Query, Repeat, generate::is_span_enabled};
 
 #[derive(Default)]
-pub struct PlanOptions {
+pub struct Options {
     #[cfg(feature = "rag")]
     pub aug: crate::augment::AugmentOptions,
 }
 
-/// Apply `plan_iter()` across the given list of Query
-async fn plan_vec_iter(v: &[Query], po: &PlanOptions) -> anyhow::Result<Vec<Query>> {
+/// Apply `optimize_iter()` across the given list of Query
+async fn optimize_vec_iter(v: &[Query], po: &Options) -> anyhow::Result<Vec<Query>> {
     // TODO: this can't be the most efficient way to do this
     Ok(
-        futures::future::try_join_all(v.iter().map(|u| plan_iter(u, po)))
+        futures::future::try_join_all(v.iter().map(|u| optimize_iter(u, po)))
             .await?
             .into_iter()
             .flatten()
@@ -19,10 +19,10 @@ async fn plan_vec_iter(v: &[Query], po: &PlanOptions) -> anyhow::Result<Vec<Quer
 }
 
 #[async_recursion::async_recursion]
-async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>> {
+async fn optimize_iter(query: &Query, po: &Options) -> anyhow::Result<Vec<Query>> {
     match query {
-        Query::Plus(v) => Ok(vec![Query::Plus(plan_vec_iter(v, po).await?)]),
-        Query::Cross(v) => Ok(vec![Query::Cross(plan_vec_iter(v, po).await?)]),
+        Query::Plus(v) => Ok(vec![Query::Plus(optimize_vec_iter(v, po).await?)]),
+        Query::Cross(v) => Ok(vec![Query::Cross(optimize_vec_iter(v, po).await?)]),
 
         #[cfg(feature = "rag")]
         // Inline the retrieved fragments
@@ -35,23 +35,23 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
 
         // Unroll repeats
         Query::Repeat(Repeat { n, query }) => {
-            let q = plan_iter(query, po).await?;
+            let q = optimize_iter(query, po).await?;
             Ok(::std::iter::repeat_n(q, *n).flatten().collect::<Vec<_>>())
         }
 
-        // Nothing, except pass-through plan of the `input` field
+        // Nothing, except pass-through of the `input` field
         Query::Generate(Generate {
             model,
             input,
             max_tokens,
             temperature,
         }) => {
-            let planned_input = plan_iter(input, po).await?;
+            let optimized_input = optimize_iter(input, po).await?;
 
             let nested_gen_input: Option<Query> = if !is_span_enabled(model) {
                 None
             } else {
-                match &planned_input[..] {
+                match &optimized_input[..] {
                     [Query::Seq(seq)] => match &seq[..] {
                         [Query::Message(m), Query::Plus(plus)] => {
                             // Plus of (only) Generates?
@@ -82,7 +82,7 @@ async fn plan_iter(query: &Query, po: &PlanOptions) -> anyhow::Result<Vec<Query>
 
             Ok(vec![Query::Generate(Generate {
                 model: model.clone(),
-                input: Box::new(nested_gen_input.unwrap_or_else(|| planned_input.into())),
+                input: Box::new(nested_gen_input.unwrap_or_else(|| optimized_input.into())),
                 max_tokens: *max_tokens,
                 temperature: *temperature,
             })])
@@ -152,14 +152,14 @@ fn simplify(query: &Query) -> Query {
     }
 }
 
-pub async fn plan(query: &Query, po: &PlanOptions) -> anyhow::Result<Query> {
+pub async fn optimize(query: &Query, po: &Options) -> anyhow::Result<Query> {
     #[cfg(feature = "rag")]
     // Index the corpus (if needed)
     crate::augment::index(query, &po.aug).await?;
 
     // iterate the simplify a few times
     Ok(simplify(&simplify(&simplify(&simplify(&simplify(
-        &plan_iter(query, po).await?.into(),
+        &optimize_iter(query, po).await?.into(),
     ))))))
 }
 
@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[tokio::test] // <-- needed for async tests
-    async fn plan_repeat_expansion() -> anyhow::Result<()> {
+    async fn hlo_repeat_expansion() -> anyhow::Result<()> {
         let n = 2;
         let m = Message(User("hello".into()));
         let q = Repeat(Rep {
@@ -213,7 +213,7 @@ mod tests {
             query: Box::new(m.clone()),
         });
         assert_eq!(
-            plan(&q, &PlanOptions::default()).await?,
+            optimize(&q, &Options::default()).await?,
             Seq(::std::iter::repeat_n(m, n).collect())
         );
         Ok(())
@@ -244,7 +244,7 @@ mod tests {
     async fn nested_gen_expect_no_span_optimization() -> anyhow::Result<()> {
         let (outer_generate, _, _, _, _) = nested_gen_query("m")?;
         assert_eq!(
-            plan(&outer_generate, &PlanOptions::default()).await?,
+            optimize(&outer_generate, &Options::default()).await?,
             outer_generate,
         );
         Ok(())
@@ -255,7 +255,7 @@ mod tests {
         let model = "spnl/m";
         let (outer_generate, inner_generate, s2, s1, u1) = nested_gen_query(model)?;
         assert_eq!(
-            plan(&outer_generate, &PlanOptions::default()).await?,
+            optimize(&outer_generate, &Options::default()).await?,
             simplify(&Generate(
                 GenerateBuilder::default()
                     .model(model)
