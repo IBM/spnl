@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+      app.kubernetes.io/component: spnl
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/component: spnl
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: quay.io/spnl/llm-d-cuda:latest
+          command:
+            - vllm
+            - serve
+            - {{ required "Please provide a value for model" .Values.model }}
+            {{- if .Values.enforce_eager }}
+            - "--enforce-eager={{ .Values.enforce_eager }}"
+            {{- end }}
+            {{- if .Values.max_model_len }}
+            - "--max-model-len={{ .Values.max_model_len }}"
+            {{- end }}
+          env:
+            - name: HF_TOKEN
+              value: {{ required "Please provide a value for HF_TOKEN" .Values.HF_TOKEN }}
+            - name: VLLM_USE_V1
+              value: "1"
+            - name: VLLM_V1_SPANS_ENABLED
+              value: "1"
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"
+            - name: VLLM_ATTENTION_BACKEND
+              value: TRITON_ATTN_VLLM_V1
+            - name: VLLM_V1_SPANS_TOKEN
+              value: "10"
+            - name: VLLM_V1_SPANS_TOKEN_RECOMPUTE
+              value: "31"
+
+          livenessProbe:
+            initialDelaySeconds: 20
+            failureThreshold: 20
+            httpGet:
+              path: /ping
+              port: {{ .Values.service.port }}
+          readinessProbe:
+            initialDelaySeconds: 20
+            failureThreshold: 20
+            httpGet:
+              path: /ping
+              port: {{ .Values.service.port }}
+          resources:
+            requests:
+              memory: 192Gi
+            limits:
+              nvidia.com/gpu: {{ .Values.gpus }}
