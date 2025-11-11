@@ -43,6 +43,23 @@ async fn optimize_vec_iter<'a>(
     )
 }
 
+/// Wrap a 1-token inner generate around each fragment
+fn prepare(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
+    if let Some(g) = parent_generate
+        && is_span_enabled(&g.model)
+    {
+        Some(Query::Monad(Box::new(Query::Generate(
+            GenerateBuilder::from(g)
+                .input(Box::new(m.clone()))
+                .max_tokens(Some(1))
+                .build()
+                .unwrap(),
+        ))))
+    } else {
+        None
+    }
+}
+
 #[async_recursion::async_recursion]
 async fn optimize_iter<'a>(
     query: &Query,
@@ -58,23 +75,9 @@ async fn optimize_iter<'a>(
             augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
                 .await?
                 .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
-                .map(|m| {
-                    if let Some(g) = attrs.parent_generate
-                        && is_span_enabled(&g.model)
-                    {
-                        // wrap a 1-token inner generate around each fragment
-                        Ok(Query::Generate(
-                            GenerateBuilder::from(g)
-                                .input(Box::new(m))
-                                .max_tokens(Some(1))
-                                .build()?,
-                        ))
-                    } else {
-                        // this means we aren't inside an outer generate
-                        Ok(m)
-                    }
-                })
-                .collect::<anyhow::Result<_>>()?,
+                .flat_map(|m| [prepare(&m, attrs.parent_generate), Some(m)]) // this flattens out the []
+                .flatten() // this flattens out the Nones
+                .collect(),
         )),
 
         Query::Repeat(Repeat { n, query }) => Ok(Query::Repeat(Repeat {
@@ -211,19 +214,20 @@ mod tests {
         let model = "spnl/m"; // This should work, because we use SimpleEmbedRetrieve which won't do any generation
         let q = Message(User("Hello".to_string()));
         let d = "I know all about Hello and stuff";
-        let outer_generate = Query::Generate(
-            GenerateBuilder::default()
-                .model(model)
-                .input(Box::new(Query::Augment(Augment {
-                    embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
-                    body: Box::new(q),
-                    doc: ("path/to/doc.txt".to_string(), Document::Text(d.to_string())),
-                })))
-                .build()?,
-        );
+        let outer_generate = GenerateBuilder::default()
+            .model(model)
+            .input(Box::new(Query::Augment(Augment {
+                embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
+                body: Box::new(q),
+                doc: ("path/to/doc.txt".to_string(), Document::Text(d.to_string())),
+            })))
+            .build()?;
+
+        let fragment = Message(User(format!("Relevant Document @base-doc.txt-0: {d}")));
+
         assert_eq!(
             optimize(
-                &outer_generate,
+                &Query::Generate(outer_generate.clone()),
                 &Options {
                     aug: augment::AugmentOptionsBuilder::default()
                         .indexer(augment::Indexer::SimpleEmbedRetrieve)
@@ -234,15 +238,12 @@ mod tests {
             Query::Generate(
                 GenerateBuilder::default()
                     .model(model)
-                    .input(Box::new(Query::Plus(vec![Query::Generate(
-                        GenerateBuilder::default()
-                            .model(model)
-                            .input(Box::new(Message(User(format!(
-                                "Relevant Document @base-doc.txt-0: {d}"
-                            )))))
-                            .max_tokens(Some(1))
-                            .build()?
-                    )])))
+                    .input(Box::new(Query::Plus(
+                        [prepare(&fragment, Some(&outer_generate)), Some(fragment)]
+                            .into_iter()
+                            .flatten() // flatten out the Nones
+                            .collect()
+                    )))
                     .build()?
             ),
         );

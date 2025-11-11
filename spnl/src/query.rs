@@ -74,6 +74,12 @@ pub enum Message {
     System(String),
 }
 
+impl From<&str> for Message {
+    fn from(s: &str) -> Self {
+        Message::User(s.to_string())
+    }
+}
+
 impl Message {
     pub fn role(&self) -> &'static str {
         match self {
@@ -117,6 +123,9 @@ pub enum Query {
 
     /// Map
     Plus(Vec<Query>),
+
+    /// Ignore the output, executed for server-side effect only (e.g. caching)
+    Monad(Box<Query>),
 
     /// Helpful for repeating an operation n times in a Plus
     Repeat(Repeat),
@@ -182,8 +191,19 @@ impl ptree::TreeItem for Query {
                 Query::Par(_) => style.paint("\x1b[31;1mParallel\x1b[0m".to_string()),
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
-                Query::Generate(Generate { model, .. }) =>
-                    style.paint(format!("\x1b[31;1mGenerate\x1b[0m \x1b[2m{model}\x1b[0m",)),
+                Query::Generate(Generate {
+                    model, max_tokens, ..
+                }) => style.paint(format!(
+                    "\x1b[31;1mGenerate\x1b[0m \x1b[2m{}model={model}\x1b[0m",
+                    if let Some(mt) = max_tokens
+                        && *mt != 0
+                    {
+                        format!("max_tokens={mt} ")
+                    } else {
+                        "".to_string()
+                    }
+                )),
+                Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
                 Query::Repeat(Repeat { n, .. }) => style.paint(format!("Repeat {n}")),
                 Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
@@ -196,6 +216,7 @@ impl ptree::TreeItem for Query {
         ::std::borrow::Cow::from(match self {
             Query::Ask(_) | Query::Message(_) | Query::Print(_) => vec![],
             Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
+            Query::Monad(q) => vec![*q.clone()],
             Query::Repeat(Repeat { query, .. }) => vec![*query.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]

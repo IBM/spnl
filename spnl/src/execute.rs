@@ -68,6 +68,12 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
         Query::Cross(u) => Ok(Query::Cross(seq(u, rp, m).await?)),
         Query::Plus(u) => plus(u, rp).await,
 
+        Query::Monad(q) => {
+            // ignore output
+            let _ = run_subtree(q, rp, m).await?;
+            Ok("".into())
+        }
+
         Query::Generate(Generate {
             model,
             input,
