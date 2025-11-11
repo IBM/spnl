@@ -23,17 +23,17 @@ pub enum Provider {
 }
 
 fn api_base(provider: Provider) -> String {
-    ::std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| {
-        {
-            match provider {
-                // Note: NO TRAILING SLASHES!
-                Provider::OpenAI => "https://api.openai.com/v1",
-                Provider::Gemini => "https://generativelanguage.googleapis.com/v1beta/openai",
-                Provider::Ollama => "http://localhost:11434/v1",
-            }
+    match provider {
+        // Note: NO TRAILING SLASHES!
+        Provider::OpenAI => {
+            ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".to_string())
         }
-        .into()
-    })
+        Provider::Gemini => ::std::env::var("GEMINI_API_BASE")
+            .unwrap_or("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+        Provider::Ollama => {
+            ::std::env::var("OLLAMA_API_BASE").unwrap_or("http://localhost:11434/v1".to_string())
+        }
+    }
 }
 
 pub async fn generate(
