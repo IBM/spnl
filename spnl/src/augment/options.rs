@@ -27,6 +27,10 @@ pub struct AugmentOptions {
     #[builder(default)]
     pub indexer: Indexer,
 
+    /// Randomly shuffle order of fragments
+    #[builder(default)]
+    pub shuffle: bool,
+
     /// Scheme to use for indexing the corpus
     #[builder(default)]
     pub verbose: bool,

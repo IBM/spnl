@@ -1,6 +1,9 @@
 // for .unique()
 use itertools::Itertools;
 
+// for shuffle support
+use rand::seq::SliceRandom;
+
 use crate::{
     Document, Query,
     augment::{
@@ -16,7 +19,7 @@ pub async fn retrieve(
     body: &Query,
     (filename, content): &(String, Document),
     options: &AugmentOptions,
-) -> anyhow::Result<impl Iterator<Item = String>> {
+) -> anyhow::Result<Vec<String>> {
     #[cfg(feature = "rag-deep-debug")]
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))
@@ -134,15 +137,19 @@ pub async fn retrieve(
         );
     }
 
-    let d = matching_docs
+    let mut d = matching_docs
         .into_iter()
         .rev() // reverse so that we can present the most relevant closest to the query (at the end)
-        .map(|doc| format!("Relevant Document {doc}"));
+        .map(|doc| format!("Relevant Document {doc}"))
+        .collect::<Vec<_>>();
 
     #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());
     }
 
+    if options.shuffle {
+        d.shuffle(&mut rand::rng());
+    }
     Ok(d)
 }

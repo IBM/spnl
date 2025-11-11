@@ -27,6 +27,7 @@ async fn main() -> Result<(), SpnlError> {
             .indexer(args.indexer.clone().unwrap_or_default())
             .verbose(args.verbose)
             .max_aug(args.max_aug)
+            .shuffle(args.shuffle)
             .vecdb_uri(args.vecdb_uri.clone())
             .vecdb_table(
                 args.builtin

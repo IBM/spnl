@@ -63,6 +63,11 @@ pub struct Args {
     #[arg(short = 'x', long, env = "SPNL_RAG_MAX_MATCHES")]
     pub max_aug: Option<usize>,
 
+    /// Randomly shuffle order of fragments
+    #[cfg(feature = "rag")]
+    #[arg(long, default_value_t = false)]
+    pub shuffle: bool,
+
     /// The RAG indexing scheme
     #[cfg(feature = "rag")]
     #[arg(value_enum, short, long)]

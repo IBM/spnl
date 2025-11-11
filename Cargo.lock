@@ -6568,6 +6568,7 @@ dependencies = [
  "pdf-extract",
  "ptree",
  "pyo3",
+ "rand 0.9.2",
  "regex",
  "reqwest",
  "rustyline",

@@ -84,6 +84,7 @@ async fn optimize_iter<'a>(
             let (prepares, fragments): (Vec<_>, Vec<_>) =
                 augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
                     .await?
+                    .into_iter()
                     .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
                     .map(|m| (prepare_fragment(&m, attrs.parent_generate), m))
                     .unzip();
