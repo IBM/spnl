@@ -2,6 +2,8 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
     let crate::args::Args {
         model,
         embedding_model,
+        temperature,
+        max_tokens,
         ..
     } = args;
 
@@ -41,5 +43,6 @@ Citations: @base-baz-2, @raptor-glam-8
             (cross
              (system system_prompt)
              (with embedding_model (user prompt) docs))
+            temperature max_tokens
     ))
 }
