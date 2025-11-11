@@ -4,6 +4,9 @@ use itertools::Itertools;
 // for shuffle support
 use rand::seq::SliceRandom;
 
+// for try_from_os_rng
+use rand::SeedableRng;
+
 use crate::{
     Document, Query,
     augment::{
@@ -149,7 +152,7 @@ pub async fn retrieve(
     }
 
     if options.shuffle {
-        d.shuffle(&mut rand::rng());
+        d.shuffle(&mut rand::rngs::StdRng::try_from_os_rng()?);
     }
     Ok(d)
 }
