@@ -17,12 +17,12 @@ pub async fn retrieve(
     (filename, content): &(String, Document),
     options: &AugmentOptions,
 ) -> anyhow::Result<impl Iterator<Item = String>> {
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     let verbose = ::std::env::var("SPNL_RAG_VERBOSE")
         .map(|var| !matches!(var.as_str(), "false"))
         .unwrap_or(false);
 
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     let now = ::std::time::Instant::now();
 
     // Maximum number of relevant fragments to consider
@@ -42,7 +42,7 @@ pub async fn retrieve(
     );
     let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
 
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("Embedding question {body}");
     }
@@ -59,7 +59,7 @@ pub async fn retrieve(
             }
         });
 
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("Matching question to document");
     }
@@ -96,7 +96,7 @@ pub async fn retrieve(
     .flatten()
     .unique();
 
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     if verbose {
         use sha2::Digest;
         eprintln!(
@@ -139,7 +139,7 @@ pub async fn retrieve(
         .rev() // reverse so that we can present the most relevant closest to the query (at the end)
         .map(|doc| format!("Relevant Document {doc}"));
 
-    #[cfg(feature = "rag_deep_debug")]
+    #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("RAG time {:.2?} ms", now.elapsed().as_millis());
     }
