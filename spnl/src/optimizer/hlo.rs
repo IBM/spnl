@@ -44,17 +44,26 @@ async fn optimize_vec_iter<'a>(
 }
 
 /// Wrap a 1-token inner generate around each fragment
-fn prepare(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
+fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
     if let Some(g) = parent_generate
         && is_span_enabled(&g.model)
     {
-        Some(Query::Monad(Box::new(Query::Generate(
+        Some(Query::Generate(
             GenerateBuilder::from(g)
                 .input(Box::new(m.clone()))
                 .max_tokens(Some(1))
                 .build()
-                .unwrap(),
-        ))))
+                .unwrap(), // TODO...
+        ))
+    } else {
+        None
+    }
+}
+
+/// Wrap a list of queries into a monad
+fn prepare_all(prepares: Vec<Query>) -> Option<Query> {
+    if !prepares.is_empty() {
+        Some(Query::Monad(Query::Plus(prepares).into()))
     } else {
         None
     }
@@ -71,15 +80,26 @@ async fn optimize_iter<'a>(
 
         #[cfg(feature = "rag")]
         // Inline the retrieved fragments, wrapping them with a 1-token nested generate
-        Query::Augment(a) => Ok(Query::Plus(
-            augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
-                .await?
-                .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
-                .flat_map(|m| [prepare(&m, attrs.parent_generate), Some(m)]) // this flattens out the []
-                .flatten() // this flattens out the Nones
-                .collect(),
-        )),
+        Query::Augment(a) => {
+            let (prepares, fragments): (Vec<_>, Vec<_>) =
+                augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
+                    .await?
+                    .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
+                    .map(|m| (prepare_fragment(&m, attrs.parent_generate), m))
+                    .unzip();
 
+            Ok(Query::Seq(
+                [
+                    prepare_all(prepares.into_iter().flatten().collect()),
+                    Some(Query::Plus(fragments)),
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
+            ))
+        }
+
+        // Optimize the query of the Repeat
         Query::Repeat(Repeat { n, query }) => Ok(Query::Repeat(Repeat {
             n: *n,
             query: Box::new(optimize_iter(query, attrs).await?),
@@ -238,11 +258,19 @@ mod tests {
             Query::Generate(
                 GenerateBuilder::default()
                     .model(model)
-                    .input(Box::new(Query::Plus(
-                        [prepare(&fragment, Some(&outer_generate)), Some(fragment)]
-                            .into_iter()
-                            .flatten() // flatten out the Nones
-                            .collect()
+                    .input(Box::new(Query::Seq(
+                        [
+                            prepare_all(
+                                [prepare_fragment(&fragment, Some(&outer_generate))]
+                                    .into_iter()
+                                    .flatten()
+                                    .collect()
+                            ),
+                            Some(Query::Plus(vec![fragment]))
+                        ]
+                        .into_iter()
+                        .flatten()
+                        .collect()
                     )))
                     .build()?
             ),
