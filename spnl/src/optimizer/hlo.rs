@@ -52,6 +52,7 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
             GenerateBuilder::from(g)
                 .input(Box::new(m.clone()))
                 .max_tokens(Some(1))
+                .temperature(Some(0.0))
                 .build()
                 .unwrap(), // TODO...
         ))
