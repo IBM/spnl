@@ -65,9 +65,9 @@ pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // TODO pyo3::create_exception!(m, PyModelNotFoundError, pyo3::exceptions::PyException);
 
     #[cfg(feature = "run_py")]
-    m.add_function(wrap_pyfunction!(crate::python::execute, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::ffi::python::execute, m)?)?;
     #[cfg(feature = "run_py")]
-    m.add_class::<crate::python::ChatResponse>()?;
+    m.add_class::<crate::ffi::python::ChatResponse>()?;
 
     #[cfg(feature = "tok")]
     m.add_class::<crate::optimizer::llo::tokenize::TokenizedQuery>()?;

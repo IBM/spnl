@@ -1,5 +1,9 @@
-// TODO ir feature?
 pub mod ir;
+
+#[cfg(feature = "ffi")]
+pub mod ffi;
+#[cfg(feature = "ffi")]
+pub use ffi::*;
 
 #[cfg(feature = "run")]
 mod execute;
@@ -17,8 +21,3 @@ pub mod optimizer;
 mod augment;
 #[cfg(feature = "rag")]
 pub use augment::{AugmentOptionsBuilder, Indexer};
-
-#[cfg(feature = "pypi")]
-mod python;
-#[cfg(feature = "pypi")]
-pub use python::spnl_py;
