@@ -1,4 +1,7 @@
-use crate::{Generate, GenerateBuilder, Message::User, Query, Repeat, generate::is_span_enabled};
+use crate::{
+    generate::is_span_enabled,
+    ir::{Generate, GenerateBuilder, Message::User, Query, Repeat},
+};
 
 #[cfg(feature = "rag")]
 use crate::augment;
@@ -179,7 +182,7 @@ pub async fn optimize(query: &Query, po: &Options) -> anyhow::Result<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Augment, Document, Message::*, Query::Message};
+    use crate::ir::{Augment, Document, Message::*, Query::Message};
 
     fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Generate, Query, Query, Query)> {
         let s2 = Message(System("outer system".into()));

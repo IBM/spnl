@@ -1,4 +1,4 @@
-use crate::{Generate, Query, Repeat};
+use crate::ir::{Generate, Query, Repeat};
 
 pub fn simplify(query: &Query) -> Query {
     simplify_iter(query).into()
@@ -75,7 +75,7 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Message::*, Query::*, Repeat as Rep};
+    use crate::ir::{Message::*, Query::*, Repeat as Rep};
 
     #[test]
     // Message -> Message (i.e. no change)

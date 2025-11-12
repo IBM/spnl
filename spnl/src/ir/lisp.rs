@@ -9,7 +9,7 @@ macro_rules! spnl {
 
     // Core: Generate text given $input using $model with temperature $temp and $max_tokens
     (g $model:tt $input:tt $temp:tt $max_tokens:tt) => (
-        $crate::Query::Generate($crate::Generate {
+        $crate::ir::Query::Generate($crate::ir::Generate {
             model: $crate::spnl_arg!($model).to_string(),
             input: Box::new($crate::spnl_arg!($input).into()),
             max_tokens: Some($crate::spnl_arg!($max_tokens)),
@@ -18,27 +18,27 @@ macro_rules! spnl {
     );
 
     // Core: execute serially
-    (seq $e:tt) => ( $crate::Query::Seq($crate::spnl_arg!( $e )) );
-    (seq $( $e:tt )+) => ( $crate::Query::Seq(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
+    (seq $e:tt) => ( $crate::ir::Query::Seq($crate::spnl_arg!( $e )) );
+    (seq $( $e:tt )+) => ( $crate::ir::Query::Seq(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: execute parallel
-    (par $e:tt) => ( $crate::Query::Par($crate::spnl_arg!( $e )) );
-    (par $( $e:tt )+) => ( $crate::Query::Par(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
+    (par $e:tt) => ( $crate::ir::Query::Par($crate::spnl_arg!( $e )) );
+    (par $( $e:tt )+) => ( $crate::ir::Query::Par(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: Dependent/needs-attention
-    (cross $( $e:tt )+) => ( $crate::Query::Cross(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
+    (cross $( $e:tt )+) => ( $crate::ir::Query::Cross(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: Independent/no-attention with one or more inputs provided directly as a vector
-    (plus $e:tt) => ( $crate::Query::Plus($crate::spnl_arg!( $e )) );
+    (plus $e:tt) => ( $crate::ir::Query::Plus($crate::spnl_arg!( $e )) );
 
     // Core: Independent/no-attention with multiple inputs provided inline
-    (plus $( $e:tt )+) => ( $crate::Query::Plus(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
+    (plus $( $e:tt )+) => ( $crate::ir::Query::Plus(vec![$( $crate::spnl_arg!( $e ).into() ),+]) );
 
     // Core: A user message
-    (user $e:tt) => ($crate::Query::Message($crate::Message::User($crate::spnl_arg!($e).clone().into())));
+    (user $e:tt) => ($crate::ir::Query::Message($crate::ir::Message::User($crate::spnl_arg!($e).clone().into())));
 
     // Core: A system message
-    (system $e:tt) => ($crate::Query::Message($crate::Message::System($crate::spnl_arg!($e).into())));
+    (system $e:tt) => ($crate::ir::Query::Message($crate::ir::Message::System($crate::spnl_arg!($e).into())));
 
     // Data: incorporate a file at compile time
     (file $f:tt) => (include_str!($crate::spnl_arg!($f)));
@@ -47,18 +47,18 @@ macro_rules! spnl {
     (filen $f:tt) => (($crate::spnl_arg!($f).to_string(), include_str!($crate::spnl_arg!($f)).to_string()));
 
     // Data: incorporate a file at run time
-    (fetch $f:tt) => (match $crate::spnl!(fetchn $f).1 { $crate::Document::Text(a) => a,  $crate::Document::Binary(b) => String::from_utf8(b).expect("string") });
+    (fetch $f:tt) => (match $crate::spnl!(fetchn $f).1 { $crate::ir::Document::Text(a) => a,  $crate::ir::Document::Binary(b) => String::from_utf8(b).expect("string") });
 
     // Data: incorporate a file at run time, preserving file name
     (fetchn $f:tt) => {{
         let filename = ::std::path::Path::new(file!()).parent().expect("macro to have parent directory").join($crate::spnl_arg!($f));
-        (filename.clone().into_os_string().into_string().expect("filename"), $crate::Document::Text(::std::fs::read_to_string(filename).expect("error reading file")))
+        (filename.clone().into_os_string().into_string().expect("filename"), $crate::ir::Document::Text(::std::fs::read_to_string(filename).expect("error reading file")))
     }};
 
     // Data: incorporate a binary file at run time, preserving file name
     (fetchb $f:tt) => {{
         let filename = ::std::path::Path::new(file!()).parent().expect("macro to have parent directory").join($crate::spnl_arg!($f));
-        (filename.clone().into_os_string().into_string().expect("filename"), $crate::Document::Binary(::std::fs::read(filename).expect("error reading file")))
+        (filename.clone().into_os_string().into_string().expect("filename"), $crate::ir::Document::Binary(::std::fs::read(filename).expect("error reading file")))
     }};
 
     // Data: peel off the first $n elements of the given serialized
@@ -93,7 +93,7 @@ macro_rules! spnl {
 
     // Data: augment a prompt with relevant fragments from one or more documents
     (with $embedding_model:tt $input:tt $docs:tt) => {{
-        let docs: Vec<$crate::Query> = $crate::spnl_arg!($docs)
+        let docs: Vec<$crate::ir::Query> = $crate::spnl_arg!($docs)
             .into_iter()
             .map(|doc| match ::std::path::Path::new(&doc)
                  .extension()
@@ -122,7 +122,7 @@ macro_rules! spnl {
 
     // Internal
     (__spnl_retrieve $embedding_model:tt $input:tt $doc:tt) => (
-        $crate::Query::Augment($crate::Augment {
+        $crate::ir::Query::Augment($crate::ir::Augment {
             embedding_model: $crate::spnl_arg!($embedding_model).clone(),
             body: Box::new($crate::spnl_arg!($input)),
             doc: $crate::spnl_arg!( $doc ).into()
@@ -165,7 +165,7 @@ macro_rules! spnl {
     // times and makes available an index variable $i ranging from
     // $start to $n-$start-1.
     (repeat $i:ident $start:tt $n:tt $e:tt) => {{
-        let mut args: Vec<$crate::Query> = vec![];
+        let mut args: Vec<$crate::ir::Query> = vec![];
         let start = $crate::spnl_arg!($start);
         let end = $crate::spnl_arg!($n) + start;
         for $i in start..end {
@@ -183,10 +183,10 @@ macro_rules! spnl {
     (length $list:tt) => ($crate::spnl_arg!($list).len());
 
     // Utility: read as string from stdin
-    (ask $message:tt) => ( $crate::Query::Ask($crate::spnl_arg!($message).into()) );
+    (ask $message:tt) => ( $crate::ir::Query::Ask($crate::spnl_arg!($message).into()) );
 
     // Utility: print a helpful message to the console
-    (print $message:tt) => ( $crate::Query::Print($crate::spnl_arg!($message).into()) );
+    (print $message:tt) => ( $crate::ir::Query::Print($crate::spnl_arg!($message).into()) );
 
     // Utility:
     (format $fmt:tt $( $e:tt )*) => ( &format!($fmt, $($crate::spnl_arg!($e)),* ) );
@@ -205,7 +205,7 @@ macro_rules! spnl_arg {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Message::*, Query};
+    use crate::ir::{Message::*, Query};
 
     #[test]
     fn macro_user() {
@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(
             result,
             Query::Generate(
-                crate::GenerateBuilder::default()
+                crate::ir::GenerateBuilder::default()
                     .model("ollama/granite3.2:2b".to_string())
                     .input(Box::new(Query::Message(User("hello".to_string()))))
                     .max_tokens(Some(0))

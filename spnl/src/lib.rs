@@ -1,5 +1,5 @@
-mod query;
-pub use query::*;
+// TODO ir feature?
+pub mod ir;
 
 #[cfg(feature = "run")]
 mod execute;
@@ -25,6 +25,3 @@ pub mod pull;
 mod python;
 #[cfg(feature = "pypi")]
 pub use python::spnl_py;
-
-#[cfg(feature = "lisp")]
-mod lisp;

@@ -1,9 +1,11 @@
 use pyo3::prelude::*;
 
 use crate::{
-    Generate,
-    Message::{self, *},
-    Query,
+    ir::{
+        Generate,
+        Message::{self, *},
+        Query,
+    },
     optimizer::llo::chat_template::{self, ChatTemplate},
 };
 

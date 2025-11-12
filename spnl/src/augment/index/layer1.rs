@@ -4,12 +4,12 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use super::windowing;
 
 use crate::{
-    Augment, Document,
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
         storage,
     },
+    ir::{Augment, Document},
 };
 
 /// Number of fragment embeddings to perform in a single call

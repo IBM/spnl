@@ -1,4 +1,4 @@
-use crate::Message;
+use crate::ir::Message;
 use itertools::Itertools;
 
 #[derive(thiserror::Error, Debug)]

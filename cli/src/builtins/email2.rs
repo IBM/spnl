@@ -1,5 +1,5 @@
 use crate::args::Args;
-use spnl::{Query, spnl};
+use spnl::{ir::Query, spnl};
 
 pub fn query(args: Args) -> Query {
     let Args {

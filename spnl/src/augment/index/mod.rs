@@ -6,13 +6,13 @@ mod windowing;
 use indicatif::MultiProgress;
 
 use crate::{
-    Augment, Query,
     augment::{AugmentOptions, Indexer},
+    ir::{Augment, Generate, Query},
 };
 
 fn extract_augments(query: &Query, enclosing_model: &Option<String>) -> Vec<(String, Augment)> {
     match (query, enclosing_model) {
-        (Query::Generate(crate::Generate { model, input, .. }), _) => {
+        (Query::Generate(Generate { model, input, .. }), _) => {
             extract_augments(input, &Some(model.clone()))
         }
         (Query::Plus(v) | Query::Cross(v), _) => v

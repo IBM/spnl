@@ -1,4 +1,4 @@
-use crate::{Generate, Message::*, Query};
+use crate::ir::{Generate, Message::*, Query};
 use indicatif::MultiProgress;
 
 pub struct ExecuteOptions {
@@ -7,7 +7,7 @@ pub struct ExecuteOptions {
 }
 
 pub type SpnlError = anyhow::Error;
-pub type SpnlResult = anyhow::Result<crate::Query>;
+pub type SpnlResult = anyhow::Result<Query>;
 
 async fn seq(
     units: &[Query],

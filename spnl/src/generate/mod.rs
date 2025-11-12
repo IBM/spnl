@@ -1,4 +1,4 @@
-use crate::{Query, SpnlResult};
+use crate::{SpnlResult, ir::Query};
 
 pub mod backend;
 

@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use spnl::{from_yaml_str, optimizer::hlo};
+use spnl::{ir::from_yaml_str, optimizer::hlo};
 
 /*#[wasm_bindgen]
 extern "C" {

@@ -1,6 +1,10 @@
 use clap::Parser;
 use petname::Generator; // Trait needs to be in scope for `iter`.
-use spnl::{ExecuteOptions, Message::User, Query, SpnlError, execute, spnl};
+use spnl::{
+    ExecuteOptions, SpnlError, execute,
+    ir::{Message::User, Query},
+    spnl,
+};
 
 type GeneratedNames = Vec<String>;
 #[derive(serde::Deserialize)]

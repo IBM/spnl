@@ -1,4 +1,4 @@
-pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::Query> {
+pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
     let crate::args::Args {
         n,
         reverse,

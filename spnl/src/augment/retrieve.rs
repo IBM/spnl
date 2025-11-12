@@ -8,12 +8,12 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
 use crate::{
-    Document, Query,
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
         storage,
     },
+    ir::{Document, Query},
 };
 
 /// Retrieve relevant

@@ -44,7 +44,7 @@ pub struct ChatResponse {
 #[cfg(feature = "run_py")]
 #[pyfunction]
 pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
-    let query: crate::Query = serde_json::from_str(q.as_str()).map_err(handle_serde_err)?;
+    let query: crate::ir::Query = serde_json::from_str(q.as_str()).map_err(handle_serde_err)?;
 
     let rt = tokio::runtime::Runtime::new()?;
     let res = rt.block_on(crate::execute(

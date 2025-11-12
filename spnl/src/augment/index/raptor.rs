@@ -4,14 +4,12 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use super::layer1::{Fragments, process_corpora};
 use crate::augment::storage;
 use crate::{
-    Augment,
-    Message::*,
-    Query,
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
     },
     generate::generate,
+    ir::{Augment, Message::*, Query},
 };
 
 /// Maximum concurrent calls to llm generate for summarization.

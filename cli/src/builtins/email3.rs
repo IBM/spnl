@@ -1,7 +1,7 @@
 use rustyline::error::ReadlineError;
 
 use crate::args::Args;
-use spnl::{Query, spnl};
+use spnl::{ir::Query, spnl};
 
 // https://github.ibm.com/AI4BA/agentic-policy
 pub fn query(args: Args) -> Query {

@@ -4,7 +4,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-use crate::{Generate, Query};
+use crate::ir::{Generate, Query};
 
 /// Pull models (in parallel, if needed) used by the given query
 pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
@@ -181,7 +181,7 @@ pub fn extract_models(query: &Query) -> Vec<String> {
 fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
     match query {
         #[cfg(feature = "rag")]
-        Query::Augment(crate::Augment {
+        Query::Augment(crate::ir::Augment {
             embedding_model, ..
         }) => models.push(embedding_model.clone()),
         Query::Generate(Generate { model, .. }) => models.push(model.clone()),
