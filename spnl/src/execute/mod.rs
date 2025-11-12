@@ -1,6 +1,9 @@
 use crate::ir::{Generate, Message::*, Query};
 use indicatif::MultiProgress;
 
+#[cfg(feature = "pull")]
+pub mod pull;
+
 pub struct ExecuteOptions {
     /// Prepare query?
     pub prepare: Option<bool>,
@@ -58,7 +61,7 @@ pub async fn execute(query: &Query, rp: &ExecuteOptions) -> SpnlResult {
 #[async_recursion::async_recursion]
 async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
     #[cfg(feature = "pull")]
-    crate::pull::pull_if_needed(query).await?;
+    crate::execute::pull::pull_if_needed(query).await?;
 
     match query {
         Query::Message(_) => Ok(query.clone()),

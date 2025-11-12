@@ -18,9 +18,6 @@ mod augment;
 #[cfg(feature = "rag")]
 pub use augment::{AugmentOptionsBuilder, Indexer};
 
-#[cfg(feature = "pull")]
-pub mod pull;
-
 #[cfg(feature = "pypi")]
 mod python;
 #[cfg(feature = "pypi")]
