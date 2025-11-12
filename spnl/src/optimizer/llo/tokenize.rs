@@ -4,7 +4,7 @@ use crate::{
     Generate,
     Message::{self, *},
     Query,
-    chat_template::{self, ChatTemplate},
+    optimizer::llo::chat_template::{self, ChatTemplate},
 };
 
 struct Tokenizer {

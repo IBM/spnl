@@ -11,12 +11,7 @@ pub use execute::*;
 mod generate;
 
 // TODO optimizer feature?
-#[cfg(feature = "run")]
-mod optimizer;
-
-// TODO optimizer feature?
-#[cfg(feature = "run")]
-pub use optimizer::*;
+pub mod optimizer;
 
 #[cfg(feature = "rag")]
 mod augment;
@@ -25,12 +20,6 @@ pub use augment::{AugmentOptionsBuilder, Indexer};
 
 #[cfg(feature = "pull")]
 pub mod pull;
-
-#[cfg(feature = "tok")]
-pub mod tokenize;
-
-#[cfg(feature = "tok")]
-pub mod chat_template;
 
 #[cfg(feature = "pypi")]
 mod python;

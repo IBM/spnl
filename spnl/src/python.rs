@@ -70,16 +70,22 @@ pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python::ChatResponse>()?;
 
     #[cfg(feature = "tok")]
-    m.add_class::<crate::tokenize::TokenizedQuery>()?;
+    m.add_class::<crate::optimizer::llo::tokenize::TokenizedQuery>()?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(crate::tokenize::tokenize_query, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        crate::optimizer::llo::tokenize::tokenize_query,
+        m
+    )?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(crate::tokenize::tokenize_prepare, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        crate::optimizer::llo::tokenize::tokenize_prepare,
+        m
+    )?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(crate::tokenize::init, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::optimizer::llo::tokenize::init, m)?)?;
 
     //m.add_class::<SimpleQuery>()?;
     //m.add_class::<SimpleGenerate>()?;

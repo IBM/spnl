@@ -2,7 +2,7 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{ExecuteOptions, SpnlError, execute, from_str, hlo, pretty_print};
+use spnl::{ExecuteOptions, SpnlError, execute, from_str, optimizer::hlo, pretty_print};
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
