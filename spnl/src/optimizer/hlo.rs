@@ -1,6 +1,6 @@
 use crate::{
     generate::is_span_enabled,
-    ir::{Generate, GenerateBuilder, GenerateMetadataBuilder, Message::User, Query, Repeat},
+    ir::{Generate, GenerateBuilder, Query, Repeat},
 };
 
 #[cfg(feature = "rag")]
@@ -47,6 +47,7 @@ async fn optimize_vec_iter<'a>(
 }
 
 /// Wrap a 1-token inner generate around each fragment
+#[cfg(feature = "rag")]
 fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
     if let Some(g) = parent_generate
         && is_span_enabled(&g.metadata.model)
@@ -54,7 +55,7 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
         Some(Query::Generate(
             GenerateBuilder::from(g)
                 .metadata(
-                    GenerateMetadataBuilder::from(&g.metadata)
+                    crate::ir::GenerateMetadataBuilder::from(&g.metadata)
                         .max_tokens(1)
                         .temperature(0.0)
                         .build()
@@ -70,6 +71,7 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
 }
 
 /// Wrap a list of queries into a monad
+#[cfg(feature = "rag")]
 fn prepare_all(prepares: Vec<Query>) -> Option<Query> {
     if !prepares.is_empty() {
         Some(Query::Monad(Query::Plus(prepares).into()))
@@ -94,7 +96,7 @@ async fn optimize_iter<'a>(
                 augment::retrieve(&a.embedding_model, &a.body, &a.doc, &attrs.options.aug)
                     .await?
                     .into_iter()
-                    .map(|s| Query::Message(User(s))) // we don't currently have a special type for fragments
+                    .map(|s| Query::Message(crate::ir::Message::User(s))) // we don't currently have a special type for fragments
                     .map(|m| (prepare_fragment(&m, attrs.parent_generate), m))
                     .unzip();
 
@@ -187,7 +189,7 @@ pub async fn optimize(query: &Query, po: &Options) -> anyhow::Result<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{Augment, Document, Message::*, Query::Message};
+    use crate::ir::{Augment, Document, GenerateMetadataBuilder, Message::*, Query::Message};
 
     fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Generate, Query, Query, Query)> {
         let s2 = Message(System("outer system".into()));
