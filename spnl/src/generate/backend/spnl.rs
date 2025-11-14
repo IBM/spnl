@@ -3,7 +3,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use crate::{
     SpnlResult,
-    ir::{Generate, Message::Assistant, Query, to_string},
+    ir::{Generate, GenerateMetadata, Message::Assistant, Query, to_string},
 };
 
 #[derive(serde::Deserialize)]
@@ -34,10 +34,12 @@ pub async fn generate(
     let client = reqwest::Client::new();
 
     let query = Query::Generate(Generate {
-        model: model.to_string(),
+        metadata: GenerateMetadata {
+            model: model.to_string(),
+            max_tokens: *max_tokens,
+            temperature: *temp,
+        },
         input: Box::new(input.clone()),
-        max_tokens: *max_tokens,
-        temperature: *temp,
     });
     // eprintln!("Sending query {:?}", to_string(&query)?);
 

@@ -4,7 +4,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-use crate::ir::{Generate, Query};
+use crate::ir::{Generate, GenerateMetadata, Query};
 
 /// Pull models (in parallel, if needed) used by the given query
 pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
@@ -184,7 +184,10 @@ fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
         Query::Augment(crate::ir::Augment {
             embedding_model, ..
         }) => models.push(embedding_model.clone()),
-        Query::Generate(Generate { model, .. }) => models.push(model.clone()),
+        Query::Generate(Generate {
+            metadata: GenerateMetadata { model, .. },
+            ..
+        }) => models.push(model.clone()),
         Query::Plus(v) | Query::Cross(v) => {
             v.iter().for_each(|vv| extract_models_iter(vv, models));
         }

@@ -93,7 +93,7 @@ pub fn from_file(f: &str) -> Result<Query, Box<dyn ::std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::GenerateBuilder;
+    use crate::ir::{GenerateBuilder, GenerateMetadataBuilder};
 
     #[test]
     fn serde_user() -> serde_json::Result<()> {
@@ -173,10 +173,12 @@ mod tests {
             result,
             Query::Generate(
                 GenerateBuilder::default()
-                    .model("ollama/granite3.2:2b")
                     .input(Query::Message(Message::User("hello".to_string())).into())
-                    .max_tokens(None)
-                    .temperature(None)
+                    .metadata(
+                        GenerateMetadataBuilder::default()
+                            .model("ollama/granite3.2:2b")
+                            .build()?
+                    )
                     .build()?
             )
         );

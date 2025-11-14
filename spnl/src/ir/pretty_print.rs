@@ -57,7 +57,11 @@ impl ptree::TreeItem for Query {
                 Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
                 Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
                 Query::Generate(Generate {
-                    model, max_tokens, ..
+                    metadata:
+                        GenerateMetadata {
+                            model, max_tokens, ..
+                        },
+                    ..
                 }) => style.paint(format!(
                     "\x1b[31;1mGenerate\x1b[0m \x1b[2m{}model={model}\x1b[0m",
                     if let Some(mt) = max_tokens

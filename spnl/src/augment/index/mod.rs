@@ -7,14 +7,18 @@ use indicatif::MultiProgress;
 
 use crate::{
     augment::{AugmentOptions, Indexer},
-    ir::{Augment, Generate, Query},
+    ir::{Augment, Generate, GenerateMetadata, Query},
 };
 
 fn extract_augments(query: &Query, enclosing_model: &Option<String>) -> Vec<(String, Augment)> {
     match (query, enclosing_model) {
-        (Query::Generate(Generate { model, input, .. }), _) => {
-            extract_augments(input, &Some(model.clone()))
-        }
+        (
+            Query::Generate(Generate {
+                input,
+                metadata: GenerateMetadata { model, .. },
+            }),
+            _,
+        ) => extract_augments(input, &Some(model.clone())),
         (Query::Plus(v) | Query::Cross(v), _) => v
             .iter()
             .flat_map(|q| extract_augments(q, enclosing_model))

@@ -10,10 +10,12 @@ macro_rules! spnl {
     // Core: Generate text given $input using $model with temperature $temp and $max_tokens
     (g $model:tt $input:tt $temp:tt $max_tokens:tt) => (
         $crate::ir::Query::Generate($crate::ir::Generate {
-            model: $crate::spnl_arg!($model).to_string(),
             input: Box::new($crate::spnl_arg!($input).into()),
-            max_tokens: Some($crate::spnl_arg!($max_tokens)),
-            temperature: Some($crate::spnl_arg!($temp)),
+            metadata: $crate::ir::GenerateMetadata {
+                model: $crate::spnl_arg!($model).to_string(),
+                max_tokens: Some($crate::spnl_arg!($max_tokens)),
+                temperature: Some($crate::spnl_arg!($temp)),
+            },
         })
     );
 
@@ -282,10 +284,14 @@ mod tests {
             result,
             Query::Generate(
                 crate::ir::GenerateBuilder::default()
-                    .model("ollama/granite3.2:2b".to_string())
+                    .metadata(
+                        crate::ir::GenerateMetadataBuilder::default()
+                            .model("ollama/granite3.2:2b".to_string())
+                            .max_tokens(0)
+                            .temperature(0.0)
+                            .build()?
+                    )
                     .input(Box::new(Query::Message(User("hello".to_string()))))
-                    .max_tokens(Some(0))
-                    .temperature(Some(0.0))
                     .build()?
             )
         );

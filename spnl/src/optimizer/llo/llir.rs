@@ -1,4 +1,4 @@
-use crate::ir::{Generate, Message, Query};
+use crate::ir::{Generate, GenerateMetadata, Message, Query};
 
 //#[pyclass]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -51,10 +51,12 @@ impl From<NonGenerateInput> for Query {
 impl From<SingleGenerateQuery> for Query {
     fn from(q: SingleGenerateQuery) -> Self {
         Self::Generate(Generate {
-            model: q.g.model.clone(),
+            metadata: GenerateMetadata {
+                model: q.g.model.clone(),
+                max_tokens: q.g.max_tokens,
+                temperature: q.g.temperature,
+            },
             input: Box::new(q.g.input.clone().into()),
-            max_tokens: q.g.max_tokens,
-            temperature: q.g.temperature,
         })
     }
 }

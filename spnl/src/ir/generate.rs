@@ -3,19 +3,52 @@ use crate::ir::Query;
 #[derive(
     Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, derive_builder::Builder,
 )]
-pub struct Generate {
+#[builder(derive(serde::Serialize))]
+pub struct GenerateMetadata {
     #[builder(setter(into))]
     pub model: String,
 
-    pub input: Box<Query>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[builder(default = Some(0))]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default = "default_max_tokens"
+    )]
+    #[builder(setter(into), default = Some(0))]
     pub max_tokens: Option<i32>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[builder(default = Some(0.6))]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default = "default_temperature"
+    )]
+    #[builder(setter(into), default = Some(0.6))]
     pub temperature: Option<f32>,
+}
+
+fn default_max_tokens() -> Option<i32> {
+    Some(0)
+}
+
+fn default_temperature() -> Option<f32> {
+    Some(0.6)
+}
+
+impl From<&GenerateMetadata> for GenerateMetadataBuilder {
+    fn from(other: &GenerateMetadata) -> Self {
+        GenerateMetadataBuilder::default()
+            .model(other.model.clone())
+            .max_tokens(other.max_tokens)
+            .temperature(other.temperature)
+            .clone()
+    }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, derive_builder::Builder,
+)]
+pub struct Generate {
+    #[serde(flatten)]
+    pub metadata: GenerateMetadata,
+
+    pub input: Box<Query>,
 }
 
 impl Generate {
@@ -35,10 +68,8 @@ impl Generate {
 impl From<&Generate> for GenerateBuilder {
     fn from(other: &Generate) -> Self {
         GenerateBuilder::default()
-            .model(other.model.clone())
+            .metadata(other.metadata.clone())
             .input(other.input.clone())
-            .max_tokens(other.max_tokens)
-            .temperature(other.temperature)
             .clone()
     }
 }

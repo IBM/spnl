@@ -77,17 +77,12 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
             Ok("".into())
         }
 
-        Query::Generate(Generate {
-            model,
-            input,
-            max_tokens,
-            temperature,
-        }) => {
+        Query::Generate(Generate { metadata, input }) => {
             crate::generate::generate(
-                model.as_str(),
+                metadata.model.as_str(),
                 &run_subtree(input, rp, m).await?,
-                max_tokens,
-                temperature,
+                &metadata.max_tokens,
+                &metadata.temperature,
                 m,
                 rp.prepare.unwrap_or_default(),
             )

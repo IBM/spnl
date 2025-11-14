@@ -57,16 +57,9 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
 
             otherwise => otherwise.iter().flat_map(simplify_iter).collect(),
         })],
-        Query::Generate(Generate {
-            model,
-            input,
-            max_tokens,
-            temperature,
-        }) => vec![Query::Generate(Generate {
-            model: model.clone(),
+        Query::Generate(Generate { input, metadata }) => vec![Query::Generate(Generate {
+            metadata: metadata.clone(),
             input: Box::new(simplify(input)),
-            max_tokens: *max_tokens,
-            temperature: *temperature,
         })],
         otherwise => vec![otherwise.clone()],
     }

@@ -1,6 +1,6 @@
 use crate::{
     generate::is_span_enabled,
-    ir::{Generate, GenerateBuilder, Message::User, Query, Repeat},
+    ir::{Generate, GenerateBuilder, GenerateMetadataBuilder, Message::User, Query, Repeat},
 };
 
 #[cfg(feature = "rag")]
@@ -49,13 +49,18 @@ async fn optimize_vec_iter<'a>(
 /// Wrap a 1-token inner generate around each fragment
 fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
     if let Some(g) = parent_generate
-        && is_span_enabled(&g.model)
+        && is_span_enabled(&g.metadata.model)
     {
         Some(Query::Generate(
             GenerateBuilder::from(g)
+                .metadata(
+                    GenerateMetadataBuilder::from(&g.metadata)
+                        .max_tokens(1)
+                        .temperature(0.0)
+                        .build()
+                        .unwrap(), // TODO...
+                )
                 .input(Box::new(m.clone()))
-                .max_tokens(Some(1))
-                .temperature(Some(0.0))
                 .build()
                 .unwrap(), // TODO...
         ))
@@ -120,7 +125,7 @@ async fn optimize_iter<'a>(
             )
             .await?;
 
-            let nested_gen_input: Option<Query> = if !is_span_enabled(&g.model) {
+            let nested_gen_input: Option<Query> = if !is_span_enabled(&g.metadata.model) {
                 None
             } else {
                 match &optimized_input {
@@ -153,10 +158,8 @@ async fn optimize_iter<'a>(
             };
 
             Ok(Query::Generate(Generate {
-                model: g.model.clone(),
+                metadata: g.metadata.clone(),
                 input: Box::new(nested_gen_input.unwrap_or(optimized_input)),
-                max_tokens: g.max_tokens,
-                temperature: g.temperature,
             }))
         }
 
@@ -189,12 +192,12 @@ mod tests {
         let s1 = Message(System("inner system".into()));
         let u1 = Message(User("inner user".into()));
         let inner_generate = GenerateBuilder::default()
-            .model(model)
+            .metadata(GenerateMetadataBuilder::default().model(model).build()?)
             .input(Box::new(Query::Seq(vec![s1.clone(), u1.clone()])))
             .build()?;
         let outer_generate = Query::Generate(
             GenerateBuilder::default()
-                .model(model)
+                .metadata(GenerateMetadataBuilder::default().model(model).build()?)
                 .input(Box::new(Query::Seq(vec![
                     s2.clone(),
                     Query::Plus(vec![Query::Generate(inner_generate.clone())]),
@@ -223,7 +226,7 @@ mod tests {
             optimize(&outer_generate, &Options::default()).await?,
             simplify(&Query::Generate(
                 GenerateBuilder::default()
-                    .model(model)
+                    .metadata(GenerateMetadataBuilder::default().model(model).build()?)
                     .input(Box::new(Query::Seq(vec![
                         s2,
                         Query::Plus(vec![s1, u1, Query::Generate(inner_generate.wrap_plus())])
@@ -240,7 +243,7 @@ mod tests {
         let q = Message(User("Hello".to_string()));
         let d = "I know all about Hello and stuff";
         let outer_generate = GenerateBuilder::default()
-            .model(model)
+            .metadata(GenerateMetadataBuilder::default().model(model).build()?)
             .input(Box::new(Query::Augment(Augment {
                 embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
                 body: Box::new(q),
@@ -262,7 +265,7 @@ mod tests {
             .await?,
             Query::Generate(
                 GenerateBuilder::default()
-                    .model(model)
+                    .metadata(GenerateMetadataBuilder::default().model(model).build()?)
                     .input(Box::new(Query::Seq(
                         [
                             prepare_all(

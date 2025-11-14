@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 use crate::{
     ir::{
-        Generate,
+        Generate, GenerateMetadata,
         Message::{self, *},
         Query,
     },
@@ -402,7 +402,10 @@ pub fn tokenize_prepare(
     let squery: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
     let query: Query = squery.into();
     match query {
-        Query::Generate(Generate { model, input, .. }) => {
+        Query::Generate(Generate {
+            input,
+            metadata: GenerateMetadata { model, .. },
+        }) => {
             let s = ::std::time::Instant::now();
             let tok = state
                 .get_or_create(&model, pad_token, None, plus_token, block_size)
