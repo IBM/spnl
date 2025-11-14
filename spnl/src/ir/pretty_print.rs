@@ -73,7 +73,7 @@ impl ptree::TreeItem for Query {
                     }
                 )),
                 Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
-                Query::Bulk(Repeat { n, .. }) => style.paint(format!("Repeat {n}")),
+                Query::Bulk(Bulk::Repeat(Repeat { n, .. })) => style.paint(format!("Repeat {n}")),
                 Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
                 #[cfg(feature = "rag")]
@@ -86,7 +86,7 @@ impl ptree::TreeItem for Query {
             Query::Ask(_) | Query::Message(_) | Query::Print(_) => vec![],
             Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Monad(q) => vec![*q.clone()],
-            Query::Bulk(Repeat { generate, .. }) => vec![*generate.input.clone()],
+            Query::Bulk(Bulk::Repeat(Repeat { generate, .. })) => vec![*generate.input.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]
             Query::Augment(Augment {

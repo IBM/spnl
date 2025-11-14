@@ -1,6 +1,6 @@
 use crate::{
     generate::is_span_enabled,
-    ir::{Generate, GenerateBuilder, Query, Repeat},
+    ir::{Bulk, Generate, GenerateBuilder, Query, Repeat},
 };
 
 #[cfg(feature = "rag")]
@@ -112,12 +112,14 @@ async fn optimize_iter<'a>(
         }
 
         // Optimize the input of the Repeat
-        Query::Bulk(Repeat { n, generate }) => Ok(Query::Bulk(Repeat {
-            n: *n,
-            generate: GenerateBuilder::from(generate)
-                .input(optimize_iter(&generate.input, attrs).await?.into())
-                .build()?,
-        })),
+        Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
+            Ok(Query::Bulk(Bulk::Repeat(Repeat {
+                n: *n,
+                generate: GenerateBuilder::from(generate)
+                    .input(optimize_iter(&generate.input, attrs).await?.into())
+                    .build()?,
+            })))
+        }
 
         // Optimize for nested generate; Generate(Seq(Message, Plus(Generate, Generate, Generate)))
         Query::Generate(g) => {

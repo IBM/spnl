@@ -1,4 +1,4 @@
-use super::{Generate, Message, Repeat};
+use super::{Bulk, Generate, Message};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -18,9 +18,6 @@ pub enum Query {
     /// Ignore the output, executed for server-side effect only (e.g. caching)
     Monad(Box<Query>),
 
-    /// Some kind of bulk operation
-    Bulk(Repeat),
-
     /// Generate new content via a given model
     #[serde(rename = "g")]
     Generate(Generate),
@@ -37,6 +34,10 @@ pub enum Query {
     /// Print a helpful message to the console
     #[cfg(feature = "print")]
     Print(String),
+
+    /// Some kind of bulk operation
+    #[serde(untagged)]
+    Bulk(Bulk),
 
     /// Some sort of chat message
     #[serde(untagged)]
