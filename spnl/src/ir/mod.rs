@@ -4,6 +4,9 @@ pub use augment::*;
 mod generate;
 pub use generate::*;
 
+mod bulk;
+pub use bulk::*;
+
 mod message;
 pub use message::*;
 

@@ -1,10 +1,4 @@
-use crate::ir::{Generate, Message};
-
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct Repeat {
-    pub n: usize,
-    pub query: Box<Query>,
-}
+use super::{Generate, Message, Repeat};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]

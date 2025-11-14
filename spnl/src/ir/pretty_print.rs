@@ -1,4 +1,4 @@
-use crate::ir::*;
+use super::*;
 
 impl ::std::fmt::Display for Query {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -86,7 +86,7 @@ impl ptree::TreeItem for Query {
             Query::Ask(_) | Query::Message(_) | Query::Print(_) => vec![],
             Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Monad(q) => vec![*q.clone()],
-            Query::Bulk(Repeat { query, .. }) => vec![*query.clone()],
+            Query::Bulk(Repeat { generate, .. }) => vec![*generate.input.clone()],
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]
             Query::Augment(Augment {

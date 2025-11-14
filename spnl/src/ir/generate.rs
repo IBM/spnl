@@ -1,4 +1,4 @@
-use crate::ir::Query;
+use super::Query;
 
 #[derive(
     Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, derive_builder::Builder,

@@ -1,4 +1,4 @@
-use crate::ir::{Message, Query};
+use super::{Message, Query};
 
 impl From<&str> for Query {
     fn from(s: &str) -> Self {

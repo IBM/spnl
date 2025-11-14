@@ -9,9 +9,8 @@ pub fn simplify(query: &Query) -> Query {
 fn simplify_iter(query: &Query) -> Vec<Query> {
     match query {
         // Unroll repeats
-        Query::Bulk(Repeat { n, query }) => {
-            let q = simplify_iter(query);
-            ::std::iter::repeat_n(q, *n).flatten().collect::<Vec<_>>()
+        Query::Bulk(Repeat { n, generate }) => {
+            ::std::iter::repeat_n(Query::Generate(generate.clone()), *n).collect::<Vec<_>>()
         }
 
         Query::Seq(v) => match &v[..] {
@@ -68,7 +67,7 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{Message::*, Query::*};
+    use crate::ir::{GenerateBuilder, GenerateMetadataBuilder, Message::*, Query::*};
 
     #[test]
     // Message -> Message (i.e. no change)
@@ -109,11 +108,23 @@ mod tests {
     #[test]
     fn simplify_repeat_expansion() {
         let n = 2;
-        let m = Message(User("hello".to_string()));
+        let g = GenerateBuilder::default()
+            .metadata(
+                GenerateMetadataBuilder::default()
+                    .model("does not matter for this test")
+                    .build()
+                    .unwrap(),
+            )
+            .input(Message(User("hello".to_string())).into())
+            .build()
+            .unwrap();
         let q = Bulk(Repeat {
             n,
-            query: Box::new(m.clone()),
+            generate: g.clone(),
         });
-        assert_eq!(simplify(&q), Seq(::std::iter::repeat_n(m, n).collect()));
+        assert_eq!(
+            simplify(&q),
+            Seq(::std::iter::repeat_n(Query::Generate(g), n).collect())
+        );
     }
 }

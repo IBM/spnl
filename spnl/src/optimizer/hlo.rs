@@ -109,10 +109,12 @@ async fn optimize_iter<'a>(
             ))
         }
 
-        // Optimize the query of the Repeat
-        Query::Bulk(Repeat { n, query }) => Ok(Query::Bulk(Repeat {
+        // Optimize the input of the Repeat
+        Query::Bulk(Repeat { n, generate }) => Ok(Query::Bulk(Repeat {
             n: *n,
-            query: Box::new(optimize_iter(query, attrs).await?),
+            generate: GenerateBuilder::from(generate)
+                .input(optimize_iter(&generate.input, attrs).await?.into())
+                .build()?,
         })),
 
         // Optimize for nested generate; Generate(Seq(Message, Plus(Generate, Generate, Generate)))
