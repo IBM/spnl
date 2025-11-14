@@ -105,7 +105,7 @@ async fn optimize_iter<'a>(
         }
 
         // Optimize the query of the Repeat
-        Query::Repeat(Repeat { n, query }) => Ok(Query::Repeat(Repeat {
+        Query::Bulk(Repeat { n, query }) => Ok(Query::Bulk(Repeat {
             n: *n,
             query: Box::new(optimize_iter(query, attrs).await?),
         })),

@@ -119,7 +119,7 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
         }
 
         // TODO: should not happen; we need to improve the typing of runnable queries
-        Query::Repeat(_) => todo!("repeat"),
+        Query::Bulk(_) => todo!("bulk"),
         #[cfg(feature = "rag")]
         Query::Augment(_) => todo!("augment"),
     }

@@ -24,8 +24,8 @@ pub enum Query {
     /// Ignore the output, executed for server-side effect only (e.g. caching)
     Monad(Box<Query>),
 
-    /// Helpful for repeating an operation n times in a Plus
-    Repeat(Repeat),
+    /// Some kind of bulk operation
+    Bulk(Repeat),
 
     /// Generate new content via a given model
     #[serde(rename = "g")]
@@ -44,7 +44,7 @@ pub enum Query {
     #[cfg(feature = "print")]
     Print(String),
 
-    /// Some sort of message
+    /// Some sort of chat message
     #[serde(untagged)]
     Message(Message),
 }
