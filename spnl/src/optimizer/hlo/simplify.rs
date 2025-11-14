@@ -1,4 +1,4 @@
-use crate::ir::{Bulk, Generate, Query, Repeat};
+use crate::ir::{Bulk, Generate, Map, Message, Query, Repeat};
 
 pub fn simplify(query: &Query) -> Query {
     simplify_iter(query).into()
@@ -8,9 +8,24 @@ pub fn simplify(query: &Query) -> Query {
 /// e.g. Plus-of-Plus or Cross with a tail Cross.
 fn simplify_iter(query: &Query) -> Vec<Query> {
     match query {
-        // Unroll repeats
+        // Unroll repeats. TODO: move this into the query executor backend, to expose server-side support for Repeat
         Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
             ::std::iter::repeat_n(Query::Generate(generate.clone()), *n).collect::<Vec<_>>()
+        }
+
+        // Unroll batch. TODO: move this into the query executor backend, to expose server-side support for Map
+        Query::Bulk(Bulk::Map(Map { metadata, inputs })) => {
+            vec![Query::Plus(
+                inputs
+                    .iter()
+                    .map(|input| {
+                        Query::Generate(Generate {
+                            metadata: metadata.clone(),
+                            input: Query::Message(Message::User(input.clone())).into(),
+                        })
+                    })
+                    .collect(),
+            )]
         }
 
         Query::Seq(v) => match &v[..] {
@@ -125,6 +140,45 @@ mod tests {
         assert_eq!(
             simplify(&q),
             Seq(::std::iter::repeat_n(Query::Generate(g), n).collect())
+        );
+    }
+
+    #[test]
+    fn simplify_batch_expansion() {
+        let inputs = ["a".into(), "b".into(), "c".into()];
+        let metadata = GenerateMetadataBuilder::default()
+            .model("does not matter for this test")
+            .build()
+            .unwrap();
+        let q = Bulk(Bulk::Map(Map {
+            metadata: metadata.clone(),
+            inputs: inputs.to_vec(),
+        }));
+        assert_eq!(
+            simplify(&q),
+            Plus(vec![
+                Generate(
+                    GenerateBuilder::default()
+                        .metadata(metadata.clone())
+                        .input(Message(User(inputs[0].clone())).into())
+                        .build()
+                        .unwrap()
+                ),
+                Generate(
+                    GenerateBuilder::default()
+                        .metadata(metadata.clone())
+                        .input(Message(User(inputs[1].clone())).into())
+                        .build()
+                        .unwrap()
+                ),
+                Generate(
+                    GenerateBuilder::default()
+                        .metadata(metadata.clone())
+                        .input(Message(User(inputs[2].clone())).into())
+                        .build()
+                        .unwrap()
+                ),
+            ])
         );
     }
 }
