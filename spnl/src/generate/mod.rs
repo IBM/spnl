@@ -1,8 +1,11 @@
 use crate::{
     SpnlResult,
     ir::Query,
-    ir::{Generate, GenerateBuilder, GenerateMetadata, GenerateMetadataBuilder},
+    ir::{Generate, GenerateMetadata},
 };
+
+#[cfg(any(feature = "ollama", feature = "openai", feature = "gemini"))]
+use crate::generate::backend::openai::Provider::*;
 
 pub mod backend;
 
@@ -32,82 +35,22 @@ pub async fn repeat(
 }
 
 pub async fn generate(
-    metadata: &GenerateMetadata,
-    input: &Query,
+    spec: Generate,
     mp: Option<&indicatif::MultiProgress>,
     prepare: bool,
 ) -> SpnlResult {
-    match &metadata.model {
+    match spec.metadata.model.splitn(2, '/').collect::<Vec<_>>()[..] {
         #[cfg(feature = "ollama")]
-        m if m.starts_with("ollama/") => {
-            crate::generate::backend::openai::generate(
-                crate::generate::backend::openai::Provider::Ollama,
-                GenerateBuilder::default()
-                    .input(Box::new(input.clone()))
-                    .metadata(
-                        GenerateMetadataBuilder::from(metadata)
-                            .model(&m[7..])
-                            .build()?,
-                    )
-                    .build()?,
-                mp,
-                prepare,
-            )
-            .await
-        }
+        ["ollama/", m] => backend::openai::generate(Ollama, spec.with_model(m)?, mp, prepare).await,
 
         #[cfg(feature = "openai")]
-        m if m.starts_with("openai/") => {
-            crate::generate::backend::openai::generate(
-                crate::generate::backend::openai::Provider::OpenAI,
-                GenerateBuilder::default()
-                    .input(Box::new(input.clone()))
-                    .metadata(
-                        GenerateMetadataBuilder::from(metadata)
-                            .model(&m[7..])
-                            .build()?,
-                    )
-                    .build()?,
-                mp,
-                prepare,
-            )
-            .await
-        }
+        ["openai/", m] => backend::openai::generate(OpenAI, spec.with_model(m)?, mp, prepare).await,
 
         #[cfg(feature = "gemini")]
-        m if m.starts_with("gemini/") => {
-            crate::generate::backend::openai::generate(
-                crate::generate::backend::openai::Provider::Gemini,
-                GenerateBuilder::default()
-                    .input(Box::new(input.clone()))
-                    .metadata(
-                        GenerateMetadataBuilder::from(metadata)
-                            .model(&m[7..])
-                            .build()?,
-                    )
-                    .build()?,
-                mp,
-                prepare,
-            )
-            .await
-        }
+        ["gemini/", m] => backend::openai::generate(Gemini, spec.with_model(m)?, mp, prepare).await,
 
         #[cfg(feature = "spnl-api")]
-        m if m.starts_with("spnl/") => {
-            crate::generate::backend::spnl::generate(
-                GenerateBuilder::default()
-                    .input(Box::new(input.clone()))
-                    .metadata(
-                        GenerateMetadataBuilder::from(metadata)
-                            .model(&m[5..])
-                            .build()?,
-                    )
-                    .build()?,
-                mp,
-                prepare,
-            )
-            .await
-        }
+        ["spnl", m] => backend::spnl::generate(spec.with_model(m)?, mp, prepare).await,
 
         _ => Err(ModelNotFoundError.into()),
     }

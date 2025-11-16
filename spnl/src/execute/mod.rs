@@ -1,4 +1,4 @@
-use crate::ir::{Bulk, Generate, Map, Message::*, Query, Repeat};
+use crate::ir::{Bulk, Generate, GenerateBuilder, Map, Message::*, Query, Repeat};
 use indicatif::MultiProgress;
 
 #[cfg(feature = "pull")]
@@ -86,8 +86,10 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
 
         Query::Generate(Generate { metadata, input }) => {
             crate::generate::generate(
-                metadata,
-                &run_subtree(input, rp, m).await?,
+                GenerateBuilder::default()
+                    .metadata(metadata.clone())
+                    .input(Box::from(run_subtree(input, rp, m).await?))
+                    .build()?,
                 m,
                 rp.prepare.unwrap_or_default(),
             )

@@ -31,6 +31,16 @@ fn default_temperature() -> Option<f32> {
     Some(0.6)
 }
 
+impl From<GenerateMetadata> for GenerateMetadataBuilder {
+    fn from(other: GenerateMetadata) -> Self {
+        GenerateMetadataBuilder::default()
+            .model(other.model)
+            .max_tokens(other.max_tokens)
+            .temperature(other.temperature)
+            .clone()
+    }
+}
+
 impl From<&GenerateMetadata> for GenerateMetadataBuilder {
     fn from(other: &GenerateMetadata) -> Self {
         GenerateMetadataBuilder::default()
@@ -71,5 +81,17 @@ impl From<&Generate> for GenerateBuilder {
             .metadata(other.metadata.clone())
             .input(other.input.clone())
             .clone()
+    }
+}
+
+impl Generate {
+    pub fn with_model(&self, model: &str) -> anyhow::Result<Self> {
+        Ok(GenerateBuilder::from(self)
+            .metadata(
+                GenerateMetadataBuilder::from(self.metadata.clone())
+                    .model(model.to_string())
+                    .build()?,
+            )
+            .build()?)
     }
 }

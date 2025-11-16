@@ -9,7 +9,7 @@ use crate::{
         embed::{EmbedData, embed},
     },
     generate::generate,
-    ir::{Augment, GenerateMetadata, Message::*, Query},
+    ir::{Augment, Generate, GenerateMetadata, Message::*, Query},
 };
 
 /// Maximum concurrent calls to llm generate for summarization.
@@ -134,20 +134,22 @@ async fn cross_index_fragment(
     let temperature = Some(0.2);
 
     let summary = match generate(
-        &GenerateMetadata {
-            model: enclosing_model.to_string(),
-            max_tokens,
-            temperature,
+        Generate {
+            metadata: GenerateMetadata {
+                model: enclosing_model.to_string(),
+                max_tokens,
+                temperature,
+            },
+            input: Box::from(Query::Cross(vec![
+                //Query::System("You create concise summaries by extracting key concepts and term definitions".into()),
+                Query::Message(System("You are a helpful assistant.".into())), // copied from raptor python code
+                Query::Message(User(
+                    "Write a summary of the following, including as many key details as possible:"
+                        .into(),
+                )), // copied from raptor python code
+                Query::Plus(input),
+            ])),
         },
-        &Query::Cross(vec![
-            //Query::System("You create concise summaries by extracting key concepts and term definitions".into()),
-            Query::Message(System("You are a helpful assistant.".into())), // copied from raptor python code
-            Query::Message(User(
-                "Write a summary of the following, including as many key details as possible:"
-                    .into(),
-            )), // copied from raptor python code
-            Query::Plus(input),
-        ]),
         Some(m),
         false,
     )

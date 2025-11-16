@@ -13,7 +13,7 @@ use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequ
 
 use crate::{
     SpnlResult,
-    ir::{Generate, GenerateMetadata, Message::*, Query},
+    ir::{Generate, Message::*, Query},
 };
 
 #[cfg(feature = "rag")]
@@ -49,18 +49,8 @@ pub async fn generate(
         todo!()
     }
 
-    let Generate {
-        input,
-        metadata:
-            GenerateMetadata {
-                model,
-                max_tokens,
-                temperature,
-            },
-    } = spec;
-
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
-    let input_messages = messagify(&input);
+    let input_messages = messagify(&spec.input);
 
     let quiet = m.is_some();
     let mut stdout = stdout();
@@ -77,7 +67,9 @@ pub async fn generate(
     } */
 
     // Extract a max tokens
-    let mt = max_tokens
+    let mt = spec
+        .metadata
+        .max_tokens
         .map(|mt| match mt {
             0 => 2048_u32, // vllm 400's if given 0
             _ => mt as u32,
@@ -85,9 +77,9 @@ pub async fn generate(
         .unwrap_or(2048);
 
     let request = CreateChatCompletionRequestArgs::default()
-        .model(model)
+        .model(spec.metadata.model)
         .messages(input_messages)
-        .temperature(temperature.unwrap_or_default())
+        .temperature(spec.metadata.temperature.unwrap_or_default())
         .max_tokens(mt) // yes, this is deprecated, but... for ollama https://github.com/ollama/ollama/issues/7125
         .max_completion_tokens(mt)
         .build()?;
@@ -97,7 +89,8 @@ pub async fn generate(
     )?;
     let mut pb = m.map(|m| {
         m.add(
-            max_tokens
+            spec.metadata
+                .max_tokens
                 .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
                 .unwrap_or_else(ProgressBar::no_length)
                 .with_style(style)
