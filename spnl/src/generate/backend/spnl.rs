@@ -3,7 +3,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use crate::{
     SpnlResult,
-    ir::{Generate, GenerateMetadata, Message::Assistant, Query, to_string},
+    ir::{Generate, Message::Assistant, Query, to_string},
 };
 
 #[derive(serde::Deserialize)]
@@ -22,31 +22,16 @@ struct Response {
     choices: Vec<Choice>,
 }
 
-pub async fn generate(
-    model: &str,
-    input: &Query,
-    max_tokens: &Option<i32>,
-    temp: &Option<f32>,
-    m: Option<&MultiProgress>,
-    prepare: bool,
-) -> SpnlResult {
+pub async fn generate(spec: Generate, m: Option<&MultiProgress>, prepare: bool) -> SpnlResult {
     let exec = if prepare { "prepare" } else { "execute" };
     let client = reqwest::Client::new();
 
-    let query = Query::Generate(Generate {
-        metadata: GenerateMetadata {
-            model: model.to_string(),
-            max_tokens: *max_tokens,
-            temperature: *temp,
-        },
-        input: Box::new(input.clone()),
-    });
     // eprintln!("Sending query {:?}", to_string(&query)?);
 
     let response = client
         .post(format!("http://localhost:8000/v1/query/{exec}"))
         .header("Content-Type", "text/plain")
-        .body(to_string(&query)?)
+        .body(to_string(&Query::Generate(spec))?)
         .send()
         .await?;
 

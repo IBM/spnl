@@ -17,8 +17,7 @@ pub struct Repeat {
     pub generate: Generate,
 }
 
-/// Bulk operation: generate `n` outputs using the given `metadata`
-/// specification, one output per given input
+/// Bulk operation: map the generate operation across the given inputs, using the given metadata
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Map {
     /// The metadata governing the content generation

@@ -1,4 +1,4 @@
-use crate::ir::{Generate, Message::*, Query};
+use crate::ir::{Bulk, Generate, Map, Message::*, Query, Repeat};
 use indicatif::MultiProgress;
 
 #[cfg(feature = "pull")]
@@ -77,12 +77,17 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
             Ok("".into())
         }
 
+        Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
+            crate::generate::repeat(*n, generate, m).await
+        }
+        Query::Bulk(Bulk::Map(Map { metadata, inputs })) => {
+            crate::generate::map(metadata, inputs, m).await
+        }
+
         Query::Generate(Generate { metadata, input }) => {
             crate::generate::generate(
-                metadata.model.as_str(),
+                metadata,
                 &run_subtree(input, rp, m).await?,
-                &metadata.max_tokens,
-                &metadata.temperature,
                 m,
                 rp.prepare.unwrap_or_default(),
             )
@@ -114,7 +119,6 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
         }
 
         // TODO: should not happen; we need to improve the typing of runnable queries
-        Query::Bulk(_) => todo!("bulk"),
         #[cfg(feature = "rag")]
         Query::Augment(_) => todo!("augment"),
     }

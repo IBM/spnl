@@ -13,7 +13,7 @@ use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequ
 
 use crate::{
     SpnlResult,
-    ir::{Message::*, Query},
+    ir::{Generate, GenerateMetadata, Message::*, Query},
 };
 
 #[cfg(feature = "rag")]
@@ -41,10 +41,7 @@ fn api_base(provider: Provider) -> String {
 
 pub async fn generate(
     provider: Provider,
-    model: &str,
-    input: &Query,
-    max_tokens: &Option<i32>,
-    temp: &Option<f32>,
+    spec: Generate,
     m: Option<&MultiProgress>,
     prepare: bool,
 ) -> SpnlResult {
@@ -52,8 +49,18 @@ pub async fn generate(
         todo!()
     }
 
+    let Generate {
+        input,
+        metadata:
+            GenerateMetadata {
+                model,
+                max_tokens,
+                temperature,
+            },
+    } = spec;
+
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
-    let input_messages = messagify(input);
+    let input_messages = messagify(&input);
 
     let quiet = m.is_some();
     let mut stdout = stdout();
@@ -80,7 +87,7 @@ pub async fn generate(
     let request = CreateChatCompletionRequestArgs::default()
         .model(model)
         .messages(input_messages)
-        .temperature(temp.unwrap_or_default())
+        .temperature(temperature.unwrap_or_default())
         .max_tokens(mt) // yes, this is deprecated, but... for ollama https://github.com/ollama/ollama/issues/7125
         .max_completion_tokens(mt)
         .build()?;

@@ -1,4 +1,8 @@
-use crate::{SpnlResult, ir::Query};
+use crate::{
+    SpnlResult,
+    ir::Query,
+    ir::{Generate, GenerateBuilder, GenerateMetadata, GenerateMetadataBuilder},
+};
 
 pub mod backend;
 
@@ -11,37 +15,41 @@ pub fn is_span_enabled(model: &str) -> bool {
     model.starts_with("spnl/")
 }
 
+pub async fn map(
+    _metadata: &GenerateMetadata,
+    _inputs: &[String],
+    _mp: Option<&indicatif::MultiProgress>,
+) -> SpnlResult {
+    Ok(Query::Message(crate::ir::Message::User("".into())))
+}
+
+pub async fn repeat(
+    _n: usize,
+    _generate: &Generate,
+    _mp: Option<&indicatif::MultiProgress>,
+) -> SpnlResult {
+    Ok(Query::Message(crate::ir::Message::User("".into())))
+}
+
 pub async fn generate(
-    model: &str,
+    metadata: &GenerateMetadata,
     input: &Query,
-    max_tokens: &Option<i32>,
-    temp: &Option<f32>,
     mp: Option<&indicatif::MultiProgress>,
     prepare: bool,
 ) -> SpnlResult {
-    match model {
+    match &metadata.model {
         #[cfg(feature = "ollama")]
         m if m.starts_with("ollama/") => {
             crate::generate::backend::openai::generate(
                 crate::generate::backend::openai::Provider::Ollama,
-                &m[7..],
-                input,
-                max_tokens,
-                temp,
-                mp,
-                prepare,
-            )
-            .await
-        }
-
-        #[cfg(feature = "ollama")]
-        m if m.starts_with("ollama_chat/") => {
-            crate::generate::backend::openai::generate(
-                crate::generate::backend::openai::Provider::Ollama,
-                &m[12..],
-                input,
-                max_tokens,
-                temp,
+                GenerateBuilder::default()
+                    .input(Box::new(input.clone()))
+                    .metadata(
+                        GenerateMetadataBuilder::from(metadata)
+                            .model(&m[7..])
+                            .build()?,
+                    )
+                    .build()?,
                 mp,
                 prepare,
             )
@@ -52,10 +60,14 @@ pub async fn generate(
         m if m.starts_with("openai/") => {
             crate::generate::backend::openai::generate(
                 crate::generate::backend::openai::Provider::OpenAI,
-                &m[7..],
-                input,
-                max_tokens,
-                temp,
+                GenerateBuilder::default()
+                    .input(Box::new(input.clone()))
+                    .metadata(
+                        GenerateMetadataBuilder::from(metadata)
+                            .model(&m[7..])
+                            .build()?,
+                    )
+                    .build()?,
                 mp,
                 prepare,
             )
@@ -66,10 +78,14 @@ pub async fn generate(
         m if m.starts_with("gemini/") => {
             crate::generate::backend::openai::generate(
                 crate::generate::backend::openai::Provider::Gemini,
-                &m[7..],
-                input,
-                max_tokens,
-                temp,
+                GenerateBuilder::default()
+                    .input(Box::new(input.clone()))
+                    .metadata(
+                        GenerateMetadataBuilder::from(metadata)
+                            .model(&m[7..])
+                            .build()?,
+                    )
+                    .build()?,
                 mp,
                 prepare,
             )
@@ -78,8 +94,19 @@ pub async fn generate(
 
         #[cfg(feature = "spnl-api")]
         m if m.starts_with("spnl/") => {
-            crate::generate::backend::spnl::generate(&m[5..], input, max_tokens, temp, mp, prepare)
-                .await
+            crate::generate::backend::spnl::generate(
+                GenerateBuilder::default()
+                    .input(Box::new(input.clone()))
+                    .metadata(
+                        GenerateMetadataBuilder::from(metadata)
+                            .model(&m[5..])
+                            .build()?,
+                    )
+                    .build()?,
+                mp,
+                prepare,
+            )
+            .await
         }
 
         _ => Err(ModelNotFoundError.into()),
