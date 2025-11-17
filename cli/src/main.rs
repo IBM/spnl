@@ -46,6 +46,7 @@ async fn main() -> Result<(), SpnlError> {
 
     let query = hlo::optimize(
         &match args.builtin {
+            Some(Builtin::BulkMap) => bulk_map::query(args),
             Some(Builtin::Email) => email::query(args),
             Some(Builtin::Email2) => email2::query(args),
             Some(Builtin::Email3) => email3::query(args),

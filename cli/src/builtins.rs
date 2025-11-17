@@ -1,3 +1,4 @@
+pub mod bulk_map;
 pub mod email;
 pub mod email2;
 pub mod email3;
@@ -13,6 +14,7 @@ pub mod spans;
 #[derive(clap::ValueEnum, Clone, Debug, serde::Serialize)]
 #[clap(rename_all = "lowercase")]
 pub enum Builtin {
+    BulkMap,
     Email,
     Email2,
     Email3,

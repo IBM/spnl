@@ -9,11 +9,15 @@ use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncWriteExt, stdout};
 
-use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequestArgs};
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    types::{CreateChatCompletionRequestArgs, CreateCompletionRequestArgs},
+};
 
 use crate::{
     SpnlResult,
-    ir::{Message::*, Query, Repeat},
+    ir::{Map, Message::*, Query, Repeat},
 };
 
 #[cfg(feature = "rag")]
@@ -39,7 +43,111 @@ fn api_base(provider: Provider) -> String {
     }
 }
 
-pub async fn generate(
+pub async fn generate_completion(
+    provider: Provider,
+    spec: Map,
+    m: Option<&MultiProgress>,
+    prepare: bool,
+) -> SpnlResult {
+    if prepare {
+        todo!()
+    }
+
+    let quiet = m.is_some();
+    let n_prompts = spec.inputs.len();
+    let mut stdout = stdout();
+
+    // Extract a max tokens
+    let mt = spec
+        .metadata
+        .max_tokens
+        .map(|mt| match mt {
+            0 => 2048_u32, // vllm 400's if given 0
+            _ => mt as u32,
+        })
+        .unwrap_or(2048);
+
+    let request = CreateCompletionRequestArgs::default()
+        .model(spec.metadata.model)
+        .prompt(spec.inputs)
+        .temperature(spec.metadata.temperature.unwrap_or_default())
+        .max_tokens(mt)
+        .build()?;
+
+    let style = ProgressStyle::with_template(
+        "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
+    )?;
+    let pbs: Option<Vec<_>> = m.map(|m| {
+        ::std::iter::repeat_n(0, n_prompts)
+            .enumerate()
+            .map(|(idx, _)| {
+                m.add(
+                    spec.metadata
+                        .max_tokens
+                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
+                        .unwrap_or_else(ProgressBar::no_length)
+                        .with_style(style.clone())
+                        .with_message(if n_prompts == 1 {
+                            "Generating".to_string()
+                        } else {
+                            format!("Generating {}", idx + 1)
+                        }),
+                )
+            })
+            .collect()
+    });
+
+    // println!("A {:?}", client.models().list().await?);
+
+    let mut response_strings = ::std::iter::repeat_n(String::new(), n_prompts).collect::<Vec<_>>();
+    if !quiet {
+        stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
+    }
+
+    // TODO: handle with chat_choice.delta.role, rather than hard-wire
+    // Asistant (at the end of this function)
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
+    let mut stream = client.completions().create_stream(request).await?;
+    loop {
+        match stream.next().await {
+            Some(Ok(res)) => {
+                for choice in res.choices.iter() {
+                    let idx: usize = choice.index.try_into()?;
+                    if !quiet {
+                        stdout.write_all(b"\x1b[32m").await?; // green
+                        stdout.write_all(choice.text.as_bytes()).await?;
+                        stdout.flush().await?;
+                        stdout.write_all(b"\x1b[0m").await?; // reset color
+                    } else if let Some(ref pbs) = pbs
+                        && idx < pbs.len()
+                    {
+                        pbs[idx].inc(choice.text.len() as u64);
+                    }
+                    if idx < response_strings.len() {
+                        response_strings[idx] += choice.text.as_str();
+                    }
+                }
+            }
+            Some(Err(err)) => return Err(err.into()),
+            None => break,
+        }
+    }
+    if !quiet {
+        stdout.write_all(b"\n").await?;
+    }
+
+    let response = response_strings
+        .into_iter()
+        .map(|s| Query::Message(Assistant(s)))
+        .collect::<Vec<_>>();
+    if response.len() == 1 {
+        Ok(response.into_iter().next().unwrap())
+    } else {
+        Ok(Query::Par(response))
+    }
+}
+
+pub async fn generate_chat(
     provider: Provider,
     spec: Repeat,
     m: Option<&MultiProgress>,
@@ -120,32 +228,35 @@ pub async fn generate(
 
     // println!("A {:?}", client.models().list().await?);
 
-    let mut response_string = String::new();
+    let mut response_strings =
+        ::std::iter::repeat_n(String::new(), spec.n.into()).collect::<Vec<_>>();
     if !quiet {
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
-    // TODO: handle with chat_choice.delta.role, rather than hard-wire
+    // TODO: handle with choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
     let mut stream = client.chat().create_stream(request).await?;
     loop {
         match stream.next().await {
             Some(Ok(res)) => {
-                for chat_choice in res.choices.iter() {
-                    if let Some(ref content) = chat_choice.delta.content {
+                for choice in res.choices.iter() {
+                    if let Some(ref content) = choice.delta.content {
+                        let idx: usize = choice.index.try_into()?;
                         if !quiet {
                             stdout.write_all(b"\x1b[32m").await?; // green
                             stdout.write_all(content.as_bytes()).await?;
                             stdout.flush().await?;
                             stdout.write_all(b"\x1b[0m").await?; // reset color
-                        } else if let Some(ref pbs) = pbs {
-                            let idx: usize = chat_choice.index.try_into()?;
-                            if idx < pbs.len() {
-                                pbs[idx].inc(content.len() as u64);
-                            }
+                        } else if let Some(ref pbs) = pbs
+                            && idx < pbs.len()
+                        {
+                            pbs[idx].inc(content.len() as u64);
                         }
-                        response_string += content.as_str();
+                        if idx < response_strings.len() {
+                            response_strings[idx] += content.as_str();
+                        }
                     }
                 }
             }
@@ -157,7 +268,15 @@ pub async fn generate(
         stdout.write_all(b"\n").await?;
     }
 
-    Ok(Query::Message(Assistant(response_string)))
+    let response = response_strings
+        .into_iter()
+        .map(|s| Query::Message(Assistant(s)))
+        .collect::<Vec<_>>();
+    if response.len() == 1 {
+        Ok(response.into_iter().next().unwrap())
+    } else {
+        Ok(Query::Par(response))
+    }
 }
 
 pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {

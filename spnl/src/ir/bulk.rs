@@ -41,3 +41,14 @@ pub struct Map {
     /// Generate one output for each input in this list
     pub inputs: Vec<String>,
 }
+
+impl Map {
+    pub fn with_model(&self, model: &str) -> anyhow::Result<Self> {
+        Ok(Map {
+            inputs: self.inputs.clone(),
+            metadata: GenerateMetadataBuilder::from(self.metadata.clone())
+                .model(model.to_string())
+                .build()?,
+        })
+    }
+}

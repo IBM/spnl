@@ -1,6 +1,5 @@
-use crate::ir::{Generate, GenerateMetadata, Message, Query};
+use crate::ir::{GenerateMetadata, Message, Query};
 
-//#[pyclass]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum NonGenerateInput {
@@ -21,19 +20,16 @@ pub(crate) enum NonGenerateInput {
     Message(Message),
 }
 
-//#[pyclass]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub(crate) struct SingleGenerate {
-    pub model: String,
     pub input: NonGenerateInput,
-    pub max_tokens: Option<i32>,
-    pub temperature: Option<f32>,
+    pub metadata: GenerateMetadata,
 }
 
-//#[pyclass]
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub(crate) struct SingleGenerateQuery {
-    pub g: SingleGenerate,
+pub(crate) enum SingleGenerateQuery {
+    #[serde(rename = "g")]
+    SingleGenerate(SingleGenerate),
 }
 
 impl From<NonGenerateInput> for Query {
@@ -45,18 +41,5 @@ impl From<NonGenerateInput> for Query {
             NonGenerateInput::Seq(v) => Query::Seq(v.into_iter().map(|m| m.into()).collect()),
             NonGenerateInput::Par(v) => Query::Par(v.into_iter().map(|m| m.into()).collect()),
         }
-    }
-}
-
-impl From<SingleGenerateQuery> for Query {
-    fn from(q: SingleGenerateQuery) -> Self {
-        Self::Generate(Generate {
-            metadata: GenerateMetadata {
-                model: q.g.model.clone(),
-                max_tokens: q.g.max_tokens,
-                temperature: q.g.temperature,
-            },
-            input: Box::new(q.g.input.clone().into()),
-        })
     }
 }

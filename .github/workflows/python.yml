@@ -53,5 +53,5 @@ jobs:
 
       - name: invoke the python tokenize api
         run: |
-          query='{"g": {"model": "ibm-granite/granite-3.3-2b-instruct", "input": {"user": "hello"}}}'
+          query='{"g": {"metadata": {"model": "ibm-granite/granite-3.3-2b-instruct"}, "input": {"user": "hello"}}}'
           python -c "import spnl; s = spnl.init(1); spnl.tokenize_query(s, '$query', 27, 10, 31, 16)"

@@ -2,9 +2,8 @@ use pyo3::prelude::*;
 
 use crate::{
     ir::{
-        Generate, GenerateMetadata,
+        GenerateMetadata,
         Message::{self, *},
-        Query,
     },
     optimizer::llo::chat_template::{self, ChatTemplate},
 };
@@ -225,33 +224,34 @@ fn encode_plus_part(
     }
 }
 
-fn extract_up_to_plus(tok: &Tokenizer, q: &Query) -> Vec<String> {
+fn extract_up_to_plus(tok: &Tokenizer, q: &NonGenerateInput) -> Vec<String> {
     match q {
-        Query::Par(v) | Query::Seq(v) | Query::Cross(v) => v
+        NonGenerateInput::Par(v) | NonGenerateInput::Seq(v) | NonGenerateInput::Cross(v) => v
             .iter()
             .flat_map(|qq| extract_up_to_plus(tok, qq))
             .collect(),
-        Query::Plus(_) => vec![],
-        Query::Message(Assistant(m)) => vec![tok.assistant(m)],
-        Query::Message(System(m)) => vec![tok.system(m)],
-        Query::Message(User(m)) => vec![tok.user(m)],
-        _ => vec![],
+        NonGenerateInput::Plus(_) => vec![],
+        NonGenerateInput::Message(Assistant(m)) => vec![tok.assistant(m)],
+        NonGenerateInput::Message(System(m)) => vec![tok.system(m)],
+        NonGenerateInput::Message(User(m)) => vec![tok.user(m)],
     }
 }
 
-fn extract_parts(tok: &Tokenizer, q: &Query, in_plus: bool) -> Vec<String> {
+fn extract_parts(tok: &Tokenizer, q: &NonGenerateInput, in_plus: bool) -> Vec<String> {
     match (q, in_plus) {
-        (Query::Par(v), _) | (Query::Seq(v), _) | (Query::Cross(v), _) => v
+        (NonGenerateInput::Par(v), _)
+        | (NonGenerateInput::Seq(v), _)
+        | (NonGenerateInput::Cross(v), _) => v
             .iter()
             .flat_map(|qq| extract_parts(tok, qq, in_plus))
             .collect(),
-        (Query::Plus(v), _) => v
+        (NonGenerateInput::Plus(v), _) => v
             .iter()
             .map(|qq| extract_parts(tok, qq, true).join(""))
             .collect(),
-        (Query::Message(Assistant(m)), true) => vec![tok.assistant(m)],
-        (Query::Message(System(m)), true) => vec![tok.system(m)],
-        (Query::Message(User(m)), true) => vec![tok.user(m)],
+        (NonGenerateInput::Message(Assistant(m)), true) => vec![tok.assistant(m)],
+        (NonGenerateInput::Message(System(m)), true) => vec![tok.system(m)],
+        (NonGenerateInput::Message(User(m)), true) => vec![tok.user(m)],
         _ => vec![],
     }
 }
@@ -358,33 +358,36 @@ pub fn tokenize_query(
     block_size: usize,
 ) -> Result<TokenizedQuery, PyErr> {
     let query: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
-    let SingleGenerate {
-        model,
-        input,
-        max_tokens,
-        temperature,
-    } = query.g;
+    match query {
+        SingleGenerateQuery::SingleGenerate(SingleGenerate { input, metadata }) => {
+            let tok = state
+                .get_or_create(
+                    &metadata.model,
+                    pad_token,
+                    cross_token,
+                    plus_token,
+                    block_size,
+                )
+                .map_err(handle_arc_err)?;
+            let mut tokens: Vec<u32> = vec![];
+            tokenize_part(&input, &tok, &mut tokens)
+                .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
+                .map_err(handle_err)?;
 
-    let tok = state
-        .get_or_create(&model, pad_token, cross_token, plus_token, block_size)
-        .map_err(handle_arc_err)?;
-    let mut tokens: Vec<u32> = vec![];
-    tokenize_part(&input, &tok, &mut tokens)
-        .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
-        .map_err(handle_err)?;
+            // TODO: add a verbose parameter, and print this out if so?
+            /* if let Ok(s) = tok.tok.decode(&tokens, false) {
+                eprintln!("Tokens {tokens:?}");
+                eprintln!("Reverse de-tokenized message (for debugging): {s}");
+            } */
 
-    // TODO: add a verbose parameter, and print this out if so?
-    /* if let Ok(s) = tok.tok.decode(&tokens, false) {
-        eprintln!("Tokens {tokens:?}");
-        eprintln!("Reverse de-tokenized message (for debugging): {s}");
-    } */
-
-    Ok(TokenizedQuery {
-        model: model.clone(),
-        messages_: tokens,
-        max_tokens,
-        temperature,
-    })
+            Ok(TokenizedQuery {
+                model: metadata.model,
+                messages_: tokens,
+                max_tokens: metadata.max_tokens,
+                temperature: metadata.temperature,
+            })
+        }
+    }
 }
 
 /// Extract the relocatable spans from the given query `q`. If
@@ -399,10 +402,9 @@ pub fn tokenize_prepare(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<Vec<Vec<u32>>, PyErr> {
-    let squery: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
-    let query: Query = squery.into();
+    let query: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
     match query {
-        Query::Generate(Generate {
+        SingleGenerateQuery::SingleGenerate(SingleGenerate {
             input,
             metadata: GenerateMetadata { model, .. },
         }) => {
@@ -437,7 +439,6 @@ pub fn tokenize_prepare(
                 parts.collect::<Result<_, _>>().map_err(handle_err)
             }
         }
-        _ => todo!(),
     }
 }
 

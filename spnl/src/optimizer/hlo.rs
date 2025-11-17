@@ -72,7 +72,7 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
 
 /// Wrap a list of queries into a monad
 #[cfg(feature = "rag")]
-fn prepare_all(prepares: Vec<Query>) -> Option<Query> {
+fn prepare_monad(prepares: Vec<Query>) -> Option<Query> {
     if !prepares.is_empty() {
         Some(Query::Monad(Query::Plus(prepares).into()))
     } else {
@@ -102,7 +102,7 @@ async fn optimize_iter<'a>(
 
             Ok(Query::Seq(
                 [
-                    prepare_all(prepares.into_iter().flatten().collect()),
+                    prepare_monad(prepares.into_iter().flatten().collect()),
                     Some(Query::Plus(fragments)),
                 ]
                 .into_iter()
@@ -274,7 +274,7 @@ mod tests {
                     .metadata(GenerateMetadataBuilder::default().model(model).build()?)
                     .input(Box::new(Query::Seq(
                         [
-                            prepare_all(
+                            prepare_monad(
                                 [prepare_fragment(&fragment, Some(&outer_generate))]
                                     .into_iter()
                                     .flatten()

@@ -3,7 +3,7 @@ use super::*;
 impl ::std::fmt::Display for Query {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
-            Query::Cross(v) | Query::Plus(v) => write!(
+            Query::Cross(v) | Query::Plus(v) | Query::Par(v) | Query::Seq(v) => write!(
                 f,
                 "{}",
                 v.iter()
@@ -75,8 +75,23 @@ impl ptree::TreeItem for Query {
                 Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
                 Query::Bulk(Bulk::Repeat(Repeat { n, .. })) =>
                     style.paint(format!("\x1b[31;1mGenerate {n} candidates\x1b[0m")),
-                Query::Bulk(Bulk::Map(Map { inputs, .. })) =>
-                    style.paint(format!("Map {}", inputs.len())),
+                Query::Bulk(Bulk::Map(Map {
+                    inputs,
+                    metadata:
+                        GenerateMetadata {
+                            model, max_tokens, ..
+                        },
+                })) => style.paint(format!(
+                    "\x1b[31;1mMap\x1b[0m (x{}) \x1b[2m{}model={model}\x1b[0m",
+                    inputs.len(),
+                    if let Some(mt) = max_tokens
+                        && *mt != 0
+                    {
+                        format!("max_tokens={mt} ")
+                    } else {
+                        "".to_string()
+                    }
+                )),
                 Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
                 #[cfg(feature = "rag")]
@@ -86,12 +101,16 @@ impl ptree::TreeItem for Query {
     }
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
-            Query::Ask(_) | Query::Message(_) | Query::Print(_) | Query::Bulk(Bulk::Map(_)) => {
+            Query::Ask(_) | Query::Message(_) | Query::Print(_) => {
                 vec![]
             }
             Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
             Query::Monad(q) => vec![*q.clone()],
             Query::Bulk(Bulk::Repeat(Repeat { generate, .. })) => vec![*generate.input.clone()],
+            Query::Bulk(Bulk::Map(Map { inputs, .. })) => inputs
+                .iter()
+                .map(|m| Query::Message(Message::User(m.to_string())))
+                .collect(),
             Query::Generate(Generate { input, .. }) => vec![*input.clone()],
             #[cfg(feature = "rag")]
             Query::Augment(Augment {
