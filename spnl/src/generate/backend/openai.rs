@@ -13,7 +13,7 @@ use async_openai::{Client, config::OpenAIConfig, types::CreateChatCompletionRequ
 
 use crate::{
     SpnlResult,
-    ir::{Generate, Message::*, Query},
+    ir::{Message::*, Query, Repeat},
 };
 
 #[cfg(feature = "rag")]
@@ -41,7 +41,7 @@ fn api_base(provider: Provider) -> String {
 
 pub async fn generate(
     provider: Provider,
-    spec: Generate,
+    spec: Repeat,
     m: Option<&MultiProgress>,
     prepare: bool,
 ) -> SpnlResult {
@@ -49,8 +49,7 @@ pub async fn generate(
         todo!()
     }
 
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
-    let input_messages = messagify(&spec.input);
+    let input_messages = messagify(&spec.generate.input);
 
     let quiet = m.is_some();
     let mut stdout = stdout();
@@ -68,6 +67,7 @@ pub async fn generate(
 
     // Extract a max tokens
     let mt = spec
+        .generate
         .metadata
         .max_tokens
         .map(|mt| match mt {
@@ -76,26 +76,46 @@ pub async fn generate(
         })
         .unwrap_or(2048);
 
-    let request = CreateChatCompletionRequestArgs::default()
-        .model(spec.metadata.model)
+    let mut request_builder_0 = CreateChatCompletionRequestArgs::default();
+    let request_builder_1 = request_builder_0
+        .model(spec.generate.metadata.model)
+        .n(spec.n)
         .messages(input_messages)
-        .temperature(spec.metadata.temperature.unwrap_or_default())
-        .max_tokens(mt) // yes, this is deprecated, but... for ollama https://github.com/ollama/ollama/issues/7125
-        .max_completion_tokens(mt)
-        .build()?;
+        .temperature(spec.generate.metadata.temperature.unwrap_or_default())
+        .max_completion_tokens(mt);
+
+    let request_builder = match &provider {
+        Provider::Ollama => {
+            // yes, this is deprecated, but... for ollama https://github.com/ollama/ollama/issues/7125
+            request_builder_1.max_tokens(mt)
+        }
+        _ => request_builder_1,
+    };
+
+    let request = request_builder.build()?;
 
     let style = ProgressStyle::with_template(
         "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
     )?;
-    let mut pb = m.map(|m| {
-        m.add(
-            spec.metadata
-                .max_tokens
-                .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
-                .unwrap_or_else(ProgressBar::no_length)
-                .with_style(style)
-                .with_message("Generating"),
-        )
+    let pbs: Option<Vec<_>> = m.map(|m| {
+        ::std::iter::repeat_n(0, spec.n.into())
+            .enumerate()
+            .map(|(idx, _)| {
+                m.add(
+                    spec.generate
+                        .metadata
+                        .max_tokens
+                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
+                        .unwrap_or_else(ProgressBar::no_length)
+                        .with_style(style.clone())
+                        .with_message(if spec.n == 1 {
+                            "Generating".to_string()
+                        } else {
+                            format!("Generating {}", idx + 1)
+                        }),
+                )
+            })
+            .collect()
     });
 
     // println!("A {:?}", client.models().list().await?);
@@ -105,6 +125,9 @@ pub async fn generate(
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
+    // TODO: handle with chat_choice.delta.role, rather than hard-wire
+    // Asistant (at the end of this function)
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
     let mut stream = client.chat().create_stream(request).await?;
     loop {
         match stream.next().await {
@@ -116,8 +139,11 @@ pub async fn generate(
                             stdout.write_all(content.as_bytes()).await?;
                             stdout.flush().await?;
                             stdout.write_all(b"\x1b[0m").await?; // reset color
-                        } else if let Some(pb) = pb.as_mut() {
-                            pb.inc(content.len() as u64)
+                        } else if let Some(ref pbs) = pbs {
+                            let idx: usize = chat_choice.index.try_into()?;
+                            if idx < pbs.len() {
+                                pbs[idx].inc(content.len() as u64);
+                            }
                         }
                         response_string += content.as_str();
                     }

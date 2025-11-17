@@ -1,3 +1,4 @@
+use crate::generate::backend::capabilities::supports_bulk_repeat;
 use crate::ir::{Bulk, Generate, Map, Message, Query, Repeat};
 
 pub fn simplify(query: &Query) -> Query {
@@ -8,9 +9,16 @@ pub fn simplify(query: &Query) -> Query {
 /// e.g. Plus-of-Plus or Cross with a tail Cross.
 fn simplify_iter(query: &Query) -> Vec<Query> {
     match query {
-        // Unroll repeats. TODO: move this into the query executor backend, to expose server-side support for Repeat
+        // Unroll repeats if the backend does not support their direct execution
         Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
-            ::std::iter::repeat_n(Query::Generate(generate.clone()), *n).collect::<Vec<_>>()
+            if supports_bulk_repeat(&generate.metadata.model) {
+                vec![query.clone()]
+            } else {
+                vec![Query::Par(
+                    ::std::iter::repeat_n(Query::Generate(generate.clone()), (*n).into())
+                        .collect::<Vec<_>>(),
+                )]
+            }
         }
 
         // Unroll batch. TODO: move this into the query executor backend, to expose server-side support for Map
@@ -122,7 +130,7 @@ mod tests {
 
     #[test]
     fn simplify_repeat_expansion() {
-        let n = 2;
+        let n = 2u8;
         let g = GenerateBuilder::default()
             .metadata(
                 GenerateMetadataBuilder::default()
@@ -139,7 +147,7 @@ mod tests {
         }));
         assert_eq!(
             simplify(&q),
-            Seq(::std::iter::repeat_n(Query::Generate(g), n).collect())
+            Par(::std::iter::repeat_n(Query::Generate(g), n.into()).collect())
         );
     }
 

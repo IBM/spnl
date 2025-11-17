@@ -155,18 +155,29 @@ macro_rules! spnl {
                       (user "Combine and flatten these into one JSON array, preserving order")))
     );
 
-    // Sugar: this unfolds to repeating the given expression $e $n times.
-    (repeat $n:tt $e:tt) => (spnl!(repeat i $n $e));
-
-    // Sugar: this unfolds to repeating the given expression $e $n
-    // times and makes available an index variable $i ranging from 0
-    // to $n-1.
-    (repeat $i:ident $n:tt $e:tt) => (spnl!(repeat $i 0 $n $e));
+    // Bulk generate
+    (repeat $n:tt $model:tt $input:tt $temp:tt $max_tokens:tt) => (
+        $crate::ir::Query::Bulk(
+            $crate::ir::Bulk::Repeat(
+                $crate::ir::Repeat{
+                    n: $crate::spnl_arg!($n) as u8,
+                    generate: $crate::ir::Generate{
+                        input: Box::new($crate::spnl_arg!($input).into()),
+                        metadata: $crate::ir::GenerateMetadata{
+                            model: $crate::spnl_arg!($model).clone(),
+                            temperature: Some($crate::spnl_arg!($temp)),
+                            max_tokens: Some($crate::spnl_arg!($max_tokens))
+                        }
+                    }
+                }
+            )
+        )
+    );
 
     // Sugar: this unfolds to repeating the given expression $e $n
     // times and makes available an index variable $i ranging from
     // $start to $n-$start-1.
-    (repeat $i:ident $start:tt $n:tt $e:tt) => {{
+    (foreach $i:ident $start:tt $n:tt $e:tt) => {{
         let mut args: Vec<$crate::ir::Query> = vec![];
         let start = $crate::spnl_arg!($start);
         let end = $crate::spnl_arg!($n) + start;

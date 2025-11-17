@@ -1,5 +1,5 @@
 use crate::{
-    generate::is_span_enabled,
+    generate::backend::capabilities::supports_spans,
     ir::{Bulk, Generate, GenerateBuilder, Query, Repeat},
 };
 
@@ -50,7 +50,7 @@ async fn optimize_vec_iter<'a>(
 #[cfg(feature = "rag")]
 fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
     if let Some(g) = parent_generate
-        && is_span_enabled(&g.metadata.model)
+        && supports_spans(&g.metadata.model)
     {
         Some(Query::Generate(
             GenerateBuilder::from(g)
@@ -131,7 +131,7 @@ async fn optimize_iter<'a>(
             )
             .await?;
 
-            let nested_gen_input: Option<Query> = if !is_span_enabled(&g.metadata.model) {
+            let nested_gen_input: Option<Query> = if !supports_spans(&g.metadata.model) {
                 None
             } else {
                 match &optimized_input {

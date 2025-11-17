@@ -16,7 +16,7 @@ pub fn query(args: Args) -> anyhow::Result<Query> {
 
               (print (format "Generating {n} proposed edits"))
               (plus
-               (repeat i 1 n
+               (foreach i 1 n
                 (g model (cross
                           (system (file "system.txt"))
                           (user (file "user.txt"))

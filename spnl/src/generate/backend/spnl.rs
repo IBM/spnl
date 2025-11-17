@@ -3,7 +3,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use crate::{
     SpnlResult,
-    ir::{Generate, Message::Assistant, Query, to_string},
+    ir::{Message::Assistant, Query, Repeat, to_string},
 };
 
 #[derive(serde::Deserialize)]
@@ -22,7 +22,8 @@ struct Response {
     choices: Vec<Choice>,
 }
 
-pub async fn generate(spec: Generate, m: Option<&MultiProgress>, prepare: bool) -> SpnlResult {
+// TODO implement repeat.n
+pub async fn generate(spec: Repeat, m: Option<&MultiProgress>, prepare: bool) -> SpnlResult {
     let exec = if prepare { "prepare" } else { "execute" };
     let client = reqwest::Client::new();
 
@@ -31,7 +32,7 @@ pub async fn generate(spec: Generate, m: Option<&MultiProgress>, prepare: bool) 
     let response = client
         .post(format!("http://localhost:8000/v1/query/{exec}"))
         .header("Content-Type", "text/plain")
-        .body(to_string(&Query::Generate(spec))?)
+        .body(to_string(&Query::Generate(spec.generate))?)
         .send()
         .await?;
 

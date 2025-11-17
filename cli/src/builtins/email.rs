@@ -16,10 +16,9 @@ pub fn query(args: Args) -> Query {
 
            (print (format "Generate {n} candidate emails in parallel"))
 
-           (plus
-            (repeat n
-             (g model (format "write an introductory email for a job application, limited to at most {max_tokens} characters.")
-              temperature max_tokens)))
+           (repeat n
+             model (format "write an introductory email for a job application, limited to at most {max_tokens} characters.")
+              temperature max_tokens)
 
            (print "Ask the model to select the best option from the candidates")
 

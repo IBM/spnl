@@ -52,10 +52,10 @@ impl ptree::TreeItem for Query {
                     style.paint(format!("\x1b[33mUser\x1b[0m {}", trim(s, 700))),
                 Query::Message(Message::System(s)) =>
                     style.paint(format!("\x1b[34mSystem\x1b[0m {}", trim(s, 700))),
-                Query::Seq(_) => style.paint("\x1b[31;1mSequence\x1b[0m".to_string()),
-                Query::Par(_) => style.paint("\x1b[31;1mParallel\x1b[0m".to_string()),
-                Query::Plus(_) => style.paint("\x1b[31;1mPlus\x1b[0m".to_string()),
-                Query::Cross(_) => style.paint("\x1b[31;1mCross\x1b[0m".to_string()),
+                Query::Seq(_) => style.paint("\x1b[35;1mSequence\x1b[0m".to_string()),
+                Query::Par(_) => style.paint("\x1b[35;1mParallel\x1b[0m".to_string()),
+                Query::Plus(_) => style.paint("\x1b[35;1mPlus\x1b[0m".to_string()),
+                Query::Cross(_) => style.paint("\x1b[35;1mCross\x1b[0m".to_string()),
                 Query::Generate(Generate {
                     metadata:
                         GenerateMetadata {
@@ -73,7 +73,8 @@ impl ptree::TreeItem for Query {
                     }
                 )),
                 Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
-                Query::Bulk(Bulk::Repeat(Repeat { n, .. })) => style.paint(format!("Repeat {n}")),
+                Query::Bulk(Bulk::Repeat(Repeat { n, .. })) =>
+                    style.paint(format!("\x1b[31;1mGenerate {n} candidates\x1b[0m")),
                 Query::Bulk(Bulk::Map(Map { inputs, .. })) =>
                     style.paint(format!("Map {}", inputs.len())),
                 Query::Ask(m) => style.paint(format!("Ask {m}")),

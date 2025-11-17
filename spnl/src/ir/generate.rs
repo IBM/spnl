@@ -5,6 +5,7 @@ use super::Query;
 )]
 #[builder(derive(serde::Serialize))]
 pub struct GenerateMetadata {
+    /// This is of the form `{provider}/{model}`
     #[builder(setter(into))]
     pub model: String,
 
@@ -72,6 +73,15 @@ impl Generate {
     /// Return self, but with input wrapped with a Plus
     pub fn wrap_plus(&self) -> Self {
         self.wrap(|input| Query::Plus(vec![input]))
+    }
+}
+
+impl From<Generate> for GenerateBuilder {
+    fn from(other: Generate) -> Self {
+        GenerateBuilder::default()
+            .metadata(other.metadata)
+            .input(other.input)
+            .clone()
     }
 }
 

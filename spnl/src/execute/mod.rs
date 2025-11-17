@@ -77,19 +77,23 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
             Ok("".into())
         }
 
-        Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
-            crate::generate::repeat(*n, generate, m).await
+        Query::Bulk(Bulk::Repeat(r)) => {
+            crate::generate::generate(r.clone(), m, rp.prepare.unwrap_or_default()).await
         }
+
         Query::Bulk(Bulk::Map(Map { metadata, inputs })) => {
             crate::generate::map(metadata, inputs, m).await
         }
 
         Query::Generate(Generate { metadata, input }) => {
             crate::generate::generate(
-                GenerateBuilder::default()
-                    .metadata(metadata.clone())
-                    .input(Box::from(run_subtree(input, rp, m).await?))
-                    .build()?,
+                Repeat {
+                    n: 1,
+                    generate: GenerateBuilder::default()
+                        .metadata(metadata.clone())
+                        .input(Box::from(run_subtree(input, rp, m).await?))
+                        .build()?,
+                },
                 m,
                 rp.prepare.unwrap_or_default(),
             )
