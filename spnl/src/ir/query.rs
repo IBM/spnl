@@ -9,10 +9,10 @@ pub enum Query {
     /// Execute in parallel
     Par(Vec<Query>),
 
-    /// Reduce
+    /// Non-commutative
     Cross(Vec<Query>),
 
-    /// Map
+    /// Commutative
     Plus(Vec<Query>),
 
     /// Ignore the output, executed for server-side effect only (e.g. caching)

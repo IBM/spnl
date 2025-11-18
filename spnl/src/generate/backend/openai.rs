@@ -219,7 +219,7 @@ pub async fn generate_chat(
                         .with_message(if spec.n == 1 {
                             "Generating".to_string()
                         } else {
-                            format!("Generating {}", idx + 1)
+                            format!("Bulk Generation ({})", idx + 1)
                         }),
                 )
             })

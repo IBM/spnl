@@ -1,6 +1,7 @@
 use super::{Generate, GenerateBuilder, GenerateMetadata, GenerateMetadataBuilder};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Bulk {
     Repeat(Repeat),
 

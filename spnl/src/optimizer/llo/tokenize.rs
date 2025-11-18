@@ -170,6 +170,8 @@ pub fn init(max_capacity: u64) -> TokenizerState {
 #[derive(Debug)]
 pub struct TokenizedQuery {
     #[pyo3(get)]
+    n: u8,
+    #[pyo3(get)]
     model: String,
     #[pyo3(get)]
     max_tokens: Option<i32>,
@@ -256,6 +258,18 @@ fn extract_parts(tok: &Tokenizer, q: &NonGenerateInput, in_plus: bool) -> Vec<St
     }
 }
 
+fn tokenize_message(
+    m: &Message,
+    tok: &Tokenizer,
+    tokens: &mut Vec<u32>,
+) -> tokenizers::tokenizer::Result<()> {
+    match m {
+        Assistant(m) => tok.assistanttok(m, tokens),
+        System(m) => tok.systemtok(m, tokens),
+        User(m) => tok.usertok(m, tokens),
+    }
+}
+
 fn tokenize_part(
     input: &NonGenerateInput,
     tok: &Tokenizer,
@@ -286,9 +300,7 @@ fn tokenize_part(
             tokenize_part(part, tok, tokens)
         }),
 
-        NonGenerateInput::Message(Assistant(m)) => tok.assistanttok(m, tokens),
-        NonGenerateInput::Message(System(m)) => tok.systemtok(m, tokens),
-        NonGenerateInput::Message(User(m)) => tok.usertok(m, tokens),
+        NonGenerateInput::Message(m) => tokenize_message(m, tok, tokens),
     }
 }
 
@@ -348,6 +360,46 @@ fn add_final_assistant_token(
     Ok(())
 }
 
+fn tokenize_query_generate(
+    state: &mut TokenizerState,
+    Repeat {
+        n,
+        generate: SingleGenerate { input, metadata },
+    }: Repeat,
+    pad_token: u32,
+    cross_token: Option<u32>,
+    plus_token: Option<u32>,
+    block_size: usize,
+) -> Result<TokenizedQuery, PyErr> {
+    let tok = state
+        .get_or_create(
+            &metadata.model,
+            pad_token,
+            cross_token,
+            plus_token,
+            block_size,
+        )
+        .map_err(handle_arc_err)?;
+    let mut tokens: Vec<u32> = vec![];
+    tokenize_part(&input, &tok, &mut tokens)
+        .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
+        .map_err(handle_err)?;
+
+    // TODO: add a verbose parameter, and print this out if so?
+    /* if let Ok(s) = tok.tok.decode(&tokens, false) {
+        eprintln!("Tokens {tokens:?}");
+        eprintln!("Reverse de-tokenized message (for debugging): {s}");
+    } */
+
+    Ok(TokenizedQuery {
+        n,
+        model: metadata.model,
+        messages_: tokens,
+        max_tokens: metadata.max_tokens,
+        temperature: metadata.temperature,
+    })
+}
+
 #[pyfunction]
 pub fn tokenize_query(
     state: &mut TokenizerState,
@@ -357,35 +409,26 @@ pub fn tokenize_query(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<TokenizedQuery, PyErr> {
-    let query: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
-    match query {
-        SingleGenerateQuery::SingleGenerate(SingleGenerate { input, metadata }) => {
-            let tok = state
-                .get_or_create(
-                    &metadata.model,
-                    pad_token,
-                    cross_token,
-                    plus_token,
-                    block_size,
-                )
-                .map_err(handle_arc_err)?;
-            let mut tokens: Vec<u32> = vec![];
-            tokenize_part(&input, &tok, &mut tokens)
-                .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
-                .map_err(handle_err)?;
-
-            // TODO: add a verbose parameter, and print this out if so?
-            /* if let Ok(s) = tok.tok.decode(&tokens, false) {
-                eprintln!("Tokens {tokens:?}");
-                eprintln!("Reverse de-tokenized message (for debugging): {s}");
-            } */
-
-            Ok(TokenizedQuery {
-                model: metadata.model,
-                messages_: tokens,
-                max_tokens: metadata.max_tokens,
-                temperature: metadata.temperature,
-            })
+    match serde_json::from_str(q).map_err(handle_serde_err)? {
+        SingleGenerateQuery::SingleGenerate(generate) => tokenize_query_generate(
+            state,
+            Repeat { n: 1, generate },
+            pad_token,
+            cross_token,
+            plus_token,
+            block_size,
+        ),
+        SingleGenerateQuery::Bulk(Bulk::Repeat(repeat)) => tokenize_query_generate(
+            state,
+            repeat,
+            pad_token,
+            cross_token,
+            plus_token,
+            block_size,
+        ),
+        _ => {
+            //SingleGenerateQuery::Bulk(Bulk::Map(Map { metadata, inputs })) => {
+            todo!()
         }
     }
 }
@@ -402,8 +445,7 @@ pub fn tokenize_prepare(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<Vec<Vec<u32>>, PyErr> {
-    let query: SingleGenerateQuery = serde_json::from_str(q).map_err(handle_serde_err)?;
-    match query {
+    match serde_json::from_str(q).map_err(handle_serde_err)? {
         SingleGenerateQuery::SingleGenerate(SingleGenerate {
             input,
             metadata: GenerateMetadata { model, .. },
@@ -438,6 +480,17 @@ pub fn tokenize_prepare(
             } else {
                 parts.collect::<Result<_, _>>().map_err(handle_err)
             }
+        }
+
+        // SingleGenerateQuery::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
+        //     todo!()
+        // }
+
+        // SingleGenerateQuery::Bulk(Bulk::Map(Map { metadata, inputs })) => {
+        //     todo!()
+        // }
+        _ => {
+            todo!()
         }
     }
 }
