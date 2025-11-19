@@ -37,8 +37,12 @@ pub async fn map(spec: &Map, mmp: Option<&indicatif::MultiProgress>, prepare: bo
             backend::openai::generate_completion(Gemini, spec.with_model(m)?, mp, prepare).await
         }
 
-        //        #[cfg(feature = "spnl-api")]
-        //        ["spnl", m] => backend::spnl::generate(spec.with_model(m)?, mp, prepare).await,
+        #[cfg(feature = "spnl-api")]
+        ["spnl", m] => {
+            backend::openai::generate_completion(OpenAI, spec.with_model(m)?, mp, prepare).await
+            // TODO "native" spnl support for Map backend::spnl::generate_completion(spec.with_model(m)?, mp, prepare).await,
+        }
+
         _ => Err(ModelNotFoundError.into()),
     }
 }
