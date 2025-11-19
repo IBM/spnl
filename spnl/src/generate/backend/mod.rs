@@ -5,3 +5,5 @@ pub(crate) mod openai;
 pub(crate) mod spnl;
 
 pub(crate) mod capabilities;
+
+mod progress;

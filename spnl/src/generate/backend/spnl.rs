@@ -31,6 +31,7 @@ pub async fn generate(spec: Repeat, m: Option<&MultiProgress>, prepare: bool) ->
 
     let response = client
         .post(format!("http://localhost:8000/v1/query/{exec}"))
+        .query(&[("stream", "stream")])
         .header("Content-Type", "text/plain")
         .body(to_string(&Query::Bulk(Bulk::Repeat(spec)))?)
         .send()

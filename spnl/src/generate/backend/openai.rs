@@ -6,7 +6,7 @@ use async_openai::types::{
 };
 
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};
 
 use async_openai::{
@@ -67,35 +67,14 @@ pub async fn generate_completion(
         })
         .unwrap_or(2048);
 
+    let pbs = super::progress::bars(n_prompts, &spec.metadata, &m)?;
+
     let request = CreateCompletionRequestArgs::default()
         .model(spec.metadata.model)
         .prompt(spec.inputs)
         .temperature(spec.metadata.temperature.unwrap_or_default())
         .max_tokens(mt)
         .build()?;
-
-    let style = ProgressStyle::with_template(
-        "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
-    )?;
-    let pbs: Option<Vec<_>> = m.map(|m| {
-        ::std::iter::repeat_n(0, n_prompts)
-            .enumerate()
-            .map(|(idx, _)| {
-                m.add(
-                    spec.metadata
-                        .max_tokens
-                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
-                        .unwrap_or_else(ProgressBar::no_length)
-                        .with_style(style.clone())
-                        .with_message(if n_prompts == 1 {
-                            "Generating".to_string()
-                        } else {
-                            format!("Generating {}", idx + 1)
-                        }),
-                )
-            })
-            .collect()
-    });
 
     // println!("A {:?}", client.models().list().await?);
 
@@ -184,6 +163,8 @@ pub async fn generate_chat(
         })
         .unwrap_or(2048);
 
+    let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m)?;
+
     let mut request_builder_0 = CreateChatCompletionRequestArgs::default();
     let request_builder_1 = request_builder_0
         .model(spec.generate.metadata.model)
@@ -201,30 +182,6 @@ pub async fn generate_chat(
     };
 
     let request = request_builder.build()?;
-
-    let style = ProgressStyle::with_template(
-        "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
-    )?;
-    let pbs: Option<Vec<_>> = m.map(|m| {
-        ::std::iter::repeat_n(0, spec.n.into())
-            .enumerate()
-            .map(|(idx, _)| {
-                m.add(
-                    spec.generate
-                        .metadata
-                        .max_tokens
-                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
-                        .unwrap_or_else(ProgressBar::no_length)
-                        .with_style(style.clone())
-                        .with_message(if spec.n == 1 {
-                            "Generating".to_string()
-                        } else {
-                            format!("Bulk Generation ({})", idx + 1)
-                        }),
-                )
-            })
-            .collect()
-    });
 
     // println!("A {:?}", client.models().list().await?);
 
