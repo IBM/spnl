@@ -1,9 +1,9 @@
 name: llm-d image build
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["publish_pypi"]
-    branches: [main]
     types: 
       - completed
 # for debugging
