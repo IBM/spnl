@@ -34,7 +34,7 @@ jobs:
           - runner: ubuntu-22.04
             target: ppc64le
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -99,7 +99,7 @@ jobs:
           - runner: windows-11-arm
             target: aarch64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -128,7 +128,7 @@ jobs:
           - runner: macos-14
             target: aarch64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -149,7 +149,7 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Download maturin-action
         run: mkdir -p maturin-action/dist && cd maturin-action && cd dist && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/dist/index.js && cd .. && curl -LO https://raw.githubusercontent.com/PyO3/maturin-action/refs/heads/main/action.yml
       - name: Build sdist
