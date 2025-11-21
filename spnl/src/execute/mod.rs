@@ -1,4 +1,5 @@
 use crate::ir::{Bulk, Generate, GenerateBuilder, Message::*, Query, Repeat};
+use crate::optimizer::hlo::simplify;
 use indicatif::MultiProgress;
 
 #[cfg(feature = "pull")]
@@ -60,6 +61,10 @@ pub async fn execute(query: &Query, rp: &ExecuteOptions) -> SpnlResult {
 
 #[async_recursion::async_recursion]
 async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
+    Ok(simplify(&run_subtree_(query, rp, m).await?))
+}
+
+async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
     #[cfg(feature = "pull")]
     crate::execute::pull::pull_if_needed(query).await?;
 
@@ -138,6 +143,42 @@ mod tests {
     async fn it_works() -> Result<(), SpnlError> {
         let result = execute(&"hello".into(), &ExecuteOptions { prepare: None }).await?;
         assert_eq!(result, Query::Message(User("hello".to_string())));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn simplfiy_monad() -> Result<(), SpnlError> {
+        let result = execute(
+            &Query::Plus(vec![
+                Query::Monad(Box::new("ignored".into())),
+                "not ignored".into(),
+            ]),
+            &ExecuteOptions { prepare: None },
+        )
+        .await?;
+        assert_eq!(
+            result,
+            Query::Plus(vec![Query::Message(User("not ignored".to_string()))])
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn simplfiy_nested_monad() -> Result<(), SpnlError> {
+        let result = execute(
+            &Query::Cross(vec![Query::Plus(vec![
+                Query::Monad(Box::new("ignored".into())),
+                "not ignored".into(),
+            ])]),
+            &ExecuteOptions { prepare: None },
+        )
+        .await?;
+        assert_eq!(
+            result,
+            Query::Cross(vec![Query::Plus(vec![Query::Message(User(
+                "not ignored".to_string()
+            ))])])
+        );
         Ok(())
     }
 }

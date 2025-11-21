@@ -149,6 +149,14 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
         })],
 
         Query::Monad(q) => vec![Query::Monad(Box::new(simplify(q)))],
+        Query::Message(m) => {
+            if m.is_empty() {
+                vec![]
+            } else {
+                vec![Query::Message(m.clone())]
+            }
+        }
+
         otherwise => vec![otherwise.clone()],
     }
 }

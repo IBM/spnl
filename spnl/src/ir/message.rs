@@ -18,6 +18,12 @@ impl From<&str> for Message {
 }
 
 impl Message {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Message::Assistant(m) | Message::User(m) | Message::System(m) => m.is_empty(),
+        }
+    }
+
     pub fn role(&self) -> &'static str {
         match self {
             Message::Assistant(_) => "assistant",

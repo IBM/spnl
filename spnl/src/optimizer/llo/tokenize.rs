@@ -58,7 +58,7 @@ impl Tokenizer {
         Ok(())
     }
 
-    /// Push plus token
+    /// Push plus token on block boundary
     fn plus(&self, tokens: &mut Vec<u32>) {
         if let Some(plus_token) = self.plus_token {
             self.pad_push(plus_token, tokens);
@@ -93,11 +93,16 @@ impl Tokenizer {
 
     /// Pad to block boundary, then push
     fn pad_push(&self, token: u32, tokens: &mut Vec<u32>) {
+        self.pad(tokens);
+        tokens.push(token);
+    }
+
+    /// Pad to block boundary
+    fn pad(&self, tokens: &mut Vec<u32>) {
         let n_pads = self.block_size - tokens.len() % self.block_size;
-        if n_pads < self.block_size {
+        if n_pads > 0 && n_pads < self.block_size {
             tokens.extend(::std::iter::repeat_n(self.pad_token, n_pads));
         }
-        tokens.push(token);
     }
 }
 
@@ -167,8 +172,8 @@ pub fn init(max_capacity: u64) -> TokenizerState {
 }
 
 #[pyclass]
-#[derive(Debug)]
-pub struct TokenizedQuery {
+#[derive(Clone, Debug)]
+pub struct TokenizedChatCompletionQuery {
     #[pyo3(get)]
     n: u8,
     #[pyo3(get)]
@@ -180,8 +185,30 @@ pub struct TokenizedQuery {
     messages_: Vec<u32>,
 }
 
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct CompletionRequest {
+    #[pyo3(get)]
+    model: String,
+    #[pyo3(get)]
+    max_tokens: Option<i32>,
+    #[pyo3(get)]
+    temperature: Option<f32>,
+    #[pyo3(get, set)]
+    stream: Option<bool>,
+    #[pyo3(get)]
+    inputs: Vec<Vec<u32>>,
+}
+
+#[pyclass]
+#[derive(Debug)]
+pub enum TokenizedQuery {
+    CompletionRequest(CompletionRequest),
+    TokenizedChatCompletionQuery(TokenizedChatCompletionQuery),
+}
+
 #[pymethods]
-impl TokenizedQuery {
+impl TokenizedChatCompletionQuery {
     #[getter]
     fn messages(&self) -> Vec<u32> {
         self.messages_.clone()
@@ -360,6 +387,58 @@ fn add_final_assistant_token(
     Ok(())
 }
 
+fn tokenize(
+    state: &mut TokenizerState,
+    input: &NonGenerateInput,
+    model: &String,
+    pad_token: u32,
+    cross_token: Option<u32>,
+    plus_token: Option<u32>,
+    block_size: usize,
+) -> Result<Vec<u32>, PyErr> {
+    let tok = state
+        .get_or_create(model, pad_token, cross_token, plus_token, block_size)
+        .map_err(handle_arc_err)?;
+    let mut tokens: Vec<u32> = vec![];
+    tokenize_part(input, &tok, &mut tokens)
+        .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
+        .map_err(handle_err)?;
+
+    // TODO: add a verbose parameter, and print this out if so?
+    /* if let Ok(s) = tok.tok.decode(&tokens, false) {
+        eprintln!("Tokens {tokens:?}");
+        eprintln!("Reverse de-tokenized message (for debugging): {s}");
+    } */
+
+    Ok(tokens)
+}
+
+fn tokenize_map(
+    state: &mut TokenizerState,
+    inputs: &[String],
+    model: &String,
+    pad_token: u32,
+    cross_token: Option<u32>,
+    plus_token: Option<u32>,
+    block_size: usize,
+) -> Result<Vec<Vec<u32>>, PyErr> {
+    let tok = state
+        .get_or_create(model, pad_token, cross_token, plus_token, block_size)
+        .map_err(handle_arc_err)?;
+
+    inputs
+        .iter()
+        .map(|input| {
+            let mut tokens: Vec<u32> = vec![];
+            tok.plus(&mut tokens);
+            tokenize_message(&Message::User(input.clone()), &tok, &mut tokens)
+                .map_err(handle_err)?;
+            tok.pad(&mut tokens);
+            Ok(tokens)
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
 fn tokenize_query_generate(
     state: &mut TokenizerState,
     Repeat {
@@ -371,33 +450,23 @@ fn tokenize_query_generate(
     plus_token: Option<u32>,
     block_size: usize,
 ) -> Result<TokenizedQuery, PyErr> {
-    let tok = state
-        .get_or_create(
-            &metadata.model,
-            pad_token,
-            cross_token,
-            plus_token,
-            block_size,
-        )
-        .map_err(handle_arc_err)?;
-    let mut tokens: Vec<u32> = vec![];
-    tokenize_part(&input, &tok, &mut tokens)
-        .and_then(|()| add_final_assistant_token(&tok, &mut tokens))
-        .map_err(handle_err)?;
-
-    // TODO: add a verbose parameter, and print this out if so?
-    /* if let Ok(s) = tok.tok.decode(&tokens, false) {
-        eprintln!("Tokens {tokens:?}");
-        eprintln!("Reverse de-tokenized message (for debugging): {s}");
-    } */
-
-    Ok(TokenizedQuery {
-        n,
-        model: metadata.model,
-        messages_: tokens,
-        max_tokens: metadata.max_tokens,
-        temperature: metadata.temperature,
-    })
+    Ok(TokenizedQuery::TokenizedChatCompletionQuery(
+        TokenizedChatCompletionQuery {
+            n,
+            messages_: tokenize(
+                state,
+                &input,
+                &metadata.model,
+                pad_token,
+                cross_token,
+                plus_token,
+                block_size,
+            )?,
+            model: metadata.model,
+            max_tokens: metadata.max_tokens,
+            temperature: metadata.temperature,
+        },
+    ))
 }
 
 #[pyfunction]
@@ -426,9 +495,22 @@ pub fn tokenize_query(
             plus_token,
             block_size,
         ),
-        _ => {
-            //SingleGenerateQuery::Bulk(Bulk::Map(Map { metadata, inputs })) => {
-            todo!()
+        SingleGenerateQuery::Bulk(Bulk::Map(map)) => {
+            Ok(TokenizedQuery::CompletionRequest(CompletionRequest {
+                inputs: tokenize_map(
+                    state,
+                    &map.inputs,
+                    &map.metadata.model,
+                    pad_token,
+                    cross_token,
+                    plus_token,
+                    block_size,
+                )?,
+                model: map.metadata.model,
+                max_tokens: map.metadata.max_tokens,
+                temperature: map.metadata.temperature,
+                stream: None,
+            }))
         }
     }
 }

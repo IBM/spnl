@@ -7,7 +7,7 @@ use crate::{
 use crate::augment;
 
 mod simplify;
-use simplify::simplify;
+pub use simplify::simplify;
 
 #[derive(Debug, Default)]
 pub struct Options {
