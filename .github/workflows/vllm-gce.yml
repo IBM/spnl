@@ -1,0 +1,82 @@
+name: vLLM GCE
+
+on:
+  #workflow_dispatch:
+  #push:
+  #  branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vllm_gce:
+    name: Test in GCE VM
+    env:
+      # Adjust these as needed
+      VLLM_ORG: starpit
+      VLLM_REPO: vllm-ibm
+      VLLM_BRANCH: spnl-ibm
+      MODEL: ibm-granite/granite-3.3-2b-instruct
+
+      # You probably won't need to change this
+      SPNL_GITHUB: https://github.com/IBM/spnl.git
+      
+      # Don't touch these
+      RUN_ID: github-${{ github.run_id }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GCS_BUCKET: spnl-test-${{vars.GCP_PROJECT}}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != '' # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
+      - uses: hashicorp/setup-terraform@v3
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+
+      - id: auth
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT }}
+          credentials_json: '${{ env.GCP_CREDENTIALS }}'
+          create_credentials_file: true
+          # TODO: use a workload identity provider rather than json credentials
+          # workload_identity_provider: 'projects/${{vars.GCP_PROJECT}}/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+          # service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          version: '>= 363.0.0'
+
+      - name: Use gcloud CLI
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        run: gcloud info
+
+      - name: Initialize terraform
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        working-directory: docker/gce/vllm/
+        run: terraform init
+        
+      - name: Launch GCE VM via Terraform
+        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        working-directory: docker/gce/vllm/
+        run: ./up.sh
+
+      # Use `if: always()` to ensure the GCE VM is always torn down, no matter what happens above
+      - name: Destroy VM
+        if: always() # this gives us a "finally" block
+        working-directory: docker/gce/vllm/
+        run: |
+          [ -n "$GCP_CREDENTIALS" ] && [ -n "$HF_TOKEN" ] && ./down.sh || true
