@@ -31,7 +31,7 @@ yaml = ["dep:serde_yaml2"]
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"], optional = true }
 serde = { version = "1.0.219", features = ["derive"] }
 serde-lexpr = { version = "0.1.3", optional = true }
-async-openai = { version = "0.30.0", optional = true }
+async-openai = { version = "0.31.1", features=["embedding","chat-completion","completions","_api"], optional = true }
 async-recursion = {version = "1.1.1", optional = true }
 duct = { version = "1.0", optional = true }
 fs4 = { version = "0.13.1", optional = true }

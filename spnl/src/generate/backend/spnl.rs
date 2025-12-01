@@ -1,7 +1,8 @@
 use tokio_stream::StreamExt;
 
 use async_openai::types::{
-    CreateChatCompletionResponse, CreateChatCompletionStreamResponse, CreateCompletionResponse,
+    chat::{CreateChatCompletionResponse, CreateChatCompletionStreamResponse},
+    completions::CreateCompletionResponse,
 };
 use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};

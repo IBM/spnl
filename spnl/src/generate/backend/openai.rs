@@ -1,19 +1,18 @@
-use async_openai::types::{
-    ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
-    ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
-    ChatCompletionRequestUserMessageContent,
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    types::chat::{
+        ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
+        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+        ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
+        ChatCompletionRequestUserMessageContent, CreateChatCompletionRequestArgs,
+    },
+    types::completions::CreateCompletionRequestArgs,
 };
 
 use futures::StreamExt;
 use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};
-
-use async_openai::{
-    Client,
-    config::OpenAIConfig,
-    types::{CreateChatCompletionRequestArgs, CreateCompletionRequestArgs},
-};
 
 use crate::{
     SpnlResult,
@@ -298,7 +297,7 @@ pub async fn embed(
     embedding_model: &str,
     data: &EmbedData,
 ) -> anyhow::Result<impl Iterator<Item = Vec<f32>> + use<>> {
-    use async_openai::types::CreateEmbeddingRequestArgs;
+    use async_openai::types::embeddings::CreateEmbeddingRequestArgs;
 
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
 
