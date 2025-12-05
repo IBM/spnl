@@ -151,7 +151,7 @@ jobs:
 
 
   pypi_build_sdist:
-    name: Build ddist
+    name: Build pypi sdist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
