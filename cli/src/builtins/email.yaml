@@ -7,12 +7,11 @@ g:
       - plus:
           - repeat:
               n: "{n}"
-              query:
-                g:
-                  model: "{model}"
-                  input:
-                    user: write an introductory email for a job application, limited to at most {max_tokens} characters.
-                  max_tokens: "{max_tokens}"
-                  temperature: "{temperature}"
+              g:
+                model: "{model}"
+                input:
+                  user: write an introductory email for a job application, limited to at most {max_tokens} characters.
+                max_tokens: "{max_tokens}"
+                temperature: "{temperature}"
       - print: Ask the model to select the best option from the candidates
       - user: My name is Shiloh. I am a data scientist with 10 years of experience and need an introductory email to apply for a position at IBM in their research department

@@ -104,7 +104,7 @@ ${x.system
       props.emit("*" + x.print + "*\n\n")
       return x
     })
-    .with({ repeat: { n: P.number, query: P._ } }, (x) => {
+    .with({ repeat: P._ }, (x) => {
       /* will be expanded by the planner */
       return x
     })

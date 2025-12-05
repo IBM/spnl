@@ -9,9 +9,15 @@ export type Seq = { seq: Query[] }
 export type Par = { par: Query[] }
 export type Plus = { plus: Query[] }
 export type Cross = { cross: Query[] }
-export type Repeat = { repeat: { n: number; query: Query } }
+export type GenerateSpec = {
+  model: string
+  input: Query
+  max_tokens: number
+  temperature: number
+}
+export type Repeat = { repeat: { n: number; g: GenerateSpec } }
 export type Generate = {
-  g: { model: string; input: Query; max_tokens: number; temperature: number }
+  g: GenerateSpec
 }
 export type Query =
   | Print

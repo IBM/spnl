@@ -15,6 +15,7 @@ pub struct Repeat {
     pub n: u8,
 
     /// The specification of what to generate
+    #[serde(rename = "g")]
     pub generate: Generate,
 }
 

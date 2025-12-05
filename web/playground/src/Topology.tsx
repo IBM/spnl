@@ -31,10 +31,10 @@ function graphify(unit: import("./Query").Query, id = "root"): Data[] {
       node(id, "G", graphify(input, id + ".G")),
     ])
     .with({ print: P._ }, () => [])
-    .with({ repeat: { n: P.number, query: P._ } }, ({ repeat }) =>
+    .with({ repeat: P._ }, ({ repeat }) =>
       Array(repeat.n)
         .fill(0)
-        .flatMap((_, idx) => graphify(repeat.query, id + "." + idx)),
+        .flatMap((_, idx) => graphify(repeat.g.input, id + "." + idx)),
     )
     .with({ seq: P.array() }, ({ seq }) => [
       node(
