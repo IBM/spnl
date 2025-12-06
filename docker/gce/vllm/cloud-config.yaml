@@ -1,0 +1,32 @@
+#cloud-config
+packages:
+  - build-essential
+  - pkg-config
+  - libssl-dev
+  - protobuf-compiler
+  - python3-dev
+
+write_files:
+  - path: /etc/environment
+    append: true
+    content: |
+      RUN_ID=${run_id}
+      HF_TOKEN=${hf_token}
+      GCS_BUCKET=${gcs_bucket}
+      TESTS_FILE=/tmp/tests.tar.gz.base64
+      SPNL_GITHUB=${spnl_github}
+      GITHUB_SHA=${spnl_github_sha}
+      GITHUB_REF=${spnl_github_ref}
+      VLLM_ORG=${vllm_org}
+      VLLM_REPO=${vllm_repo}
+      VLLM_BRANCH=${vllm_branch}
+      MODEL=${model}
+  - path: /tmp/setup.sh
+    permissions: '0755'
+    content: |
+      ${setup_script}
+
+runcmd:
+  - /tmp/setup.sh
+  - echo "Shutting down"
+  - sudo /sbin/shutdown -h now
