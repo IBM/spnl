@@ -181,7 +181,7 @@ pub async fn generate(
         .collect::<Vec<_>>();
 
     if let Some(start_time) = start_time {
-        eprintln!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+        println!("GenerateTime {} ns", start_time.elapsed().as_nanos())
     }
 
     if response.len() == 1 {

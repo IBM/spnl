@@ -95,7 +95,7 @@ async fn main() -> Result<(), SpnlError> {
     })?;
 
     if let Some(start_time) = start_time {
-        eprintln!("TotalTime {} ns", start_time.elapsed().as_nanos());
+        println!("AllTime {} ns", start_time.elapsed().as_nanos());
     }
 
     res
