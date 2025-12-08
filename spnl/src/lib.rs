@@ -13,6 +13,8 @@ pub use execute::*;
 // TODO generate feature?
 #[cfg(feature = "run")]
 mod generate;
+#[cfg(feature = "run")]
+pub use generate::WhatToTime;
 
 // TODO optimizer feature?
 pub mod optimizer;

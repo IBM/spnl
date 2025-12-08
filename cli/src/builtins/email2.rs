@@ -10,6 +10,8 @@ pub fn query(args: Args) -> Query {
         ..
     } = args;
 
+    let outer_max_tokens = if args.time.is_some() { Some(1) } else { None };
+
     spnl!(
         g model
          (seq
@@ -30,5 +32,7 @@ pub fn query(args: Args) -> Query {
 
           (print "Ask the model to select the best option from the candidates")
          )
+
+            temperature outer_max_tokens
     )
 }

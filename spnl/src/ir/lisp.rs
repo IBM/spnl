@@ -13,8 +13,8 @@ macro_rules! spnl {
             input: Box::new($crate::spnl_arg!($input).into()),
             metadata: $crate::ir::GenerateMetadata {
                 model: $crate::spnl_arg!($model).to_string(),
-                max_tokens: Some($crate::spnl_arg!($max_tokens)),
-                temperature: Some($crate::spnl_arg!($temp)),
+                max_tokens: $crate::spnl_arg!($max_tokens).into(),
+                temperature: $crate::spnl_arg!($temp).into(),
             },
         })
     );

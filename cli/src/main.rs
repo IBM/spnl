@@ -2,7 +2,9 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::builtins::*;
-use spnl::{ExecuteOptions, SpnlError, execute, ir::from_str, ir::pretty_print, optimizer::hlo};
+use spnl::{
+    ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
+};
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
@@ -18,6 +20,7 @@ async fn main() -> Result<(), SpnlError> {
     let dry_run = args.dry_run;
 
     let rp = ExecuteOptions {
+        time: args.time.clone(),
         prepare: Some(args.prepare),
     };
 
@@ -38,7 +41,8 @@ async fn main() -> Result<(), SpnlError> {
             .build()?,
     };
 
-    let time = if args.time {
+    let is_timing = args.time.is_some();
+    let start_time = if let Some(WhatToTime::All) = args.time {
         Some(::std::time::Instant::now())
     } else {
         None
@@ -84,14 +88,14 @@ async fn main() -> Result<(), SpnlError> {
     }
 
     let res = execute(&query, &rp).await.map(|res| {
-        if !res.to_string().is_empty() {
+        if !is_timing && !res.to_string().is_empty() {
             println!("{res}");
         }
         Ok(())
     })?;
 
-    if let Some(time) = time {
-        eprintln!("{}", time.elapsed().as_millis());
+    if let Some(start_time) = start_time {
+        eprintln!("TotalTime {} ns", start_time.elapsed().as_nanos());
     }
 
     res

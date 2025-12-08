@@ -5,10 +5,7 @@ use indicatif::MultiProgress;
 #[cfg(feature = "pull")]
 pub mod pull;
 
-pub struct ExecuteOptions {
-    /// Prepare query?
-    pub prepare: Option<bool>,
-}
+pub type ExecuteOptions = crate::generate::GenerateOptions;
 
 pub type SpnlError = anyhow::Error;
 pub type SpnlResult = anyhow::Result<Query>;
@@ -82,13 +79,9 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
             Ok("".into())
         }
 
-        Query::Bulk(Bulk::Repeat(repeat)) => {
-            crate::generate::generate(repeat.clone(), m, rp.prepare.unwrap_or_default()).await
-        }
+        Query::Bulk(Bulk::Repeat(repeat)) => crate::generate::generate(repeat.clone(), m, rp).await,
 
-        Query::Bulk(Bulk::Map(map)) => {
-            crate::generate::map(map, m, rp.prepare.unwrap_or_default()).await
-        }
+        Query::Bulk(Bulk::Map(map)) => crate::generate::map(map, m, rp).await,
 
         Query::Generate(Generate { metadata, input }) => {
             crate::generate::generate(
@@ -100,14 +93,16 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
                         .build()?,
                 },
                 m,
-                rp.prepare.unwrap_or_default(),
+                rp,
             )
             .await
         }
 
         #[cfg(feature = "print")]
         Query::Print(m) => {
-            println!("{m}");
+            if rp.time.is_none() {
+                println!("{m}");
+            }
             Ok(Query::Message(User("".into())))
         }
         #[cfg(feature = "cli_support")]
@@ -141,7 +136,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() -> Result<(), SpnlError> {
-        let result = execute(&"hello".into(), &ExecuteOptions { prepare: None }).await?;
+        let result = execute(&"hello".into(), &ExecuteOptions::default()).await?;
         assert_eq!(result, Query::Message(User("hello".to_string())));
         Ok(())
     }
@@ -153,7 +148,7 @@ mod tests {
                 Query::Monad(Box::new("ignored".into())),
                 "not ignored".into(),
             ]),
-            &ExecuteOptions { prepare: None },
+            &ExecuteOptions::default(),
         )
         .await?;
         assert_eq!(
@@ -170,7 +165,7 @@ mod tests {
                 Query::Monad(Box::new("ignored".into())),
                 "not ignored".into(),
             ])]),
-            &ExecuteOptions { prepare: None },
+            &ExecuteOptions::default(),
         )
         .await?;
         assert_eq!(

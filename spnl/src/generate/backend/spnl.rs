@@ -9,6 +9,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use crate::{
     SpnlResult,
+    generate::GenerateOptions,
     ir::{Bulk, GenerateMetadata, Map, Message::Assistant, Query, Repeat, to_string},
 };
 
@@ -43,8 +44,23 @@ impl Spec {
 const DATA_COLON: &[u8] = &[100, 97, 116, 97, 58, 32];
 
 /// Call the /api/query/{prepare|execute} API, passing the given query `spec`
-pub async fn generate(spec: Spec, m: Option<&MultiProgress>, prepare: bool) -> SpnlResult {
-    let exec = if prepare { "prepare" } else { "execute" };
+pub async fn generate(
+    spec: Spec,
+    m: Option<&MultiProgress>,
+    options: &GenerateOptions,
+) -> SpnlResult {
+    let start_time = match (spec.metadata().max_tokens, &options.time) {
+        (Some(1), Some(crate::WhatToTime::Gen1))
+        | (_, Some(crate::WhatToTime::Gen))
+        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
+        _ => None,
+    };
+
+    let exec = if let Some(true) = options.prepare {
+        "prepare"
+    } else {
+        "execute"
+    };
     let client = reqwest::Client::new();
 
     // eprintln!("Sending query {:?}", to_string(&query)?);
@@ -72,7 +88,7 @@ pub async fn generate(spec: Spec, m: Option<&MultiProgress>, prepare: bool) -> S
         // between Bulk::Map and Bulk::Repeat cases. The OpenAI data
         // structures for Completion are close but not identical to
         // those for ChatCompletion.
-        response_strings = if prepare {
+        response_strings = if let Some(true) = options.prepare {
             vec!["prepared".to_string()]
         } else if is_map {
             // Non-streaming Bulk::Map case
@@ -163,6 +179,11 @@ pub async fn generate(spec: Spec, m: Option<&MultiProgress>, prepare: bool) -> S
         .into_iter()
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
+
+    if let Some(start_time) = start_time {
+        eprintln!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+    }
+
     if response.len() == 1 {
         Ok(response.into_iter().next().unwrap())
     } else {

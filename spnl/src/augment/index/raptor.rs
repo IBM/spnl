@@ -8,7 +8,7 @@ use crate::{
         AugmentOptions,
         embed::{EmbedData, embed},
     },
-    generate::generate,
+    generate::{GenerateOptions, generate},
     ir::{Augment, Generate, GenerateMetadata, Message::*, Query, Repeat},
 };
 
@@ -154,7 +154,7 @@ async fn cross_index_fragment(
             },
         },
         Some(m),
-        false,
+        &GenerateOptions::default(),
     )
     .await?
     {

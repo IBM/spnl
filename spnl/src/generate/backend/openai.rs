@@ -16,6 +16,7 @@ use tokio::io::{AsyncWriteExt, stdout};
 
 use crate::{
     SpnlResult,
+    generate::GenerateOptions,
     ir::{Map, Message::*, Query, Repeat},
 };
 
@@ -46,13 +47,12 @@ pub async fn generate_completion(
     provider: Provider,
     spec: Map,
     m: Option<&MultiProgress>,
-    prepare: bool,
+    options: &GenerateOptions,
 ) -> SpnlResult {
-    if prepare {
+    if let Some(true) = options.prepare {
         todo!()
     }
 
-    let quiet = m.is_some();
     let n_prompts = spec.inputs.len();
     let mut stdout = stdout();
 
@@ -65,6 +65,14 @@ pub async fn generate_completion(
             _ => mt as u32,
         })
         .unwrap_or(2048);
+
+    let start_time = match (mt, &options.time) {
+        (1, Some(crate::WhatToTime::Gen1))
+        | (_, Some(crate::WhatToTime::Gen))
+        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
+        _ => None,
+    };
+    let quiet = m.is_some() || start_time.is_some();
 
     let pbs = super::progress::bars(n_prompts, &spec.metadata, &m)?;
 
@@ -118,6 +126,11 @@ pub async fn generate_completion(
         .into_iter()
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
+
+    if let Some(start_time) = start_time {
+        eprintln!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+    }
+
     if response.len() == 1 {
         Ok(response.into_iter().next().unwrap())
     } else {
@@ -129,15 +142,14 @@ pub async fn generate_chat(
     provider: Provider,
     spec: Repeat,
     m: Option<&MultiProgress>,
-    prepare: bool,
+    options: &GenerateOptions,
 ) -> SpnlResult {
-    if prepare {
+    if let Some(true) = options.prepare {
         todo!()
     }
 
     let input_messages = messagify(&spec.generate.input);
 
-    let quiet = m.is_some();
     let mut stdout = stdout();
     /* if !quiet {
         if let Some(ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
@@ -161,6 +173,14 @@ pub async fn generate_chat(
             _ => mt as u32,
         })
         .unwrap_or(2048);
+
+    let start_time = match (mt, &options.time) {
+        (1, Some(crate::WhatToTime::Gen1))
+        | (_, Some(crate::WhatToTime::Gen))
+        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
+        _ => None,
+    };
+    let quiet = m.is_some() || start_time.is_some();
 
     let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m)?;
 
@@ -228,6 +248,11 @@ pub async fn generate_chat(
         .into_iter()
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
+
+    if let Some(start_time) = start_time {
+        eprintln!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+    }
+
     if response.len() == 1 {
         Ok(response.into_iter().next().unwrap())
     } else {

@@ -182,7 +182,7 @@ async fn main() -> Result<(), SpnlError> {
         return Ok(());
     }
 
-    match execute(&query, &ExecuteOptions { prepare: None }).await? {
+    match execute(&query, &ExecuteOptions::default()).await? {
         Query::Message(User(ss)) => {
             // oof, be gracious here. sometimes the model wraps the
             // requested json array with markdown even though we asked
