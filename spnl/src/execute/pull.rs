@@ -156,7 +156,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
             // finishes drawing progress bars and outputs rest of status updates
             m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
             for line in final_status_lines {
-                println!("{}", line);
+                eprintln!("{}", line);
             }
         }
         FileExt::unlock(&f)?;
