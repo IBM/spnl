@@ -78,7 +78,7 @@ pub async fn generate(
         .await?;
 
     let mut stdout = stdout();
-    let quiet = m.is_some();
+    let quiet = m.is_some() || start_time.is_some();
     if !quiet {
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
