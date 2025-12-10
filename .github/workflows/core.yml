@@ -16,6 +16,8 @@ permissions:
   
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # Disable incremental compilation for faster from-scratch builds
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   build_and_test:
@@ -110,10 +112,10 @@ jobs:
           fi
 
       - name: cargo test
-        run: cargo test --all-features -p spnl -p spnl-cli -- --nocapture
+        run: cargo test --locked --all-features -p spnl -p spnl-cli -- --nocapture
         
       - name: rustfmt
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy --workspace --all-features --tests -- -D warnings
+        run: cargo clippy --locked --workspace --all-features --tests -- -D warnings

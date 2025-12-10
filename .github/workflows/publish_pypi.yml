@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # Disable incremental compilation for faster from-scratch builds
+  CARGO_PROFILE_TEST_DEBUG: 0
+
 jobs:
   pypi_build_linux:
     name: Build linux wheel
