@@ -2,10 +2,10 @@
 pub enum Indexer {
     /// Only perform the initial embedding without any further
     /// knowledge graph formation
+    #[default]
     SimpleEmbedRetrieve,
 
     /// Use the RAPTOR algorithm https://github.com/parthsarthi03/raptor
-    #[default]
     Raptor,
 }
 
