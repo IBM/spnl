@@ -39,12 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != '' # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
       - uses: hashicorp/setup-terraform@v3
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
 
       - id: auth
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ vars.GCP_PROJECT }}
@@ -55,28 +55,27 @@ jobs:
           # service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
         uses: google-github-actions/setup-gcloud@v3
         with:
           version: '>= 363.0.0'
 
       - name: Use gcloud CLI
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
         run: gcloud info
 
       - name: Initialize terraform
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
         working-directory: docker/gce/vllm/
         run: terraform init
         
       - name: Launch GCE VM via Terraform
-        if: ${{ env.GCP_CREDENTIALS }} != '' && ${{ env.HF_TOKEN }} != ''
+        if: env.GCP_CREDENTIALS && env.HF_TOKEN 
         working-directory: docker/gce/vllm/
         run: ./up.sh
 
       # Use `if: always()` to ensure the GCE VM is always torn down, no matter what happens above
       - name: Destroy VM
         if: always() # this gives us a "finally" block
-        working-directory: docker/gce/vllm/
         run: |
-          [ -n "$GCP_CREDENTIALS" ] && [ -n "$HF_TOKEN" ] && ./down.sh || true
+          [ -n "$GCP_CREDENTIALS" ] && [ -n "$HF_TOKEN" ] && ./docker/gce/vllm/down.sh || echo "Nothing to destroy"

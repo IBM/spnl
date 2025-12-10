@@ -16,5 +16,5 @@ terraform destroy \
           -var="hf_token=$HF_TOKEN" \
           -var="vllm_org=${VLLM_ORG:-starpit}" \
           -var="vllm_repo=${VLLM_REPO:-vllm-ibm}" \
-          -var="vllm_branch=${VLLM_BRANCH:-spnl-ibm-2}" \
+          -var="vllm_branch=${VLLM_BRANCH:-spnl-ibm}" \
           -auto-approve
