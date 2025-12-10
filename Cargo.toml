@@ -9,10 +9,3 @@ pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH"
 ]
-
-# Fwiw, this seems to reduce the executable size (e.g. with -F
-# rag,spnl-api from 156Mi to 92Mi), but the final link (probably due
-# to codegen-units=1) takes many minutes.
-#[profile.release]
-#lto = true
-#codegen-units = 1
