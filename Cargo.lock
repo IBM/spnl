@@ -6533,6 +6533,7 @@ version = "0.10.0"
 dependencies = [
  "anyhow",
  "clap",
+ "itertools 0.14.0",
  "ptree",
  "rustyline",
  "serde",

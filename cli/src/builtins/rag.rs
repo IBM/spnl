@@ -1,9 +1,12 @@
+use itertools::Itertools;
+
 pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
     let crate::args::Args {
         model,
         embedding_model,
         temperature,
         max_tokens,
+        chunk_size,
         ..
     } = args;
 
@@ -19,8 +22,10 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
     // documentation. https://github.com/IBM/prompt-declaration-language
     let prompt = format!(
         "Question: {}",
-        args.prompt
-            .unwrap_or_else(|| "Does PDL have a contribute keyword?".into())
+        args.prompt.unwrap_or_else(|| {
+            "can i use my flexible savings account to pay for health insurance premiums?"
+                .to_string()
+        })
     );
 
     // The corpus to mine for augmentations.
@@ -28,9 +33,40 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
         docs.into_iter()
             .map(::std::path::absolute)
             .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|filepath| spnl::spnl!(fetchn filepath))
+            .collect::<Vec<_>>()
     } else {
-        // Default value, which is the PDL documentation (see link above)
-        vec![::std::path::PathBuf::from("./rag-doc1.pdf".to_string())]
+        // Default value
+        vec![(
+            format!(
+                "fiqa-first100lines-chunksize-{}.txt",
+                chunk_size
+                    .map(|s| format!("{s}"))
+                    .unwrap_or("none".to_string())
+            ),
+            spnl::ir::Document::Text(
+                spnl::windowing::jsonl(include_str!("fiqa-first100lines.jsonl"))?
+                    .into_iter()
+                    .map(|line| {
+                        if chunk_size.is_none() || line.len() == chunk_size.unwrap() {
+                            line.to_string()
+                        } else {
+                            let width = chunk_size.unwrap_or(1000); // this could probably safely be `.unwrap()`
+                            if line.len() < width {
+                                format!(
+                                    "{}{}",
+                                    line.repeat(width / line.len()),
+                                    &line[0..width % line.len()]
+                                )
+                            } else {
+                                line[0..width].to_string()
+                            }
+                        }
+                    })
+                    .join("\n"),
+            ),
+        )]
     };
 
     let system_prompt = r#"

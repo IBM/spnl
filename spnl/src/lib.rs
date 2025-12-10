@@ -22,4 +22,4 @@ pub mod optimizer;
 #[cfg(feature = "rag")]
 mod augment;
 #[cfg(feature = "rag")]
-pub use augment::{AugmentOptionsBuilder, Indexer};
+pub use augment::{AugmentOptionsBuilder, Indexer, windowing};

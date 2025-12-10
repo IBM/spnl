@@ -2,12 +2,9 @@ use crate::args::Args;
 use spnl::{ir::Query, spnl};
 
 pub fn query(args: Args) -> anyhow::Result<Query> {
-    let Args {
-        model,
-        n,
-        chunk_size,
-        ..
-    } = args;
+    let Args { model, n, .. } = args;
+
+    let chunk_size = args.chunk_size.unwrap_or(1);
 
     Ok(spnl!(combine model
              (plus (chunk chunk_size

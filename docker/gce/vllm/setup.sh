@@ -91,11 +91,11 @@ VLLM_ATTENTION_BACKEND=TRITON_ATTN \
 (curl -fsSL https://ollama.com/install.sh | sh && ollama serve) &
 
 # Wait till vllm is ready
-until curl --output /dev/null --silent --fail http://localhost:8000/health; do sleep 3; done
+timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:8000/health; do sleep 3; done'
 echo "vllm is ready"
 
 # Wait till ollama is ready
-until curl --output /dev/null --silent --fail http://localhost:11434; do sleep 3; done
+timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:11434; do sleep 3; done'
 echo "ollama is ready"
 
 # Here are the variables we will allow to be used in the test.d/* scripts
@@ -110,6 +110,6 @@ if [ -d "$TESTS_DIR" ]
 then
     n_tests=$(ls "$TESTS_DIR" | wc -l | xargs)
     echo "Starting $n_tests tests"
-    find "$TESTS_DIR" -type f -name "*.sh" -exec bash -c 'for script; do echo "Executing $script at $(date -u)"; "$script"; done' _ {} +
+    find "$TESTS_DIR" -type f -name '*.sh' -print0 | xargs -0L1 -I{} bash -c 'echo "Executing {} at $(date -u)"; "{}"'
 else echo "No tests found in $TESTS_DIR"
 fi

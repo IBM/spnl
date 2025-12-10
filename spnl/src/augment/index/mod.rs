@@ -1,7 +1,7 @@
 mod layer1;
 mod raptor;
 mod simple_embed_retrieve;
-mod windowing;
+pub mod windowing;
 
 use indicatif::MultiProgress;
 

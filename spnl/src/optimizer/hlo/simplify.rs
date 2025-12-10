@@ -118,7 +118,9 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
             )],
         },
         Query::Plus(v) => {
-            if let Some(map) = bulk_mapify(v) {
+            if v.is_empty() {
+                vec![]
+            } else if let Some(map) = bulk_mapify(v) {
                 vec![Query::Bulk(Bulk::Map(map))]
             } else {
                 vec![Query::Plus(match &v[..] {
@@ -128,7 +130,14 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
                         v2.iter().chain(&v[1..]).flat_map(simplify_iter).collect()
                     }
 
-                    otherwise => otherwise.iter().flat_map(simplify_iter).collect(),
+                    otherwise => otherwise
+                        .iter()
+                        .flat_map(simplify_iter)
+                        .flat_map(|child| match child {
+                            Query::Plus(v2) => v2,
+                            _ => vec![child],
+                        })
+                        .collect(),
                 })]
             }
         }

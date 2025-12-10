@@ -97,12 +97,6 @@ macro_rules! spnl {
     (with $embedding_model:tt $input:tt $docs:tt) => {{
         let docs: Vec<$crate::ir::Query> = $crate::spnl_arg!($docs)
             .into_iter()
-            .map(|doc| match ::std::path::Path::new(&doc)
-                 .extension()
-                 .and_then(std::ffi::OsStr::to_str) {
-                     Some("txt") | Some("json") | Some("jsonl") => $crate::spnl!(fetchn doc),
-                     _ => $crate::spnl!(fetchb doc),
-                 })
             .map(|doc| $crate::spnl!(__spnl_retrieve $embedding_model $input doc))
             .collect();
 

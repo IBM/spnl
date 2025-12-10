@@ -33,8 +33,8 @@ pub struct Args {
     pub n: u32,
 
     /// Chunk size
-    #[arg(short = 'k', long, default_value_t = 1)]
-    pub chunk_size: usize,
+    #[arg(short = 'k', long)]
+    pub chunk_size: Option<usize>,
 
     /// Vector DB Url
     #[cfg(feature = "rag")]
