@@ -22,7 +22,7 @@ pub fn query(args: Args) -> Query {
           (repeat n
            model
             (seq
-             (system (format "You write an introductory emails for a job application, paying attention to the specifics of the application, and limited to at most {max_tokens} characters."))
+             (system (format "You write an introductory email for a job application, paying attention to the specifics of the application, and limited to at most {max_tokens} characters."))
 
              (user "My name is Shiloh. I am a data scientist with 10 years of experience and need an introductory email to apply for a position at IBM in their research department")
             )
