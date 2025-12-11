@@ -135,30 +135,40 @@ async fn optimize_iter<'a>(
                 None
             } else {
                 match &optimized_input {
-                    Query::Seq(seq) => match &seq[..] {
-                        [Query::Message(m), Query::Plus(plus)] => {
-                            // Plus of (only) Generates? TODO: that's all we handle, at the moment, nested generate where the children are *only* generates
-                            match plus.iter().all(|q| matches!(q, Query::Generate(_))) {
-                                // yes, we have a Plus of only Generates
-                                true => Some(Query::Seq(vec![
-                                    Query::Message(m.clone()),
-                                    Query::Par(
-                                        plus.iter()
-                                            .filter_map(|q| match q {
-                                                Query::Generate(g) => Some(Query::Plus(vec![
-                                                    *g.input.clone(),
-                                                    Query::Generate(g.wrap_plus()),
-                                                ])),
-                                                _ => None,
-                                            })
-                                            .collect(),
-                                    ),
-                                ])),
-                                false => None,
-                            }
-                        }
-                        _ => None,
-                    },
+                    Query::Seq(seq) => Some(Query::Seq(
+                        seq.iter()
+                            .map(|q| match q {
+                                Query::Bulk(Bulk::Repeat(inner)) => Query::Plus(vec![
+                                    *inner.generate.input.clone(),
+                                    Query::Bulk(Bulk::Repeat(inner.clone())),
+                                ]),
+
+                                // Plus of (only) Generates? TODO: that's all we handle, at the moment, nested generate where the children are *only* generates
+                                Query::Plus(inner) => {
+                                    match inner.iter().all(|q| matches!(q, Query::Generate(_))) {
+                                        // yes, we have a Plus over only Generates
+                                        true => Query::Plus(
+                                            inner
+                                                .iter()
+                                                .filter_map(|q| match q {
+                                                    Query::Generate(g) => Some(Query::Plus(vec![
+                                                        *g.input.clone(),
+                                                        Query::Generate(g.wrap_plus()),
+                                                    ])),
+                                                    _ => None,
+                                                })
+                                                .collect(),
+                                        ),
+
+                                        false => q.clone(),
+                                    }
+                                }
+
+                                _ => q.clone(),
+                            })
+                            .collect(),
+                    )),
+
                     _ => None,
                 }
             };
