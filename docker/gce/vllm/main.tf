@@ -20,7 +20,7 @@ resource "google_compute_instance" "spnl-test-big" {
     device_name = "spnl-test-big-${local.run_id}"
 
     initialize_params {
-      image = "projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-580-v20251121" # "projects/ml-images/global/images/pytorch-2-7-cu128-ubuntu-2404-nvidia-570-v20251110" 
+      image = "projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-580-v20251210"
       size  = 100
       type  = "pd-ssd"
     }
@@ -64,10 +64,10 @@ resource "google_compute_instance" "spnl-test-big" {
   }
 
   scheduling {
-    automatic_restart   = true
+    automatic_restart   = false # true with STANDARD
     on_host_maintenance = "TERMINATE"
-    preemptible         = false
-    provisioning_model  = "STANDARD"
+    preemptible         = true # false with STANDARD
+    provisioning_model  = "SPOT" # versus STANDARD
   }
 
   service_account {
