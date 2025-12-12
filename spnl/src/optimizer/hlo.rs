@@ -1,6 +1,6 @@
 use crate::{
     generate::backend::capabilities::supports_spans,
-    ir::{Bulk, Generate, GenerateBuilder, Query, Repeat},
+    ir::{Bulk, Generate, GenerateBuilder, Query, Repeat, RepeatBuilder},
 };
 
 #[cfg(feature = "rag")]
@@ -113,12 +113,18 @@ async fn optimize_iter<'a>(
 
         // Optimize the input of the Repeat
         Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
-            Ok(Query::Bulk(Bulk::Repeat(Repeat {
+            Ok(Query::Plus(vec![Query::Bulk(Bulk::Repeat(Repeat {
                 n: *n,
                 generate: GenerateBuilder::from(generate)
-                    .input(optimize_iter(&generate.input, attrs).await?.into())
+                    .input(
+                        match optimize_iter(&generate.input, attrs).await? {
+                            Query::Seq(v) => Query::Plus(v),
+                            x => x,
+                        }
+                        .into(),
+                    )
                     .build()?,
-            })))
+            }))]))
         }
 
         // Optimize for nested generate; Generate(Seq(Message, Plus(Generate, Generate, Generate)))
@@ -140,7 +146,12 @@ async fn optimize_iter<'a>(
                             .map(|q| match q {
                                 Query::Bulk(Bulk::Repeat(inner)) => Query::Plus(vec![
                                     *inner.generate.input.clone(),
-                                    Query::Bulk(Bulk::Repeat(inner.clone())),
+                                    Query::Bulk(Bulk::Repeat(
+                                        RepeatBuilder::from(inner)
+                                            .generate(inner.generate.wrap_plus())
+                                            .build()
+                                            .unwrap(),
+                                    )), // TODO unwrap
                                 ]),
 
                                 // Plus of (only) Generates? TODO: that's all we handle, at the moment, nested generate where the children are *only* generates
