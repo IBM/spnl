@@ -9,11 +9,18 @@ pub struct Zip {
 }
 
 /// Turn a pair into a Zip
-impl From<(Query, Query)> for Query {
+impl From<(Query, Query)> for Zip {
     fn from(pair: (Query, Query)) -> Self {
-        Self::Zip(Zip {
+        Zip {
             first: pair.0.into(),
             second: pair.1.into(),
-        })
+        }
+    }
+}
+
+/// Turn a pair into a Query::Zip
+impl From<(Query, Query)> for Query {
+    fn from(pair: (Query, Query)) -> Self {
+        Self::Zip(pair.into())
     }
 }

@@ -9,14 +9,26 @@ pub enum Bulk {
 }
 
 /// Bulk operation: generate `n` outputs for the given `generate` specification
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, derive_builder::Builder,
+)]
 pub struct Repeat {
     /// The number of outputs to generate
+    #[builder(setter(into), default = 1u8)]
     pub n: u8,
 
     /// The specification of what to generate
     #[serde(rename = "g")]
     pub generate: Generate,
+}
+
+impl From<&Repeat> for RepeatBuilder {
+    fn from(other: &Repeat) -> Self {
+        RepeatBuilder::default()
+            .n(other.n)
+            .generate(other.generate.clone())
+            .clone()
+    }
 }
 
 impl Repeat {

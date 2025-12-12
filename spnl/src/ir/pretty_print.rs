@@ -72,7 +72,7 @@ impl ptree::TreeItem for Query {
                         "".to_string()
                     }
                 )),
-                Query::Zip(_) => style.paint("\x1bo2mZip\x1b[0m".to_string()),
+                Query::Zip(_) => style.paint("\x1b[2mZip\x1b[0m".to_string()),
                 Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
                 Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => style.paint(format!(
                     "\x1b[31;1mGenerate {n} candidates \x1b[0;2m{}model={}\x1b[0m",

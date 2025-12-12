@@ -72,7 +72,12 @@ impl Generate {
 
     /// Return self, but with input wrapped with a Plus
     pub fn wrap_plus(&self) -> Self {
-        self.wrap(|input| Query::Plus(vec![input]))
+        self.wrap(|input| {
+            Query::Plus(match input {
+                Query::Seq(s) => s,
+                _ => vec![input],
+            })
+        })
     }
 }
 
