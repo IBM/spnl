@@ -15,6 +15,8 @@ type Message = ChatCompletionMessageParam
 
 function messagify(input: Query): Message[] {
   return match(input)
+    .with({ seq: P.array() }, ({ seq }) => seq.flatMap(messagify))
+    .with({ par: P.array() }, ({ par }) => par.flatMap(messagify))
     .with({ cross: P.array() }, ({ cross }) => cross.flatMap(messagify))
     .with({ plus: P.array() }, ({ plus }) => plus.flatMap(messagify))
     .with({ assistant: P.string }, ({ assistant: content }) => [
