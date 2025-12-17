@@ -110,13 +110,6 @@ mod tests {
     }
 
     #[test]
-    fn serde_ask() -> serde_json::Result<()> {
-        let result = from_str(r#"{"ask": "hello"}"#)?;
-        assert_eq!(result, Query::Ask("hello".to_string()));
-        Ok(())
-    }
-
-    #[test]
     fn serde_plus_1() -> serde_json::Result<()> {
         let result = from_str(r#"{"plus": [{"user": "hello"}]}"#)?;
         assert_eq!(

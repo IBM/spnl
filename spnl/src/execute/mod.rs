@@ -105,24 +105,6 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
             }
             Ok(Query::Message(User("".into())))
         }
-        #[cfg(feature = "cli_support")]
-        Query::Ask(message) => {
-            use rustyline::error::ReadlineError;
-            let mut rl = rustyline::DefaultEditor::new().unwrap();
-            let _ = rl.load_history("history.txt");
-            let prompt = match rl.readline(message.as_str()) {
-                Ok(line) => {
-                    rl.add_history_entry(line.as_str()).unwrap();
-                    line
-                }
-                Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                    ::std::process::exit(0) // TODO this only works in a CLI
-                }
-                Err(err) => panic!("{}", err), // TODO this only works in a CLI
-            };
-            rl.append_history("history.txt").unwrap();
-            Ok(Query::Message(User(prompt)))
-        }
 
         // TODO: should not happen; we need to improve the typing of runnable queries
         #[cfg(feature = "rag")]

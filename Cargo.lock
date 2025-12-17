@@ -6513,7 +6513,6 @@ dependencies = [
  "rand 0.9.2",
  "regex",
  "reqwest",
- "rustyline",
  "serde",
  "serde-lexpr",
  "serde_json",

@@ -27,10 +27,6 @@ pub enum Query {
     #[cfg(feature = "rag")]
     Augment(crate::ir::Augment),
 
-    /// Ask with a given message
-    #[cfg(feature = "cli_support")]
-    Ask(String),
-
     /// Print a helpful message to the console
     #[cfg(feature = "print")]
     Print(String),

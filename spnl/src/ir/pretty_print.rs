@@ -101,7 +101,6 @@ impl ptree::TreeItem for Query {
                         "".to_string()
                     }
                 )),
-                Query::Ask(m) => style.paint(format!("Ask {m}")),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),
                 #[cfg(feature = "rag")]
                 Query::Augment(_) => style.paint("\x1b[34;1mAugment\x1b[0m".to_string()),
@@ -110,7 +109,7 @@ impl ptree::TreeItem for Query {
     }
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
         ::std::borrow::Cow::from(match self {
-            Query::Ask(_) | Query::Message(_) | Query::Print(_) => {
+            Query::Message(_) | Query::Print(_) => {
                 vec![]
             }
             Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),

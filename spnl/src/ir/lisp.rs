@@ -189,9 +189,6 @@ macro_rules! spnl {
     // Utility: the length of $list
     (length $list:tt) => ($crate::spnl_arg!($list).len());
 
-    // Utility: read as string from stdin
-    (ask $message:tt) => ( $crate::ir::Query::Ask($crate::spnl_arg!($message).into()) );
-
     // Utility: print a helpful message to the console
     (print $message:tt) => ( $crate::ir::Query::Print($crate::spnl_arg!($message).into()) );
 
@@ -224,12 +221,6 @@ mod tests {
     fn macro_system() {
         let result = spnl!(system "hello");
         assert_eq!(result, Query::Message(System("hello".to_string())));
-    }
-
-    #[test]
-    fn macro_ask() {
-        let result = spnl!(ask "hello");
-        assert_eq!(result, Query::Ask("hello".to_string()));
     }
 
     #[test]
