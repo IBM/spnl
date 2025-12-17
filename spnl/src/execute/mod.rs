@@ -54,10 +54,16 @@ async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
 
 /// Intersperse a in-between every element of b
 fn intersperse(a: Query, b: Vec<Query>) -> Vec<Query> {
-    ::std::iter::repeat_n(a, b.len())
-        .zip(b) // [(a1,b1),(a1,b2),...]
-        .flat_map(|(a, b)| [a, b]) // [a1,b1,a1,b2,...]
-        .collect()
+    match a {
+        Query::Plus(p) => b
+            .into_iter()
+            .map(|bb| Query::Plus(p.iter().cloned().chain(vec![bb]).collect()))
+            .collect(),
+        _ => ::std::iter::repeat_n(a, b.len())
+            .zip(b) // [(a1,b1),(a1,b2),...]
+            .flat_map(|(a, b)| [a, b]) // [a1,b1,a1,b2,...]
+            .collect(),
+    }
 }
 
 pub async fn execute(query: &Query, rp: &ExecuteOptions) -> SpnlResult {
@@ -85,7 +91,9 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
             let f = run_subtree(&z.first, rp, m);
             let s = run_subtree(&z.second, rp, m);
             Ok(match s.await? {
-                Query::Message(second) => Query::Seq(vec![f.await?, Query::Message(second)]),
+                Query::Message(second) => {
+                    Query::Seq(intersperse(f.await?, vec![Query::Message(second)]))
+                }
                 Query::Seq(second_list) => Query::Seq(intersperse(f.await?, second_list)),
                 Query::Par(second_list) => Query::Par(intersperse(f.await?, second_list)),
                 Query::Plus(second_list) => Query::Plus(intersperse(f.await?, second_list)),
