@@ -73,8 +73,17 @@ impl ptree::TreeItem for Query {
                     }
                 )),
                 Query::Monad(_) => style.paint("\x1b[2mMonad\x1b[0m".to_string()),
-                Query::Bulk(Bulk::Repeat(Repeat { n, .. })) =>
-                    style.paint(format!("\x1b[31;1mGenerate {n} candidates\x1b[0m")),
+                Query::Bulk(Bulk::Repeat(Repeat { n, generate })) => style.paint(format!(
+                    "\x1b[31;1mGenerate {n} candidates \x1b[0;2m{}model={}\x1b[0m",
+                    if let Some(mt) = generate.metadata.max_tokens
+                        && mt != 0
+                    {
+                        format!("max_tokens={mt} ")
+                    } else {
+                        "".to_string()
+                    },
+                    generate.metadata.model,
+                )),
                 Query::Bulk(Bulk::Map(Map {
                     inputs,
                     metadata:
