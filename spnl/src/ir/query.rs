@@ -1,4 +1,4 @@
-use super::{Bulk, Generate, Message};
+use super::{Bulk, Generate, Message, Zip};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -30,6 +30,9 @@ pub enum Query {
     /// Print a helpful message to the console
     #[cfg(feature = "print")]
     Print(String),
+
+    /// Interleave messages
+    Zip(Zip),
 
     /// Some kind of bulk operation
     #[serde(untagged)]

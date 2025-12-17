@@ -7,6 +7,9 @@ pub use generate::*;
 mod bulk;
 pub use bulk::*;
 
+mod zip;
+pub use zip::*;
+
 mod message;
 pub use message::*;
 
