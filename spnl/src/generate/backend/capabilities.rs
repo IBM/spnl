@@ -11,6 +11,7 @@ pub fn supports_bulk_repeat(provider_slash_model: &str) -> bool {
     !provider_slash_model.starts_with("disable_bulk_repeat/")
         && !provider_slash_model.starts_with("gemini/")
         && !provider_slash_model.starts_with("ollama/")
+        && !provider_slash_model.starts_with("spnl/") // the vLLM spans stuff seems to have a bug? not sure yet. can't get good cache locality with Bulk::Repeat
 }
 
 /// Does the given provider support the bulk-map API (non-chat completion across a vector of string prompts)?

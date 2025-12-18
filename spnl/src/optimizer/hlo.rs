@@ -123,13 +123,16 @@ async fn optimize_iter<'a>(
 
         // Optimize for nested generate; Generate(Seq(Message, Plus(Generate, Generate, Generate)))
         Query::Generate(g) => {
-            let optimized_input = optimize_iter(
-                &g.input,
-                &InheritedAttributesBuilder::from(attrs)
-                    .parent_generate(Some(g))
-                    .build()?,
-            )
-            .await?;
+            // Simplify needed to expand Bulk operations if backend does not support them
+            let optimized_input = simplify(
+                &optimize_iter(
+                    &g.input,
+                    &InheritedAttributesBuilder::from(attrs)
+                        .parent_generate(Some(g))
+                        .build()?,
+                )
+                .await?,
+            );
 
             let nested_gen_input: Option<Query> = if !supports_spans(&g.metadata.model) {
                 None

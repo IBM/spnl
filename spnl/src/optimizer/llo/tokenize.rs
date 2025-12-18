@@ -42,7 +42,7 @@ impl Tokenizer {
 
         self.extend_crop(
             // TODO: for now, we always drop any assistant suffix. we
-            // will need to figure out how to isolatge these on their
+            // will need to figure out how to isolate these on their
             // own block
             &extra[0..extra.len() - self.assistant_suffix_num_tokens],
             tokens,

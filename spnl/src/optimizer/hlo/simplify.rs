@@ -68,7 +68,7 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
             if supports_bulk_repeat(&generate.metadata.model) {
                 vec![query.clone()]
             } else {
-                vec![Query::Par(
+                vec![Query::Plus(
                     ::std::iter::repeat_n(Query::Generate(generate.clone()), (*n).into())
                         .collect::<Vec<_>>(),
                 )]
@@ -116,15 +116,43 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
             // One-entry parallel
             [q] => simplify_iter(q),
 
-            otherwise => vec![Query::Par(
-                otherwise.iter().flat_map(simplify_iter).collect(),
-            )],
+            otherwise => {
+                if v.iter().all(|q| matches!(q, Query::Plus(_))) {
+                    // Plus of all Pluses
+                    vec![Query::Plus(
+                        v.iter()
+                            .filter_map(|q| match q {
+                                Query::Plus(inner) => Some(inner),
+                                _ => None,
+                            })
+                            .flatten()
+                            .cloned()
+                            .collect(),
+                    )]
+                } else {
+                    vec![Query::Par(
+                        otherwise.iter().flat_map(simplify_iter).collect(),
+                    )]
+                }
+            }
         },
         Query::Plus(v) => {
             if v.is_empty() {
                 vec![]
             } else if let Some(map) = bulk_mapify(v) {
                 vec![Query::Bulk(Bulk::Map(map))]
+            } else if v.iter().all(|q| matches!(q, Query::Plus(_))) {
+                // Plus of all Pluses
+                vec![Query::Plus(
+                    v.iter()
+                        .filter_map(|q| match q {
+                            Query::Plus(inner) => Some(inner),
+                            _ => None,
+                        })
+                        .flatten()
+                        .cloned()
+                        .collect(),
+                )]
             } else {
                 vec![Query::Plus(match &v[..] {
                     // Plus where the first element is either a Seq or
