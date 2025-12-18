@@ -8,12 +8,14 @@ SCRIPTDIR=$(cd $(dirname "$0") && pwd)
 
 #set -x # debug
 
+export SPNL_EMBEDDING_MODEL=ollama/qwen3-embedding:0.6b
+
 # TODO: make at least the inner-most loop bound a parameter rather than hard-coded
 for b in email2 rag
 do
     for n in 8
     do
-        for l in 1000 10000
+        for l in 100 1000
         do
             curl -XPOST http://localhost:8000/reset_prefix_cache
             unset A

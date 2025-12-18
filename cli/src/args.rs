@@ -17,7 +17,12 @@ pub struct Args {
     pub model: String,
 
     /// Embedding Model
-    #[arg(short, long, default_value = "ollama/mxbai-embed-large:335m")]
+    #[arg(
+        short,
+        long,
+        default_value = "ollama/mxbai-embed-large:335m",
+        env = "SPNL_EMBEDDING_MODEL"
+    )]
     pub embedding_model: String,
 
     /// Temperature

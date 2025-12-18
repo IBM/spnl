@@ -95,7 +95,8 @@ timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localho
 echo "vllm is ready"
 
 # Wait till ollama is ready
-timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:11434; do sleep 3; done'
+#timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:11434; do sleep 3; done'
+timeout 5m bash -c 'until ollama ps; do sleep 3; done'
 echo "ollama is ready"
 
 # Here are the variables we will allow to be used in the test.d/* scripts
