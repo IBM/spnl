@@ -95,6 +95,9 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
         }
 
         Query::Seq(v) => match &v[..] {
+            // Empty sequence
+            [] => vec![],
+
             // One-entry sequence
             [q] => simplify_iter(q),
 
