@@ -41,7 +41,7 @@ tokio = { version = "1.44.1", features = ["io-std", "io-util"], optional = true 
 tokio-util = "0.7.16"
 tokio-stream = { version = "0.1.17", optional = true }
 anyhow = { version = "1.0.98" }
-lancedb = { version = "0.22.0", optional = true }
+lancedb = { version = "0.23.0", optional = true }
 tracing = { version = "0.1.41", optional = true }
 arrow-schema = { version = "56.2", optional = true }
 arrow-array = { version = "56.2", optional = true }
