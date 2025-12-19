@@ -81,7 +81,11 @@ export default function Body(props: BodyProps) {
             then click Run to execute it.
           </HelperTextItem>
           {compilationError && (
-            <HelperTextItem component="li" variant="error">
+            <HelperTextItem
+              component="li"
+              variant="error"
+              aria-label="Query compilation error"
+            >
               Compilation error: {compilationError.message}
             </HelperTextItem>
           )}

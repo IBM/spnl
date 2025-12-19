@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build:wasm": "wasm-pack build ../wasm --target bundler",
-    "build": "npm run build:wasm --release && tsc -b && vite build",
+    "build": "npm run build:wasm && tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write 'src/**/*.{ts,tsx,css}'",
     "test": "prettier --check 'src/**/*.{ts,tsx,css}' && npm run lint && npm run build && playwright test",

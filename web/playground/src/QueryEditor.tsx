@@ -34,6 +34,7 @@ export default function QueryEditor(props: Props) {
       icon={<TopologyIcon />}
       aria-label="Toggle Query Viewer"
       tooltipProps={{ content: "Toggle Query Viewer" }}
+      data-foo="bar"
       onClick={() =>
         navigate({
           to: "/",
@@ -60,7 +61,7 @@ export default function QueryEditor(props: Props) {
       code={props.initialQuery || ""}
       headerMainContent="Query Editor"
       customControls={customControls}
-      options={{ fontSize: 14, wordWrap: "on" }}
+      options={{ fontSize: 14, wordWrap: "on", ariaLabel: "Query Editor" }}
       onChange={props.setQuery}
       language={Language.yaml}
       onEditorDidMount={(editor) => {

@@ -35,7 +35,9 @@ export default function Drawer({ unit }: Props) {
         <CardTitle>Query Viewer</CardTitle>
       </CardHeader>
       <Divider />
-      <CardBody>{unit && <Topology unit={unit} />}</CardBody>
+      <CardBody aria-label="Query Viewer">
+        {unit && <Topology unit={unit} />}
+      </CardBody>
     </Card>
   )
 }
