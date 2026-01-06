@@ -73,6 +73,12 @@ uv venv --seed
 source .venv/bin/activate
 VLLM_USE_PRECOMPILED=1 uv pip install --editable .
 
+# Patch the vllm code. We could do this prior to the pip install just
+# above, but... for now at least this would mean downloading the spnl
+# pip, which is unnecessary due to the `maturin develop` just below,
+# which installs the specific version of spnl that was cloned above
+git apply $VLLM_PATCHFILE
+
 # Build the cloned version of spnl into vLLM, via maturin
 uv pip install maturin[patchelf]
 source $HOME/.cargo/env # to get rustc on path

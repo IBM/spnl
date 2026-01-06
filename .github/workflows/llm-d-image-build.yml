@@ -1,15 +1,15 @@
 name: llm-d image build
 
 on:
-  workflow_run:
-    workflows: ["publish_pypi"]
-    types: 
-      - completed
+#  workflow_run:
+#    workflows: ["publish_pypi"]
+#    types: 
+#      - completed
 # for debugging
 #  push:
 #    branches: [ main ]
-#  pull_request:
-#    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 # cancel any prior runs for this workflow and this PR (or branch)
 concurrency:
@@ -20,14 +20,13 @@ permissions:
   contents: read
   
 env:
-  LLMD_VERSION: v0.3.1
-  VLLM_VERSION: v0.11.0
   QUAY_ORG: spnl
   RELEASE_VERSION: latest # this may overridden below
 
 jobs:
   build_and_push:
     name: build and push
+    if: "!contains(github.event.pull_request.title, 'chore(deps)')"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -39,7 +38,7 @@ jobs:
       - name: Aggressive disk space cleanup
         run: ./.github/scripts/free-up-disk-space.sh
 
-      - name: Extract release tag to RELEASE_VERSION env varDetect whether head_branch is a tag
+      - name: Extract release tag to RELEASE_VERSION env var to detect whether head_branch is a tag
         id: detect
         shell: bash
         env:
@@ -52,19 +51,6 @@ jobs:
           fi        
       - name: Verify RELEASE_VERSION
         run: echo "RELEASE_VERSION=$RELEASE_VERSION"
-
-      - name: Extract vLLM commit hash for ${{ env.VLLM_VERSION }}
-        run: |
-          git clone https://github.com/vllm-project/vllm.git -b $VLLM_VERSION
-          cd vllm
-          echo "VLLM_PRECOMPILED_WHEEL_COMMIT=$(git show-ref -s v0.11.0 | head -1)" >> $GITHUB_ENV
-          cd ..
-          rm -rf vllm
-      - name: Verify VLLM_PRECOMPILED_WHEEL_COMMIT
-        run: echo "VLLM_PRECOMPILED_WHEEL_COMMIT=$VLLM_PRECOMPILED_WHEEL_COMMIT"
-
-      - name: Clone llm-d
-        run: git clone https://github.com/llm-d/llm-d.git -b $LLMD_VERSION
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -84,12 +70,7 @@ jobs:
           push: ${{ github.event.workflow_run.conclusion == 'success' && !github.event.release.prerelease }} # Only push if we are responding to a release
           cache-from: type=gha                              # Use github action mechanisms to cache layers
           cache-to: type=gha,mode=max                       # Use github action mechanisms to cache layers
-          context: llm-d                                    # Use the llm-d clone directory as docker context
-          file: llm-d/docker/Dockerfile.${{ matrix.gpu }}
+          file: docker/llm-d/Containerfile.${{ matrix.gpu }}
           tags: quay.io/${{ env.QUAY_ORG }}/llm-d-${{ matrix.gpu }}:${{ env.RELEASE_VERSION }},quay.io/${{ env.QUAY_ORG }}/llm-d-${{ matrix.gpu }}:latest
           build-args: |
-            TARGETOS=rhel
-            USE_SCCACHE=false
-            VLLM_REPO=https://github.com/starpit/vllm-ibm.git
-            VLLM_COMMIT_SHA=6c4dd70a2d322d27905f9de24e5bbecdff8399da
-            VLLM_PRECOMPILED_WHEEL_COMMIT=${{ env.VLLM_PRECOMPILED_WHEEL_COMMIT }}
+            SPNL_VERSION=${{ env.RELEASE_VERSION }}
