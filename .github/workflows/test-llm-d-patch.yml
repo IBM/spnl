@@ -1,0 +1,42 @@
+name: Test llm-d patch
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  
+jobs:
+  test_llm_d_patch:
+    name: Test llm-d patch
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          # - windows-latest
+          # - macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # The git rebase in genpatch.sh needs this. The values don't matter, since the branch isn't going anywhere.
+      - name: Configure git user
+        run: |
+          git config --global user.email "foo@bar.com"
+          git config --global user.name "Spnl Dev"
+
+      - name: Generate patch
+        working-directory: docker/vllm
+        run: ./genpatch.sh
+        
+      - name: Apply patch
+        working-directory: docker/vllm
+        run: ./clone.sh

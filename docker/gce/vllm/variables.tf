@@ -65,16 +65,25 @@ variable "spnl_github_ref" {
 variable "vllm_org" {
   description = "GitHub organization from which to pull vLLM source"
   type        = string
+  default     = "neuralmagic"
 }
 
 variable "vllm_repo" {
   description = "GitHub repository from which to pull vLLM source"
   type        = string
+  default     = "vllm"
 }
 
 variable "vllm_branch" {
   description = "GitHub branch from which to pull vLLM source"
   type        = string
+  default     = "llm-d-release-0.4"
+}
+
+variable "vllm_patch" {
+  description = "Patch file to apply to the vLLM repo cloned by vllm_org/vllm_repo -b vllm_branch"
+  type        = string
+  default     = "llm-d/0.4.0/01-spans-llmd-vllm.patch.gz"
 }
 
 variable "model" {

@@ -1,0 +1,19 @@
+ARG LLMD_VERSION=0.4.0
+ARG BASE=ghcr.io/llm-d/llm-d-cuda:v$LLMD_VERSION
+FROM $BASE
+
+LABEL org.opencontainers.image.source=https://github.com/IBM/spnl
+LABEL org.opencontainers.image.description="Span Query support for llm-d's vLLM"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+ARG LLMD_VERSION=0.4.0 # sigh, we need to repeat this if we want to use it inside of the FROM
+ARG SPNL_VERSION=latest
+
+COPY docker/vllm/patches/llm-d/$LLMD_VERSION/ /tmp/patches
+USER root
+RUN cd /opt/vllm-source \
+    && ls /tmp/patches \
+    && for patchfile in /tmp/patches/*.patch.gz; do git apply <(gunzip -c $patchfile); done \
+    && source /opt/vllm/bin/activate && python -m ensurepip --upgrade \
+    && ([ $SPNL_VERSION = "latest" ] && python3 -m pip install spnl || python3 -m pip install spnl==$SPNL_VERSION)
+USER vllm

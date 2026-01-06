@@ -36,12 +36,12 @@ do for zone in a b c
                         -var="run_id=$run_id" \
                         -var="hf_token=$HF_TOKEN" \
                         -var="model=${MODEL:-ibm-granite/granite-3.3-2b-instruct}" \
-                        -var="spnl_github=${SPNL_GITHUB}" \
+                        -var="spnl_github=${SPNL_GITHUB:-https://github.com/IBM/spnl.git}" \
                         -var="spnl_github_sha=${GITHUB_SHA}" \
                         -var="spnl_github_ref=${GITHUB_REF}" \
-                        -var="vllm_org=${VLLM_ORG:-starpit}" \
-                        -var="vllm_repo=${VLLM_REPO:-vllm-ibm}" \
-                        -var="vllm_branch=${VLLM_BRANCH:-spnl-ibm-2}" \
+                        -var="vllm_org=${VLLM_ORG:-neuralmagic}" \
+                        -var="vllm_repo=${VLLM_REPO:-vllm}" \
+                        -var="vllm_branch=${VLLM_BRANCH:-llm-d-release-0.4}" \
                         -auto-approve
            then
                good=1

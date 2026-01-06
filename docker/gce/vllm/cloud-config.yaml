@@ -21,10 +21,17 @@ write_files:
       VLLM_REPO=${vllm_repo}
       VLLM_BRANCH=${vllm_branch}
       MODEL=${model}
+      VLLM_PATCHFILE=/tmp/vllm.patch
   - path: /tmp/setup.sh
     permissions: '0755'
     content: |
       ${setup_script}
+  - path: /tmp/vllm.patch
+    # cloudinit will also base64 decode this for us. https://docs.cloud-init.io/en/latest/reference/yaml_examples/write_files.html#provide-gzipped-binary-content
+    encoding: gzip
+    permissions: '0644'
+    content: !!binary |
+      ${vllm_patch_b64}
 
 runcmd:
   - /tmp/setup.sh

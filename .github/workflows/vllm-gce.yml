@@ -20,9 +20,9 @@ jobs:
     name: Test in GCE VM
     env:
       # Adjust these as needed
-      VLLM_ORG: starpit
-      VLLM_REPO: vllm-ibm
-      VLLM_BRANCH: spnl-ibm
+      VLLM_ORG: neuralmagic
+      VLLM_REPO: vllm
+      VLLM_BRANCH: llm-d-release-0.4
       MODEL: ibm-granite/granite-3.3-2b-instruct
 
       # You probably won't need to change this

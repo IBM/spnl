@@ -1,0 +1,12 @@
+spnl/
+cli/
+web/
+benchmarks/
+data*/
+target*/
+.git/
+.github/
+*.md
+Cargo.*
+
+docker/gce/
