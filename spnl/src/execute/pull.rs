@@ -1,4 +1,3 @@
-use fs4::fs_std::FileExt;
 use futures::stream::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
@@ -38,6 +37,12 @@ struct OllamaTags {
     models: Vec<OllamaModel>,
 }
 
+#[derive(serde::Serialize)]
+struct DeleteRequest {
+    model: String,
+    name: String,
+}
+
 // struct to hold request params
 #[derive(serde::Serialize)]
 struct PullRequest {
@@ -48,11 +53,23 @@ struct PullRequest {
 
 // struct to hold response params
 #[derive(Debug, serde::Deserialize)]
-struct PullResponse {
+struct ValidPullResponse {
     status: String,
     digest: Option<String>,
     total: Option<u64>,
     completed: Option<u64>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct InvalidPullResponse {
+    error: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(untagged)]
+enum PullResponse {
+    Ok(ValidPullResponse),
+    Err(InvalidPullResponse),
 }
 
 async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
@@ -65,13 +82,9 @@ async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
 
 // The Ollama implementation of a single model pull
 async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
-    // don't ? the cmd! so that we can "finally" unlock the file
-    if !ollama_exists(model).await? {
-        let path = ::std::env::temp_dir().join(format!("ollama-pull-{model}"));
-        let f = ::std::fs::File::create(&path)?;
-        /*f.lock_exclusive()?;
-        if !ollama_exists(model).await?*/
-        {
+    let mut err: Option<anyhow::Error> = None;
+    for _ in 0..5 {
+        if !ollama_exists(model).await? {
             // creating client and request body
             let http_client = reqwest::Client::new();
             let request_body = PullRequest {
@@ -82,7 +95,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
 
             // receiving response and error handling
             let response = http_client
-                .post("http://localhost:11434/api/pull")
+                .post("http://localhost:11434/api/pull") // TODO use OLLAMA_API_BASE?
                 .json(&request_body)
                 .send()
                 .await?;
@@ -110,13 +123,36 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
 
             while let Some(line) = lines.next_line().await? {
                 // stores in pull response struct
-                let update: PullResponse = match serde_json::from_str(&line) {
-                    Ok(u) => u,
-                    Err(e) => {
-                        eprintln!("Failed to map JSON into PullResponse: {e}");
-                        return Err(anyhow::anyhow!("Ollama API request failed"));
+                let update = match serde_json::from_str(&line) {
+                    Ok(PullResponse::Ok(u)) => {
+                        err = None; // clear any prior error
+                        Ok(u)
                     }
-                };
+                    Ok(PullResponse::Err(e)) => {
+                        if e.error == "pull model manifest: file does not exist" {
+                            return Err(anyhow::anyhow!(e.error));
+                        }
+                        eprintln!("Possible transient error in ollama pull {}", e.error);
+                        err = Some(anyhow::anyhow!(e.error));
+
+                        let _ = http_client
+                            .post("http://localhost:11434/api/delete") // TODO use OLLAMA_API_BASE?
+                            .json(&DeleteRequest {
+                                model: model.to_string(),
+                                name: model.to_string(),
+                            })
+                            .send()
+                            .await;
+
+                        ::std::thread::sleep(::std::time::Duration::from_millis(2000));
+                        break; // break out of while iteration over lines
+                    }
+                    Err(e) => {
+                        eprintln!("Invalid response from ollama pull: {line}");
+                        eprintln!("Parse error: {e}");
+                        Err(anyhow::anyhow!("Ollama API request failed"))
+                    }
+                }?;
 
                 let my_status = update.status.to_lowercase();
 
@@ -153,16 +189,24 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
                 }
             }
 
+            if err.is_some() {
+                continue; // continue for retry loop
+            }
+
             // finishes drawing progress bars and outputs rest of status updates
             m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
             for line in final_status_lines {
                 eprintln!("{}", line);
             }
+
+            break; // break out of retry loop
         }
-        FileExt::unlock(&f)?;
     }
 
-    Ok(())
+    match err {
+        Some(err) => Err(err),
+        None => Ok(()),
+    }
 }
 
 /// Extract models referenced by the query
@@ -203,7 +247,8 @@ mod tests {
     // testing a valid model pull
     #[tokio::test]
     async fn test_pull_local_ollama() {
-        let result = ollama_pull_if_needed("qwen:0.5b").await;
+        // this is the smallest model @starpit could find as of 20260108
+        let result = ollama_pull_if_needed("smollm:135m").await;
         assert!(result.is_ok());
     }
 
