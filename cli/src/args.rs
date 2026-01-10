@@ -9,11 +9,16 @@ pub struct Args {
     pub file: Option<String>,
 
     /// Builtin to run
-    #[arg(value_enum, short, long)]
+    #[arg(value_enum, short, long, env = "SPNL_BUILTIN")]
     pub builtin: Option<Builtin>,
 
     /// Generative Model
-    #[arg(short, long, default_value = "ollama/granite3.3:2b")]
+    #[arg(
+        short,
+        long,
+        default_value = "ollama/granite3.3:2b",
+        env = "SPNL_MODEL"
+    )]
     pub model: String,
 
     /// Embedding Model

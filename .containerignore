@@ -1,0 +1,15 @@
+docs/
+web/
+!web/wasm
+benchmarks/
+!benchmarks/haystack
+data*/
+target*/
+docker/
+
+.git/
+.github/
+
+*.json
+*.md
+LICENSE
