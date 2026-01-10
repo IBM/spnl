@@ -11,7 +11,7 @@ on:
 
 # cancel any prior runs for this workflow and this PR (or branch)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 permissions:
