@@ -28,4 +28,4 @@ git rebase spans/$SPANS_VLLM_BRANCH -C0
 
 # Notes: gzip --no-name ensures deterministic output (gzip won't save mtime in the file); this helps with git sanity
 mkdir -p "$SCRIPTDIR"/patches
-git diff $BASE_VLLM_REVISION | gzip --no-name -c > "$SCRIPTDIR"/patches/llm-d/$LLMD_VERSION/01-spans-llmd-vllm.patch.gz
+git diff $BASE_VLLM_REVISION | gzip --no-name -c > "$SCRIPTDIR"/patches/$LLMD_VERSION/01-spans-llmd-vllm.patch.gz

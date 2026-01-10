@@ -22,8 +22,6 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          # - windows-latest
-          # - macos-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -34,9 +32,9 @@ jobs:
           git config --global user.name "Spnl Dev"
 
       - name: Generate patch
-        working-directory: docker/vllm
+        working-directory: docker/vllm/llm-d
         run: ./genpatch.sh
         
       - name: Apply patch
-        working-directory: docker/vllm
+        working-directory: docker/vllm/llm-d
         run: ./clone.sh
