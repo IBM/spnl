@@ -72,8 +72,12 @@ enum PullResponse {
     Err(InvalidPullResponse),
 }
 
+fn api_base() -> String {
+    ::std::env::var("OLLAMA_API_BASE").unwrap_or("http://localhost:11434/api".to_string())
+}
+
 async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
-    let tags: OllamaTags = reqwest::get("http://localhost:11434/api/tags")
+    let tags: OllamaTags = reqwest::get(format!("{}/tags", api_base()))
         .await?
         .json()
         .await?;
@@ -95,7 +99,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
 
             // receiving response and error handling
             let response = http_client
-                .post("http://localhost:11434/api/pull") // TODO use OLLAMA_API_BASE?
+                .post(format!("{}/pull", api_base()))
                 .json(&request_body)
                 .send()
                 .await?;

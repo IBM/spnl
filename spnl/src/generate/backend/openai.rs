@@ -37,9 +37,9 @@ fn api_base(provider: Provider) -> String {
         }
         Provider::Gemini => ::std::env::var("GEMINI_API_BASE")
             .unwrap_or("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
-        Provider::Ollama => {
-            ::std::env::var("OLLAMA_API_BASE").unwrap_or("http://localhost:11434/v1".to_string())
-        }
+        Provider::Ollama => ::std::env::var("OLLAMA_API_BASE")
+            .map(|b| format!("{b}/v1"))
+            .unwrap_or("http://localhost:11434/v1".to_string()),
     }
 }
 
