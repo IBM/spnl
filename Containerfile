@@ -24,4 +24,6 @@ LABEL org.opencontainers.image.source=https://github.com/IBM/spnl
 LABEL org.opencontainers.image.description="Span Query CLI"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
+ENV SPNL_BUILTIN=email2
+
 ENTRYPOINT ["spnl"]

@@ -13,10 +13,11 @@ RUN apt update && \
     apt remove -y ca-certificates curl && apt autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/ibm/spnl /usr/local/bin/spnl /usr/local/bin/spnl
 RUN printf '#!/bin/sh\nollama serve > /dev/null 2> /dev/null & spnl $@\n' > /usr/local/bin/spnl.sh && chmod a+rx /usr/local/bin/spnl.sh
-
 RUN groupadd -g 1001 spnl && useradd -u 1001 -g spnl spnl && mkdir /home/spnl && chown spnl /home/spnl
+
+COPY target/release/spnl /usr/local/bin/spnl
+
 USER spnl
 
 ARG SPNL_MODEL_BASE=smollm:135m

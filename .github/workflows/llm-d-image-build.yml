@@ -48,7 +48,7 @@ jobs:
           # exits 0 only if a tag with that name exists
           if git rev-parse -q --verify "refs/tags/${REF_NAME}" ; then
             # then this is a tag release
-            echo "RELEASE_VERSION=$REF_NAME" >> $GITHUB_ENV
+            echo "$RELEASE_VERSION=$REF_NAME" >> $GITHUB_ENV
           fi        
       - name: Verify RELEASE_VERSION
         run: echo "RELEASE_VERSION=$RELEASE_VERSION"
