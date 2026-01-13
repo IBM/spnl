@@ -48,7 +48,7 @@ jobs:
     uses: ./.github/workflows/cli-image-build-callable.yml
     with:
       push: ${{ startsWith(github.ref, 'refs/tags/') }}
-      image: ghcr.io/ibm/spnl${{ matrix.containerfile != 'Containerfile' && '-ollama' || '' }}
+      image: ghcr.io/ibm/spnl${{ matrix.containerfile != 'Containerfile.hostbuild' && '-ollama' || '' }}
       containerfile: ${{ matrix.containerfile }}
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
