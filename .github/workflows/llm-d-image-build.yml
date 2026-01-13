@@ -20,9 +20,6 @@ permissions:
   attestations: write
   id-token: write  
 
-env:
-  RELEASE_VERSION: latest # this may overridden below
-
 jobs:
   build_and_push:
     name: build and push
@@ -48,7 +45,11 @@ jobs:
           # exits 0 only if a tag with that name exists
           if git rev-parse -q --verify "refs/tags/${REF_NAME}" ; then
             # then this is a tag release
-            echo "$RELEASE_VERSION=$REF_NAME" >> $GITHUB_ENV
+            echo "Versioned build $REF_NAME"
+            echo "RELEASE_VERSION=$REF_NAME" >> $GITHUB_ENV
+          else
+            echo "Unversioned build $REF_NAME"
+            echo "RELEASE_VERSION=latest" >> $GITHUB_ENV
           fi        
       - name: Verify RELEASE_VERSION
         run: echo "RELEASE_VERSION=$RELEASE_VERSION"
