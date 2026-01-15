@@ -72,6 +72,7 @@ jobs:
       - name: install ollama
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
+            apt update && apt install -y zstd
             curl -fsSL https://ollama.com/install.sh | bash
             # note: install.sh will start ollama as an systemd service, no need to start it ourselves (actively harmful -- port conflict)
           elif [ "$RUNNER_OS" = "macOS" ]; then
