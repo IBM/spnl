@@ -6,57 +6,22 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/spnl)](https://pypi.org/project/spnl/)
 ![GitHub License](https://img.shields.io/github/license/IBM/spnl)
 
-:rocket: [Playground](https://ibm.github.io/spnl/) **|** :scroll: [Research Paper](https://arxiv.org/abs/2511.02749)
+<img align="right" src="/docs/images/nested-gen.svg" width="150">
 
-## What if we had a way to plan and optimize GenAI like we do for [SQL](https://en.wikipedia.org/wiki/SQL)? 
+Clients are evolving beyond chat completion, and now include a variety
+of innovative inference-time scaling and deep reasoning techniques. At
+the same time, inference servers remain heavily optimized for chat
+completion.  [Prior work](https://arxiv.org/html/2409.15355v5) has
+shown that large improvements to KV cache hit rate are possible if
+inference servers evolve towards these non-chat use cases. However,
+they offer solutions that are also optimized for a single use case,
+RAG. We introduce the **Span Query** to generalize the interface to
+the inference server.
 
-A **Span Query** is a declarative way to specify which portions of a
-generative AI (GenAI) program should be **run directly on model
-serving components**. As with
-[SQL](https://en.wikipedia.org/wiki/SQL), this declarative structure
-is safe to run on the backend and provides a clean starting point for
-optimization. Also like SQL, some GenAI programs will be entirely
-expressible as queries, though most will be expressed as the
-programmatic interludes around the declarative queries.
-
-<img align="right" src="/docs/spnl-cake.svg" width="230">
-
-> [!TIP]
-> Stay tuned for integration with
-> [vLLM](https://github.com/vllm-project/vllm) and programming
-> libraries such as
-> [PDL](https://github.com/IBM/prompt-declaration-language).
-
-A span query specifies how to *generate* (**G** in the diagram to the
-right) new content from a combination of *dependent* (**x**) and
-*independent* (**+**) inputs.For example, in a RAG query the final
-output depends on all of the provided input, yet each fragment from
-the corpus of documents is independent of the rest.  E.g. `a+b`
-signifies that the token sequences `a` and `b` should be considered as
-independent of each other. In this sense, a span query can be
-considered an expression tree such as those visualized to the right.
-
-By expressing these data dependencies, and the relationship to a
-corpus, the backend can do a better job optimizing query execution.
-<br>[More on KV Cache Locality](/docs/locality/#readme) **|** [More on Query Planning](./docs/query-planning.md)
-
-By reconsidering GenAI programs as a tree of such generative
-expressions, such as the query visualized inside the *Federation
-Layer*[^1] of the diagram to the right, we may also achieve a generalized
-inference scaling strategy. Independent elements are akin to the *map*
-of a [map/reduce](https://en.wikipedia.org/wiki/MapReduce), whereas
-depedendent elements are a *reduce*. Map/reduce is a proven way to
-code scale-up and scale-out implementations.
-
-[^1]: For example, [llm-d](https://llm-d.ai/) is a system being
-    designed to federate model servers such as
-    [vLLM](https://github.com/vllm-project/vllm). The llm-d system
-    will route model serving requests to a gang of backend servers,
-    based on availability, locality, and other constraints.
+:scroll: [Research Paper](https://arxiv.org/abs/2511.02749) **|** :rocket: [Playground](https://ibm.github.io/spnl/) **|** [Judge/generator Example](https://ibm.github.io/spnl/?demo=email2&qv=true)
 
 [More on Span Queries](./docs/about.md)
 
-**Examples** [Judge/generator](https://ibm.github.io/spnl/?demo=email&qv=true) **|** [Judge/generator (optimized)](https://ibm.github.io/spnl/?demo=email2&qv=true) **|** [Policy-driven email generation](https://ibm.github.io/spnl/?demo=email3&qv=true)
 
 ## Getting Started
 
