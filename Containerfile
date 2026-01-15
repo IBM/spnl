@@ -1,13 +1,13 @@
 # Builder
 FROM rust:slim AS builder
 WORKDIR /tmp/build
+ARG RUSTC_WRAPPER=sccache SCCACHE_DIR=/sccache DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt upgrade -y && apt install -y pkg-config protobuf-compiler sccache libssl-dev
 COPY Cargo.* .
 COPY spnl spnl
 COPY cli cli
 COPY benchmarks/haystack benchmarks/haystack
 COPY web/wasm web/wasm
-ARG RUSTC_WRAPPER=sccache SCCACHE_DIR=/sccache DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt upgrade -y && apt install -y pkg-config protobuf-compiler sccache libssl-dev
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
