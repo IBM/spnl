@@ -6,6 +6,7 @@ benchmarks/
 data*/
 target*/
 docker/
+!docker/vllm/llm-d/patches
 
 .git/
 .github/
