@@ -16,6 +16,8 @@ permissions:
   
 env:
   CARGO_TERM_COLOR: always
+  RUSTC_WRAPPER: "sccache"
+  SCCACHE_GHA_ENABLED: "true"
 
 jobs:
   build_and_test:
@@ -33,15 +35,15 @@ jobs:
       - name: Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
         run: ./.github/scripts/free-up-disk-space-fast.sh
 
-      - name: download rust-cache
+      - name: download sccache action
         run: |
-          mkdir rust-cache-action && cd rust-cache-action
-          mkdir -p dist/save
-          (cd dist/save && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/save/index.js)
-          mkdir -p dist/restore
-          (cd dist/restore && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/restore/index.js)
-          wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/action.yml
-      - uses: ./rust-cache-action
+          mkdir sccache-action && cd sccache-action
+          mkdir -p dist/setup
+          (cd dist/setup && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/setup/index.js)
+          mkdir -p dist/show_stats
+          (cd dist/show_stats && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/show_stats/index.js)
+          wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/action.yml
+      - uses: ./sccache-action
 
       - name: Setup protoc
         run: |
