@@ -17,6 +17,9 @@ permissions:
   attestations: write
   id-token: write  
 
+env:
+  RELEASE_VERSION: ${{ github.event.release.tag_name || 'latest' }}
+
 jobs:
   build_and_push:
     name: build and push
@@ -31,24 +34,7 @@ jobs:
       - name: Aggressive disk space cleanup
         run: ./.github/scripts/free-up-disk-space.sh
 
-      # Note: workflow_run does not have github.ref, hence the more complex logic to extract this information from head_branch.
-      # See: https://github.com/orgs/community/discussions/158805#discussioncomment-13096586
-      - name: Extract release tag to RELEASE_VERSION env var to detect whether head_branch is a tag
-        id: detect
-        shell: bash
-        env:
-          REF_NAME: ${{ github.event.workflow_run.head_branch }}
-        run: |
-          # exits 0 only if a tag with that name exists
-          if git rev-parse -q --verify "refs/tags/${REF_NAME}" ; then
-            # then this is a tag release
-            echo "Versioned build $REF_NAME"
-            echo "RELEASE_VERSION=$REF_NAME" >> $GITHUB_ENV
-          else
-            echo "Unversioned build $REF_NAME"
-            echo "RELEASE_VERSION=latest" >> $GITHUB_ENV
-          fi        
-      - name: Verify RELEASE_VERSION
+      - name: Verify release version
         run: echo "RELEASE_VERSION=$RELEASE_VERSION"
 
       - name: Set up Docker Buildx
@@ -57,7 +43,7 @@ jobs:
       # We only need to log in if we are going to push
       - name: Login to Container Registry
         uses: docker/login-action@v3
-        if: ${{ env.RELEASE_VERSION != 'latest' && github.event.workflow_run.conclusion == 'success' && !github.event.release.prerelease }}
+        if: ${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -66,7 +52,7 @@ jobs:
       - name: Build the Container Image for ${{ matrix.gpu }}
         uses: docker/build-push-action@v6
         with:
-          push: ${{ env.RELEASE_VERSION != 'latest' && github.event.workflow_run.conclusion == 'success' && !github.event.release.prerelease }}
+          push: ${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease }}
           cache-from: type=gha                              # Use github action mechanisms to cache layers
           cache-to: type=gha,mode=max                       # Use github action mechanisms to cache layers
           file: docker/vllm/llm-d/Containerfile.${{ matrix.gpu }}
