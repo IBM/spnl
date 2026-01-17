@@ -1,32 +1,22 @@
-# Attribution: https://github.com/sredevopsorg/multi-arch-docker-github-workflow (MIT licensed)
-
-# This workflow builds a multi-arch Docker image using GitHub Actions
-# and separated Github Runners with native support for ARM64 and AMD64
-# architectures, without using QEMU emulation.  It uses Docker Buildx
-# to build and push the image to GitHub Container Registry (GHCR).
-name: CLI image build callable
+name: CLI image build ollama
 
 on:
-  workflow_call:
-    inputs:
-      image:
-        required: true
-        type: string
-      containerfile:
-        required: true
-        type: string
-      push:
-        required: true
-        type: boolean
-    secrets:
-      token:
-        required: true
+  release:
+    types: [published]
+  pull_request:
+    branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
-  GHCR_IMAGE: ${{ inputs.image }}
+  CONTAINERFILE: Containerfile.hostbuild.ollama
+  GHCR_IMAGE: ghcr.io/ibm/spnl-ollama
 
 jobs:
   # The build job builds the Docker image for each platform specified in the matrix.
@@ -84,15 +74,16 @@ jobs:
         # It uses the actions/checkout action to clone the repository into the runner's workspace.
 
       # TODO make this common with core.yml via a callable workflow
-      - name: download rust-cache
+      - name: download sccache action
         run: |
-          mkdir rust-cache-action && cd rust-cache-action
-          mkdir -p dist/save
-          (cd dist/save && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/save/index.js)
-          mkdir -p dist/restore
-          (cd dist/restore && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/restore/index.js)
-          wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/action.yml
-      - uses: ./rust-cache-action
+          mkdir sccache-action && cd sccache-action
+          mkdir -p dist/setup
+          (cd dist/setup && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/setup/index.js)
+          mkdir -p dist/show_stats
+          (cd dist/show_stats && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/show_stats/index.js)
+          wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/action.yml
+      - uses: ./sccache-action
+
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
@@ -110,6 +101,7 @@ jobs:
           then curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
           fi
           unzip protoc.zip -d $HOME/.local
+
       - name: Build spnl
         run: cargo build -F rag,spnl-api --release
 
@@ -143,7 +135,7 @@ jobs:
       - name: Login to GitHub Container Registry
         # This step logs in to the GitHub Container Registry (GHCR) using the docker/login-action.
         # It uses the GitHub actor's username and the GITHUB_TOKEN secret for authentication.
-        if: ${{ inputs.push }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -164,13 +156,13 @@ jobs:
           DOCKER_BUILDKIT: 1
         with:
           context: .
-          file: "docker/${{ inputs.containerfile }}"
+          file: "docker/${{ env.CONTAINERFILE }}"
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=${{ inputs.push }},name-canonical=true,push=${{ inputs.push }},oci-mediatypes=true
-          cache-from: type=gha,scope=${{ github.repository }}-${{ inputs.containerfile }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ github.repository }}-${{ inputs.containerfile }}-${{ matrix.platform }}
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=${{ startsWith(github.ref, 'refs/tags/') }},name-canonical=true,push=${{ startsWith(github.ref, 'refs/tags/') }},oci-mediatypes=true
+          cache-from: type=gha,scope=${{ github.repository }}-${{ env.CONTAINERFILE }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-${{ env.CONTAINERFILE }}-${{ matrix.platform }}
 
 
       - name: Export digest
@@ -190,7 +182,7 @@ jobs:
         # The artifact is retained for 1 day, and if no files are found, it will throw an error.      
         uses: actions/upload-artifact@v6
         with:
-          name: digests-${{ inputs.containerfile }}-${{ env.PLATFORM_PAIR }}
+          name: digests-${{ env.CONTAINERFILE }}-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -228,7 +220,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: /tmp/digests
-          pattern: digests-${{ inputs.containerfile }}-*
+          pattern: digests-${{ env.CONTAINERFILE }}-*
           merge-multiple: true
 
 
@@ -243,8 +235,8 @@ jobs:
           annotations: |
             type=org.opencontainers.image.description,value=${{ github.event.repository.description || 'No description provided' }}
           tags: |
-            type=raw,value=${{ github.event.workflow_run.head_branch }},enable=${{ inputs.push }}
-            type=raw,value=latest,enable=${{ inputs.push }}
+            type=raw,value=${{ github.event.workflow_run.head_branch }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -254,7 +246,7 @@ jobs:
             network=host
 
       - name: Login to GitHub Container Registry
-        if: ${{ inputs.push }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: docker/login-action@v3
         # This step logs in to the GitHub Container Registry (GHCR) using the docker/login-action.
         # It uses the GitHub actor's username and the GITHUB_TOKEN secret for authentication.
@@ -278,7 +270,7 @@ jobs:
         # The manifest list is annotated with metadata such as description, creation timestamp, and source URL.
         # The annotations are obtained from the metadata generated in the previous steps.
         # The manifest list is pushed to the GitHub Container Registry (GHCR) with the specified tags.
-        if: ${{ inputs.push }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         working-directory: /tmp/digests
         id: manifest-annotate
         continue-on-error: true
@@ -294,7 +286,7 @@ jobs:
         # It uses the docker buildx imagetools create command to create the manifest list.
         # The manifest list is created without annotations if the previous step fails.
         # The manifest list is pushed to the GitHub Container Registry (GHCR) with the specified tags.
-        if: ${{ inputs.push && steps.manifest-annotate.outcome == 'failure' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') && steps.manifest-annotate.outcome == 'failure' }}
         working-directory: /tmp/digests
         run: |
               docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
@@ -305,6 +297,6 @@ jobs:
         # It uses the docker buildx imagetools inspect command to display information about the manifest list.
         # The inspection output will show the platforms and tags associated with the manifest list.
         id: inspect
-        if: ${{ inputs.push }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
           docker buildx imagetools inspect '${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}'
