@@ -22,8 +22,6 @@ jobs:
 
   call_image_builder:
     strategy:
-      fail-fast: true
-      max-parallel: 1
       matrix:
         containerfile:
           - Containerfile.hostbuild
