@@ -16,6 +16,7 @@ permissions:
   
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0" # sccache not happy with incremental https://github.com/mozilla/sccache#rust
 
 jobs:
   build_and_test:

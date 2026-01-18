@@ -27,6 +27,7 @@ permissions:
 
 env:
   GHCR_IMAGE: ${{ inputs.image }}
+  CARGO_INCREMENTAL: "0" # sccache not happy with incremental https://github.com/mozilla/sccache#rust
 
 jobs:
   # The build job builds the Docker image for each platform specified in the matrix.
@@ -84,15 +85,15 @@ jobs:
         # It uses the actions/checkout action to clone the repository into the runner's workspace.
 
       # TODO make this common with core.yml via a callable workflow
-      - name: download rust-cache
+      - name: download sccache action
         run: |
-          mkdir rust-cache-action && cd rust-cache-action
-          mkdir -p dist/save
-          (cd dist/save && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/save/index.js)
-          mkdir -p dist/restore
-          (cd dist/restore && wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/dist/restore/index.js)
-          wget https://raw.githubusercontent.com/Swatinem/rust-cache/refs/heads/master/action.yml
-      - uses: ./rust-cache-action
+          mkdir sccache-action && cd sccache-action
+          mkdir -p dist/setup
+          (cd dist/setup && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/setup/index.js)
+          mkdir -p dist/show_stats
+          (cd dist/show_stats && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/show_stats/index.js)
+          wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/action.yml
+      - uses: ./sccache-action
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
