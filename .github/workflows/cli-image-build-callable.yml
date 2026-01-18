@@ -27,7 +27,10 @@ permissions:
 
 env:
   GHCR_IMAGE: ${{ inputs.image }}
-  CARGO_INCREMENTAL: "0" # sccache not happy with incremental https://github.com/mozilla/sccache#rust
+  CARGO_INCREMENTAL: 0 # sccache not happy with incremental https://github.com/mozilla/sccache#rust
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
+  RUSTC_WRAPPER: "sccache"
+  SCCACHE_GHA_ENABLED: "true"
 
 jobs:
   # The build job builds the Docker image for each platform specified in the matrix.
@@ -111,8 +114,8 @@ jobs:
           then curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
           fi
           unzip protoc.zip -d $HOME/.local
-      - name: Build spnl
-        run: cargo build -F rag,spnl-api --release
+      - name: Build spnl CLI
+        run: cargo build -F rag,spnl-api --release --manifest-path cli/Cargo.toml
 
       - name: Docker meta default
         # This step generates metadata for the Docker image.

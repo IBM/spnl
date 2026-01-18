@@ -16,7 +16,8 @@ permissions:
   contents: read
 
 env:
-  CARGO_INCREMENTAL: "0" # sccache not happy with incremental https://github.com/mozilla/sccache#rust
+  CARGO_INCREMENTAL: 0 # sccache not happy with incremental https://github.com/mozilla/sccache#rust
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
 
 jobs:
   pypi_build_linux:
