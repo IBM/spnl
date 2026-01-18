@@ -1,6 +1,7 @@
 FROM debian:stable-slim
 
-COPY target/release/spnl /usr/local/bin/spnl
+ARG TARGET=target/release/spnl
+COPY $TARGET /usr/local/bin/spnl
 RUN groupadd -g 1001 spnl && useradd -u 1001 -g spnl spnl && mkdir /home/spnl && chown spnl /home/spnl
 USER spnl
 

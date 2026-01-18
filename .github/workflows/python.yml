@@ -16,6 +16,8 @@ permissions:
   
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
 
 jobs:
   build_and_test:

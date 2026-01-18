@@ -59,3 +59,4 @@ jobs:
           tags: ghcr.io/ibm/spnl-llm-d-${{ matrix.gpu }}:${{ env.RELEASE_VERSION }},ghcr.io/ibm/spnl-llm-d-${{ matrix.gpu }}:latest
           build-args: |
             SPNL_VERSION=${{ env.RELEASE_VERSION }}
+            BUILD_RELEASE_ARG=${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease && '--release' || ' ' }}

@@ -16,8 +16,8 @@ permissions:
   
 env:
   CARGO_TERM_COLOR: always
-  RUSTC_WRAPPER: "sccache"
-  SCCACHE_GHA_ENABLED: "true"
+  CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
 
 jobs:
   build_and_test:
@@ -31,19 +31,6 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
-        run: ./.github/scripts/free-up-disk-space-fast.sh
-
-      - name: download sccache action
-        run: |
-          mkdir sccache-action && cd sccache-action
-          mkdir -p dist/setup
-          (cd dist/setup && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/setup/index.js)
-          mkdir -p dist/show_stats
-          (cd dist/show_stats && wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/dist/show_stats/index.js)
-          wget https://raw.githubusercontent.com/Mozilla-Actions/sccache-action/refs/heads/main/action.yml
-      - uses: ./sccache-action
 
       - name: Setup protoc
         run: |
@@ -62,8 +49,6 @@ jobs:
           then curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
           fi
           unzip protoc.zip -d $HOME/.local
-      # - uses: Swatinem/rust-cache@v2
-      # - uses: pydantic/ollama-action@v3
 
       - name: report cargo version
         run: cargo --version
@@ -73,8 +58,10 @@ jobs:
 
       - name: install ollama
         run: |
+          # Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
+          ./.github/scripts/free-up-disk-space-fast.sh &
+
           if [ "$RUNNER_OS" = "Linux" ]; then
-            apt update && apt install -y zstd
             curl -fsSL https://ollama.com/install.sh | bash
             # note: install.sh will start ollama as an systemd service, no need to start it ourselves (actively harmful -- port conflict)
           elif [ "$RUNNER_OS" = "macOS" ]; then
@@ -82,12 +69,13 @@ jobs:
             brew install ollama
             brew services start ollama
           fi
+          wait # for disk space cleanup
 
-      - name: cargo test
-        run: cargo test --all-features -p spnl -p spnl-cli -- --nocapture
-        
+      - name: cargo test and clippy
+        run: |
+          cargo test --all-features -p spnl -p spnl-cli -- --nocapture & \
+          cargo clippy --workspace --all-features --tests --no-deps -- -D warnings
+          wait
+
       - name: rustfmt
         run: cargo fmt --all -- --check
-
-      - name: clippy
-        run: cargo clippy --workspace --all-features --tests -- -D warnings

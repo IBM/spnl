@@ -8,6 +8,8 @@ RUN cat /tmp/llmd_python_version
 
 # Builder
 FROM quay.io/pypa/manylinux_$MANYLINUX_VERSION AS builder
+ARG BUILD_RELEASE_ARG=" "
+ENV BUILD_RELEASE_ARG=$BUILD_RELEASE_ARG
 RUN dnf -y install pkgconfig protobuf-compiler openssl-devel
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 COPY --from=python_version /tmp/llmd_python_version /tmp/llmd_python_version
@@ -20,7 +22,7 @@ COPY benchmarks/haystack benchmarks/haystack
 COPY web/wasm web/wasm
 RUN --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
     --mount=type=cache,target=/root/.cargo/git,sharing=locked \
-    . "$HOME/.cargo/env" && maturin build -m spnl/Cargo.toml --no-default-features -F tok,run_py -i python$(cat /tmp/llmd_python_version) --compatibility linux
+    . "$HOME/.cargo/env" && maturin build $BUILD_RELEASE_ARG -m spnl/Cargo.toml --no-default-features -F tok,run_py -i python$(cat /tmp/llmd_python_version) --compatibility linux
 
 # Main
 FROM ghcr.io/llm-d/llm-d-cuda:v$LLMD_VERSION
