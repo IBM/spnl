@@ -12,6 +12,9 @@ on:
       image:
         required: true
         type: string
+      version:
+        required: true
+        type: string
       containerfile:
         required: true
         type: string
@@ -239,7 +242,7 @@ jobs:
           annotations: |
             type=org.opencontainers.image.description,value=${{ github.event.repository.description || 'No description provided' }}
           tags: |
-            type=raw,value=${{ github.event.workflow_run.head_branch }},enable=${{ inputs.push }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.push }}
             type=raw,value=latest,enable=${{ inputs.push }}
 
       - name: Set up Docker Buildx

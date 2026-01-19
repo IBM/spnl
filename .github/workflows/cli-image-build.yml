@@ -47,6 +47,7 @@ jobs:
     with:
       push: ${{ startsWith(github.ref, 'refs/tags/') }}
       image: ghcr.io/ibm/spnl${{ matrix.containerfile != 'Containerfile.hostbuild' && '-ollama' || '' }}
+      version: ${{ github.event.release.tag_name || 'latest' }}
       containerfile: ${{ matrix.containerfile }}
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
