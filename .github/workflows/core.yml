@@ -32,6 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Configure Cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
