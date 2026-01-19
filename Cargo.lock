@@ -3076,7 +3076,7 @@ dependencies = [
 
 [[package]]
 name = "haystack"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -6919,7 +6919,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -6955,7 +6955,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-cli"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -6963,6 +6963,7 @@ dependencies = [
  "ptree",
  "rustyline",
  "serde",
+ "serde_json",
  "spnl",
  "tinytemplate",
  "tokio",
@@ -6970,7 +6971,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-wasm"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "serde_json",
  "spnl",
