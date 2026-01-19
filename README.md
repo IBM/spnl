@@ -51,21 +51,14 @@ to a JSON file containing a [span query](./docs/about).
 
 ## Building your own SPNL CLI
 
-SPNL is written in [Rust](https://www.rust-lang.org/). Rust is
-awesome. Thus, step 1 in getting started with the CLI is to [configure
-your environment](./https://www.rust-lang.org/tools/install) for
-Rust. Step 2 is to clone this repository. Now you can build the CLI
-with:
+First, [configure your
+environment](./https://www.rust-lang.org/tools/install) for Rust.  Now
+you can build the CLI with `cargo build`, which will produce
+`./target/debug/spnl`. Running `cargo build --release` will produce a
+build with source code optimizations, and produces
+`./target/release/spnl`.
 
-```shell
-cargo build --release
-export PATH=$PWD/target/release:$PATH
-```
-
-You can now run the `spnl` CLI. If you want the build to complete more
-quickly, you can drop the `--release` option. In either case, the full
-usage is provided via `spnl --help`, which also specifies the available
-demos.
+## CLI Usage
 
 ```bash
 Usage: spnl [OPTIONS] [FILE]
