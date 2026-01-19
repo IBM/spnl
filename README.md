@@ -1,5 +1,6 @@
 # Span Queries
 
+[![arXiv](https://img.shields.io/badge/arXiv-2511.02749-b31b1b.svg?style=flat)](https://arxiv.org/abs/2511.02749)
 [![CI - Core](https://github.com/IBM/spnl/actions/workflows/core.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/core.yml)
 [![CI - Python](https://github.com/IBM/spnl/actions/workflows/python.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/python.yml)
 [![CI - Playground](https://github.com/IBM/spnl/actions/workflows/playground.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/playground.yml)
@@ -18,34 +19,43 @@ they offer solutions that are also optimized for a single use case,
 RAG. We introduce the **Span Query** to generalize the interface to
 the inference server.
 
-:scroll: [Research Paper](https://arxiv.org/abs/2511.02749) **|** :rocket: [Playground](https://ibm.github.io/spnl/) **|** [Judge/generator Example](https://ibm.github.io/spnl/?demo=email2&qv=true)
-
-[More on Span Queries](./docs/about.md)
+:rocket: [Playground](https://ibm.github.io/spnl/) **|** [Judge/generator Example](https://ibm.github.io/spnl/?demo=email2&qv=true) **|** [What is a Span Query?](./docs/about.md)
 
 
-## Getting Started
+## Getting Started with SPNL
 
-To kick the tires, you can use the [online
-playground](https://ibm.github.io/spnl/?qv=false),
-or the Span Query CLI. The playground will let you run queries
-directly in browsers that support
+SPNL is a library for manipulating span queries. The library is surfaced for consumption as:
+
+- a [vLLM](https://github.com/vllm-project/vllm) API that can greatly
+  improve KV cache locality (by as much as 20x). We have a
+  pre-packaged
+  [image](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda)
+  that includes vLLM with [llm-d](https://llm-d.ai/) and SPNL support.
+- a CLI that can communicate with standard OpenAI-compatible inference
+  servers, or with the optimized vLLM API. We have pre-packaged images
+  that contain [just the
+  CLI](https://github.com/IBM/spnl/pkgs/container/spnl) and [the CLI
+  with
+  Ollama](https://github.com/IBM/spnl/pkgs/container/spnl-ollama).
+- an [online playground](https://ibm.github.io/spnl/?qv=false) that
+lets you run queries directly in browsers that support
 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
-(albeit slowly).  The CLI can leverage local
-[Ollama](https://ollama.com/) or any OpenAI-compatible model server
-(e.g. [vLLM](https://github.com/vllm-project/vllm)). The CLI is
-currently geared towards demos. Using it, you can run one of the
-built-in demos, or you can point it to a JSON file containing a span
-query.
 
-### Setting up the Span Query CLI
+To kick the tires with SPNL running [Ollama](https://ollama.com/):
+```shell
+podman run --rm -it ghcr.io/ibm/spnl-ollama --verbose
+```
 
-The span query system is written in
-[Rust](https://www.rust-lang.org/). This choice was made to facilitate
-flexible integration with backends, CLIs, and with Python
-libraries. Plus, Rust is awesome. Thus, step 1 in getting started with
-the CLI is to [configure your
-environment](./https://www.rust-lang.org/tools/install) for Rust. Step
-2 is to clone this repository. Now you can build the CLI with:
+This will run a judge/generator email example. You also can point it
+to a JSON file containing a [span query](./docs/about).
+
+## Building your own SPNL CLI
+
+SPNL is written in [Rust](https://www.rust-lang.org/). Rust is
+awesome. Thus, step 1 in getting started with the CLI is to [configure
+your environment](./https://www.rust-lang.org/tools/install) for
+Rust. Step 2 is to clone this repository. Now you can build the CLI
+with:
 
 ```shell
 cargo build --release
@@ -65,11 +75,11 @@ Arguments:
 
 Options:
   -b, --builtin <BUILTIN>
-          Builtin to run [possible values: chat, email, email2, email3, sweagent, gsm8k, rag]
+          Builtin to run [env: SPNL_BUILTIN=] [possible values: bulkmap, email, email2, email3, sweagent, gsm8k, rag, spans]
   -m, --model <MODEL>
-          Generative Model [default: ollama/granite3.3:2b]
+          Generative Model [env: SPNL_MODEL=] [default: ollama/granite3.3:2b]
   -e, --embedding-model <EMBEDDING_MODEL>
-          Embedding Model [default: ollama/mxbai-embed-large:335m]
+          Embedding Model [env: SPNL_EMBEDDING_MODEL=] [default: ollama/mxbai-embed-large:335m]
   -t, --temperature <TEMPERATURE>
           Temperature [default: 0.5]
   -l, --max-tokens <MAX_TOKENS>
@@ -77,7 +87,7 @@ Options:
   -n, --n <N>
           Number of candidates to consider [default: 5]
   -k, --chunk-size <CHUNK_SIZE>
-          Chunk size [default: 1]
+          Chunk size
       --vecdb-uri <VECDB_URI>
           Vector DB Url [default: data/spnl]
   -r, --reverse
@@ -87,15 +97,23 @@ Options:
   -p, --prompt <PROMPT>
           Question to pose
   -d, --document <DOCUMENT>
-          Document that will augment the question
+          Document(s) that will augment the question
+  -x, --max-aug <MAX_AUG>
+          Max augmentations to add to the query [env: SPNL_RAG_MAX_MATCHES=]
+      --shuffle
+          Randomly shuffle order of fragments
+  -i, --indexer <INDEXER>
+          The RAG indexing scheme [possible values: simple-embed-retrieve, raptor]
   -s, --show-query
           Re-emit the compiled query
-      --time
-          Report query execution time to stderr
+      --time <TIME>
+          Report query execution time to stderr [possible values: all, gen, gen1]
   -v, --verbose
           Verbose output
+      --dry-run
+          Dry run (do not execute query)?
   -h, --help
-          Print help
+          Print help (see more with '--help')
   -V, --version
           Print version
 ```
