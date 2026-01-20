@@ -9,36 +9,42 @@
 
 <img align="right" src="/docs/images/nested-gen.svg" width="150">
 
-Clients are evolving beyond chat completion, and now include a variety
-of innovative inference-time scaling and deep reasoning techniques. At
-the same time, inference servers remain heavily optimized for chat
-completion.  [Prior work](https://arxiv.org/html/2409.15355v5) has
-shown that large improvements to KV cache hit rate are possible if
-inference servers evolve towards these non-chat use cases. However,
-they offer solutions that are also optimized for a single use case,
-RAG. We introduce the **Span Query** to generalize the interface to
-the inference server.
+Use of LLM-based inference is evolving from its origins of chat. These
+days, use cases involve the combination of multiple inference calls,
+tool calls, and database
+lookups. [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation),
+[agentic AI](https://en.wikipedia.org/wiki/AI_agent), and [deep
+research](https://en.wikipedia.org/wiki/ChatGPT_Deep_Research) are
+three examples of these more sophisticated use cases.
+
+The goal of this project to facilitate optimizations that drastically
+reduce the cost of inference for RAG, agentics, and deep research (by
+10x or more [^1]) without harming accuracy. Our approach is to
+generalize the interface to inference servers via the **Span
+Query**. In a span query, chat is a special case of a more general
+form. To the right is a visualization of a span query for a
+"judge/generator" (a.k.a. "LLM-as-a-judge").
+
+[^1]: https://arxiv.org/html/2409.15355v5
 
 :rocket: [Playground](https://ibm.github.io/spnl/) **|** [Judge/generator Example](https://ibm.github.io/spnl/?demo=email2&qv=true) **|** [What is a Span Query?](./docs/about.md)
 
 
 ## Getting Started with SPNL
 
-SPNL is a library for manipulating span queries. The library is surfaced for consumption as:
+SPNL is a library for creating, optimizing, and tokenizing span
+queries. The library is surfaced for consumption as:
 
-- a [vLLM](https://github.com/vllm-project/vllm) API that can greatly
-  improve KV cache locality (by as much as 20x). We have a
-  pre-packaged
+- **vLLM** via a pre-packaged
   [image](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda)
-  that includes vLLM with [llm-d](https://llm-d.ai/) and SPNL support.
-- a CLI that can communicate with standard OpenAI-compatible inference
-  servers, or with the optimized vLLM API. We have pre-packaged images
-  that contain [just the
-  CLI](https://github.com/IBM/spnl/pkgs/container/spnl) and [the CLI
-  with
+  that includes [vLLM](https://github.com/vllm-project/vllm) with
+  [llm-d](https://llm-d.ai/) and SPNL support.
+- **CLI** via a pre-packaged image that contains [just the
+  CLI](https://github.com/IBM/spnl/pkgs/container/spnl) or one that
+  contains [the CLI with
   Ollama](https://github.com/IBM/spnl/pkgs/container/spnl-ollama).
-- an [online playground](https://ibm.github.io/spnl/?qv=false) that
-lets you run queries directly in browsers that support
+- [**Playground**](https://ibm.github.io/spnl/?qv=false) that lets you
+run queries directly in browsers that support
 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
 To kick the tires with SPNL running [Ollama](https://ollama.com/):
