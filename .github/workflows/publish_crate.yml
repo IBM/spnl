@@ -21,6 +21,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Setup protoc
+        run: |
+          if [ $RUNNER_OS = "Linux" ]
+          then
+            if [ $RUNNER_ARCH = "X64" ]
+            then arch=x86_64
+            elif [ $RUNNER_ARCH = "ARM64" ]
+            then arch=aarch_64
+            else
+              echo "Unsupported arch for protoc"
+              exit 1
+            fi
+            curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-linux-$arch.zip
+          elif [ $RUNNER_OS = "macOS" ]
+          then curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
+          fi
+          unzip protoc.zip -d $HOME/.local
       - name: Publish
         run: cargo publish -p spnl --all-features
         env:
