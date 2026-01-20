@@ -1,10 +1,11 @@
 # Span Queries
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.02749-b31b1b.svg?style=flat)](https://arxiv.org/abs/2511.02749)
+[![Crates.io - Version](https://img.shields.io/crates/v/spnl)](https://crates.io/crates/spnl)
+[![PyPI - Version](https://img.shields.io/pypi/v/spnl)](https://pypi.org/project/spnl)
 [![CI - Core](https://github.com/IBM/spnl/actions/workflows/core.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/core.yml)
 [![CI - Python](https://github.com/IBM/spnl/actions/workflows/python.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/python.yml)
 [![CI - Playground](https://github.com/IBM/spnl/actions/workflows/playground.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/playground.yml)
-[![PyPI - Version](https://img.shields.io/pypi/v/spnl)](https://pypi.org/project/spnl/)
 ![GitHub License](https://img.shields.io/github/license/IBM/spnl)
 
 <img align="right" src="/docs/images/nested-gen.svg" width="150">
@@ -19,15 +20,17 @@ three examples of these more sophisticated use cases.
 
 The goal of this project to facilitate optimizations that drastically
 reduce the cost of inference for RAG, agentics, and deep research (by
-10x or more [^1]) without harming accuracy. Our approach is to
+10x [^1]) without harming accuracy. Our approach is to
 generalize the interface to inference servers via the **Span
-Query**. In a span query, chat is a special case of a more general
-form. To the right is a visualization of a span query for a
-"judge/generator" (a.k.a. "LLM-as-a-judge").
+Query**.
+
+In a span query, chat is a special case of a more general
+form. To the right is a visualization of a [span query for a
+"judge/generator"](https://ibm.github.io/spnl/?demo=email2&qv=true) (a.k.a. "LLM-as-a-judge").
+
+Learn more about [span query syntax and semantics](./docs/about.md)
 
 [^1]: https://arxiv.org/html/2409.15355v5
-
-:rocket: [Playground](https://ibm.github.io/spnl/) **|** [Judge/generator Example](https://ibm.github.io/spnl/?demo=email2&qv=true) **|** [What is a Span Query?](./docs/about.md)
 
 
 ## Getting Started with SPNL
@@ -35,17 +38,8 @@ form. To the right is a visualization of a span query for a
 SPNL is a library for creating, optimizing, and tokenizing span
 queries. The library is surfaced for consumption as:
 
-- **vLLM** via a pre-packaged
-  [image](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda)
-  that includes [vLLM](https://github.com/vllm-project/vllm) with
-  [llm-d](https://llm-d.ai/) and SPNL support.
-- **CLI** via a pre-packaged image that contains [just the
-  CLI](https://github.com/IBM/spnl/pkgs/container/spnl) or one that
-  contains [the CLI with
-  Ollama](https://github.com/IBM/spnl/pkgs/container/spnl-ollama).
-- [**Playground**](https://ibm.github.io/spnl/?qv=false) that lets you
-run queries directly in browsers that support
-[WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
+[**vLLM image**](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda) **|** [**vLLM patch**](docker/vllm/llm-d/patches/0.4.0) **|** [**CLI image**](https://github.com/IBM/spnl/pkgs/container/spnl) **|** [**CLI image
+  with  Ollama**](https://github.com/IBM/spnl/pkgs/container/spnl-ollama) **|** [**Rust crate**](https://crates.io/crates/spnl) **|** [**Python pip**](https://pypi.org/project/spnl) **|** [**Playground**](https://ibm.github.io/spnl/?qv=false)
 
 To kick the tires with SPNL running [Ollama](https://ollama.com/):
 ```shell
@@ -55,7 +49,7 @@ podman run --rm -it ghcr.io/ibm/spnl-ollama --verbose
 This will run a judge/generator email example. You also can point it
 to a JSON file containing a [span query](./docs/about).
 
-## Building your own SPNL CLI
+### Building SPNL
 
 First, [configure your
 environment](./https://www.rust-lang.org/tools/install) for Rust.  Now
@@ -64,7 +58,7 @@ you can build the CLI with `cargo build`, which will produce
 build with source code optimizations, and produces
 `./target/release/spnl`.
 
-## CLI Usage
+### CLI Usage
 
 ```bash
 Usage: spnl [OPTIONS] [FILE]
