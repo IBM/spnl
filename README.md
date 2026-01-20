@@ -53,10 +53,9 @@ to a JSON file containing a [span query](./docs/about).
 
 First, [configure your
 environment](./https://www.rust-lang.org/tools/install) for Rust.  Now
-you can build the CLI with `cargo build`, which will produce
-`./target/debug/spnl`. Running `cargo build --release` will produce a
-build with source code optimizations, and produces
-`./target/release/spnl`.
+you can build the CLI with `cargo build -p spnl-cli`, which will
+produce `./target/debug/spnl`. Adding `--release` will produce a build
+with source code optimizations in `./target/release/spnl`.
 
 ### CLI Usage
 

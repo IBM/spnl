@@ -11,7 +11,7 @@ COPY web/wasm web/wasm
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo build -F rag,spnl-api --release --manifest-path cli/Cargo.toml
+    cargo build -F rag,spnl-api --release -p spnl-cli --manifest-path cli/Cargo.toml
 RUN ls -ltrh target/release
 
 # Main

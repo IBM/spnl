@@ -109,7 +109,7 @@ jobs:
           fi
           unzip protoc.zip -d $HOME/.local
       - name: Build spnl CLI
-        run: cargo build -F rag,spnl-api $BUILD_RELEASE_ARG --manifest-path cli/Cargo.toml
+        run: cargo build -F rag,spnl-api -p spnl-cli $BUILD_RELEASE_ARG --manifest-path cli/Cargo.toml
 
       - name: Docker meta default
         # This step generates metadata for the Docker image.
