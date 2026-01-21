@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: will_be_replaced
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vllm-spnl
+      app.kubernetes.io/component: vllm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vllm-spnl
+        app.kubernetes.io/component: vllm
+    spec:
+      containers:
+        - name: vllm
+          image: ghcr.io/ibm/spnl-llm-d-cuda:v0.12.9
+          command:
+            - /bin/sh
+            - "-c"
+            - "vllm serve $MODEL --enforce-eager"
+            # TODO make enforce-eager optional
+          ports:
+            - containerPort: 8000  # or 8200 for decode pods
+              protocol: TCP
+          env:
+            - name: MODEL
+              value: ibm-granite/granite-3.3-8b-instruct
+            - name: HF_TOKEN
+              value: will_be_replaced
+            - name: VLLM_USE_V1
+              value: "1"
+            - name: VLLM_V1_SPANS_TOKEN_PLUS
+              value: "10"
+            - name: VLLM_V1_SPANS_TOKEN_CROSS
+              value: "31"
+            - name: VLLM_ATTENTION_BACKEND
+              value: TRITON_ATTN
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"
+            - name: VLLM_V1_SPANS_ENABLED
+              value: "True"
+            
+          resources:
+            limits:
+              nvidia.com/gpu: 1  # Request 1 GPU
+
+          # Startup Probe: Wait for model to load during initialization
+          # Protects liveness/readiness probes from firing too early
+          startupProbe:
+            httpGet:
+              path: /v1/models
+              port: 8000
+            initialDelaySeconds: 15    # Time before first probe
+            periodSeconds: 5           # How often to probe during startup
+            timeoutSeconds: 5           # HTTP request timeout
+            failureThreshold: 60        # Max attempts (30s * 60 = 30min max startup time)
+
+          # Liveness Probe: Is the server process alive?
+          # Simple health check, restarts container if failing
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10           # Check every 10s
+            timeoutSeconds: 5
+            failureThreshold: 3         # Restart after 3 failures
+
+          # Readiness Probe: Is the model loaded and ready?
+          # Controls traffic routing, removes from service if failing
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5            # Check frequently for fast recovery
+            timeoutSeconds: 2
+            failureThreshold: 3          

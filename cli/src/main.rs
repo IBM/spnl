@@ -1,10 +1,15 @@
 use clap::Parser;
 
-use crate::args::Args;
+use crate::args::{Args, Commands, FullArgs};
 use crate::builtins::*;
 use spnl::{
     ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
 };
+
+#[cfg(feature = "vllm")]
+use crate::args::VllmCommands;
+#[cfg(feature = "vllm")]
+use spnl::k8s::vllm;
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
@@ -14,11 +19,40 @@ mod builtins;
 
 #[tokio::main]
 async fn main() -> Result<(), SpnlError> {
-    let args = Args::parse();
+    let args = FullArgs::parse();
+
+    match args.command {
+        Commands::Run(run_args) => run(run_args).await,
+
+        #[cfg(feature = "vllm")]
+        Commands::Vllm {
+            command:
+                VllmCommands::Up {
+                    name,
+                    model,
+                    hf_token,
+                },
+        } => {
+            vllm::up(
+                vllm::UpArgsBuilder::default()
+                    .name(name)
+                    .model(model)
+                    .hf_token(hf_token)
+                    .build()?,
+            )
+            .await
+        }
+        #[cfg(feature = "vllm")]
+        Commands::Vllm {
+            command: VllmCommands::Down { ref name },
+        } => vllm::down(name).await,
+    }
+}
+
+async fn run(args: Args) -> Result<(), SpnlError> {
     let verbose = args.verbose;
     let show_only = args.show_query;
     let dry_run = args.dry_run;
-
     let rp = ExecuteOptions {
         time: args.time.clone(),
         prepare: Some(args.prepare),

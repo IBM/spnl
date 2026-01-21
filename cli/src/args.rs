@@ -1,15 +1,41 @@
 use crate::builtins::Builtin;
-use clap::Parser;
+use clap::{Parser, Subcommand};
+
+#[derive(Parser, Debug, serde::Serialize)]
+#[command(version, about, long_about = None)]
+pub struct FullArgs {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug, serde::Serialize)]
+pub enum Commands {
+    /// Run a query
+    Run(Args),
+
+    /// Bring up vLLM in a Kubernetes cluster
+    #[cfg(feature = "vllm")]
+    Vllm {
+        #[command(subcommand)]
+        command: VllmCommands,
+    },
+}
 
 #[derive(Parser, Debug, serde::Serialize)]
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// File to process
-    #[arg(required_unless_present("builtin"))]
+    #[arg(short = 'f', long)]
     pub file: Option<String>,
 
     /// Builtin to run
-    #[arg(value_enum, short, long, env = "SPNL_BUILTIN")]
+    #[arg(
+        value_enum,
+        short,
+        long,
+        env = "SPNL_BUILTIN",
+        required_unless_present("file")
+    )]
     pub builtin: Option<Builtin>,
 
     /// Generative Model
@@ -98,4 +124,21 @@ pub struct Args {
     /// Dry run (do not execute query)?
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[cfg(feature = "vllm")]
+#[derive(Subcommand, Debug, serde::Serialize)]
+pub enum VllmCommands {
+    Up {
+        #[arg(required = true)]
+        name: String,
+        #[arg(short = 'm', long, env = "SPNL_MODEL")]
+        model: Option<String>,
+        #[arg(short = 't', long, env = "HF_TOKEN", required = true)]
+        hf_token: String,
+    },
+    Down {
+        #[arg(required = true)]
+        name: String,
+    },
 }
