@@ -1,4 +1,4 @@
-use tokio_stream::StreamExt;
+use futures::StreamExt;
 
 use async_openai::types::{
     chat::{CreateChatCompletionResponse, CreateChatCompletionStreamResponse},
