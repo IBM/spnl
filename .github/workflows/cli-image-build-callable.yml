@@ -168,7 +168,7 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
           outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=${{ inputs.push }},name-canonical=true,push=${{ inputs.push }},oci-mediatypes=true
           cache-from: type=gha,scope=${{ github.repository }}-${{ inputs.containerfile }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ github.repository }}-${{ inputs.containerfile }}-${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ github.repository }}-${{ inputs.containerfile }}-${{ matrix.platform }}
           build-args: |
             TARGET=target/${{ env.SPNL_CLI_TARGET_DIR }}/spnl
 
