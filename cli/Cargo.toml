@@ -18,6 +18,7 @@ vllm = ["k8s","spnl/vllm"]
 [dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.37", features = ["derive", "env"] }
+env_logger = "0.11.8"
 itertools = { version = "0.14.0", optional = true }
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"] }
 rustyline = { version = "17.0.0", features = ["with-file-history"] }

@@ -19,6 +19,7 @@ mod builtins;
 
 #[tokio::main]
 async fn main() -> Result<(), SpnlError> {
+    env_logger::init();
     let args = FullArgs::parse();
 
     match args.command {
