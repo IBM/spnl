@@ -13,7 +13,12 @@ pub struct UpArgs {
     #[builder(setter(into),default = "vllm".to_string())]
     name: String,
 
+    /// Namespace of resource
+    #[builder(default = None)]
+    namespace: Option<String>,
+
     /// Model to serve
+    #[builder(default)]
     model: Option<String>,
 
     /// HuggingFace api token
@@ -28,14 +33,25 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<Deployment> {
         && let Some(ref mut spec) = spec.template.spec
         && let Some(ref mut env) = spec.containers[0].env
     {
-        if let Some(model) = args.model
-            && let Some(kv) = env.iter_mut().find(|kv| kv.name == "MODEL")
-        {
-            kv.value = Some(model);
+        if let Some(model) = args.model {
+            match env.iter_mut().find(|kv| kv.name == "MODEL") {
+                Some(kv) => kv.value = Some(model),
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "Missing MODEL env var in deployment.yml template"
+                    ));
+                }
+            };
         }
-        if let Some(kv) = env.iter_mut().find(|kv| kv.name == "HF_TOKEN") {
-            kv.value = Some(args.hf_token);
-        }
+
+        match env.iter_mut().find(|kv| kv.name == "HF_TOKEN") {
+            Some(kv) => kv.value = Some(args.hf_token),
+            None => {
+                return Err(anyhow::anyhow!(
+                    "Missing HF_TOKEN env var in deployment.yml template"
+                ));
+            }
+        };
     }
     Ok(d)
 }
@@ -48,24 +64,29 @@ async fn client() -> anyhow::Result<Client> {
     Ok(Client::try_default().await?)
 }
 
-async fn deployments() -> anyhow::Result<Api<Deployment>> {
-    Ok(Api::default_namespaced(client().await?))
+async fn deployments(namespace: &Option<String>) -> anyhow::Result<Api<Deployment>> {
+    let c = client().await?;
+    Ok(match namespace {
+        Some(ns) => Api::namespaced(c, ns),
+        None => Api::default_namespaced(c),
+    })
 }
 
 pub async fn up(args: UpArgs) -> anyhow::Result<()> {
-    let d = deployments().await?;
+    let name = &args.name.clone();
+    let d = deployments(&args.namespace).await?;
     d.create(&PostParams::default(), &load_deployment_manifest(args)?)
         .await?;
 
-    await_condition(d.clone(), "vllm", is_deployment_completed()).await?;
-    //let establish = await_condition(deployments.clone(), "vllm", is_deployment_completed());
+    await_condition(d.clone(), name, is_deployment_completed()).await?;
+    //let establish = await_condition(deployments.clone(), &args.name, is_deployment_completed());
     //let _ = tokio::time::timeout(std::time::Duration::from_secs(120), establish).await?;
 
     Ok(())
 }
 
-pub async fn down(name: &str) -> anyhow::Result<()> {
-    let _ = deployments()
+pub async fn down(name: &str, namespace: Option<String>) -> anyhow::Result<()> {
+    let _ = deployments(&namespace)
         .await?
         .delete(name, &DeleteParams::default())
         .await?
@@ -78,7 +99,8 @@ pub async fn down(name: &str) -> anyhow::Result<()> {
 mod tests {
     #[test]
     fn load_deployment_manifest() -> anyhow::Result<()> {
-        super::load_deployment_manifest(super::UpArgsBuilder::default().build()?).map(|_| ())
+        super::load_deployment_manifest(super::UpArgsBuilder::default().hf_token("").build()?)
+            .map(|_| ())
     }
 
     #[tokio::test]

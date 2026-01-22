@@ -35,7 +35,8 @@ async fn main() -> Result<(), SpnlError> {
         } => {
             vllm::up(
                 vllm::UpArgsBuilder::default()
-                    .name(name)
+                    .name(name.name)
+                    .namespace(name.namespace)
                     .model(model)
                     .hf_token(hf_token)
                     .build()?,
@@ -44,8 +45,8 @@ async fn main() -> Result<(), SpnlError> {
         }
         #[cfg(feature = "vllm")]
         Commands::Vllm {
-            command: VllmCommands::Down { ref name },
-        } => vllm::down(name).await,
+            command: VllmCommands::Down { name },
+        } => vllm::down(&name.name, name.namespace).await,
     }
 }
 

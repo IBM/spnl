@@ -130,15 +130,31 @@ pub struct Args {
 #[derive(Subcommand, Debug, serde::Serialize)]
 pub enum VllmCommands {
     Up {
-        #[arg(required = true)]
-        name: String,
+        #[command(flatten)]
+        name: K8sNameArgs,
+
+        /// Model to serve
         #[arg(short = 'm', long, env = "SPNL_MODEL")]
         model: Option<String>,
+
+        /// HuggingFace token, used to pull model weights
         #[arg(short = 't', long, env = "HF_TOKEN", required = true)]
         hf_token: String,
     },
     Down {
-        #[arg(required = true)]
-        name: String,
+        #[command(flatten)]
+        name: K8sNameArgs,
     },
+}
+
+#[cfg(feature = "k8s")]
+#[derive(clap::Args, Debug, serde::Serialize)]
+pub struct K8sNameArgs {
+    /// Name of Kubernetes Deployment resource
+    #[arg(required = true)]
+    pub name: String,
+
+    /// Namespace of Kubernetes Deployment resource
+    #[arg(short = 'n', long)]
+    pub namespace: Option<String>,
 }
