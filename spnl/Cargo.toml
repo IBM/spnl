@@ -26,8 +26,8 @@ run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini
 tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:futures","dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
-k8s = ["dep:kube","dep:k8s-openapi","dep:schemars"]
-vllm = ["k8s","yaml","dep:rustls","dep:uuid"]
+k8s = ["dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid"]
+vllm = ["k8s","yaml"]
 
 [dependencies]
 uuid = { version = "1.19.0", features = ["v4"], optional = true }

@@ -1,7 +1,6 @@
 use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::Pod;
-//use tracing::*;
 
 use kube::{
     Client, ResourceExt,
@@ -33,8 +32,13 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::U
     d.metadata.name = Some(args.name.clone());
     if let Some(ref mut ospec) = d.spec
         && let Some(ref mut spec) = ospec.template.spec
-        && let Some(ref mut env) = spec.containers[0].env
+        && !spec.containers.is_empty()
     {
+        if let Some(image) = &spec.containers[0].image {
+            spec.containers[0].image =
+                Some(format!("{}:{}", image, ::std::env!("CARGO_PKG_VERSION")));
+        }
+
         if let Some(ml) = &ospec.selector.match_labels {
             let mut match_labels = ml.clone();
             if let Some(v) = match_labels.get_mut("app.kubernetes.io/name") {
@@ -55,25 +59,27 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::U
             meta.labels = Some(labels);
         }
 
-        if let Some(model) = args.model {
-            match env.iter_mut().find(|kv| kv.name == "MODEL") {
-                Some(kv) => kv.value = Some(model),
+        if let Some(ref mut env) = spec.containers[0].env {
+            if let Some(model) = args.model {
+                match env.iter_mut().find(|kv| kv.name == "MODEL") {
+                    Some(kv) => kv.value = Some(model),
+                    None => {
+                        return Err(anyhow::anyhow!(
+                            "Missing MODEL env var in deployment.yml template"
+                        ));
+                    }
+                };
+            }
+
+            match env.iter_mut().find(|kv| kv.name == "HF_TOKEN") {
+                Some(kv) => kv.value = Some(args.hf_token),
                 None => {
                     return Err(anyhow::anyhow!(
-                        "Missing MODEL env var in deployment.yml template"
+                        "Missing HF_TOKEN env var in deployment.yml template"
                     ));
                 }
             };
         }
-
-        match env.iter_mut().find(|kv| kv.name == "HF_TOKEN") {
-            Some(kv) => kv.value = Some(args.hf_token),
-            None => {
-                return Err(anyhow::anyhow!(
-                    "Missing HF_TOKEN env var in deployment.yml template"
-                ));
-            }
-        };
     }
     Ok((d, id))
 }
@@ -127,6 +133,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
             tokio::spawn({
                 let pp = p.clone();
                 async move {
+                    let mut last_time: Option<::std::time::Instant> = None;
                     let mut done = false;
                     while !done {
                         match pp
@@ -136,8 +143,9 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
                                     follow: true,
                                     //container: Some("vllm".to_string()),
                                     //tail_lines: app.tail,
-                                    //since_seconds: app.since,
-                                    //since_time: last_time,
+                                    since_seconds: last_time
+                                        .map(|last_time| last_time.elapsed().as_secs() as i64),
+                                    // since_time:
                                     //timestamps: app.timestamps,
                                     ..LogParams::default()
                                 },
@@ -150,7 +158,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
                                 loop {
                                     match logs.try_next().await {
                                         Ok(Some(line)) => {
-                                            // last_time = ::std::time::Instant::now().as_secs();
+                                            last_time = Some(::std::time::Instant::now());
                                             println!("{line}")
                                         }
                                         Ok(None) => {
