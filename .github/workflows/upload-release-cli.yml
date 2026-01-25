@@ -1,0 +1,77 @@
+name: Upload CLI builds to release
+
+on:
+  release:
+    types: [published]
+  # uncomment for debugging:
+  #pull_request:
+  #  branches: [ main ]
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
+
+jobs:
+  build_cli_for_release:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            label: Linux x86_64 GNU
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            label: Linux aarch64 GNU
+          # - windows-latest
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            label: MacOS Apple Silicon
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            label: MacOS Intel
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      TARGET: ${{ matrix.platform.target }}
+      LABEL: ${{ matrix.platform.label }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup protoc
+        run: |
+          if [ $RUNNER_OS = "Linux" ]
+          then
+            if [ $RUNNER_ARCH = "X64" ]
+            then arch=x86_64
+            elif [ $RUNNER_ARCH = "ARM64" ]
+            then arch=aarch_64
+            else
+              echo "Unsupported arch for protoc"
+              exit 1
+            fi
+            curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-linux-$arch.zip
+          elif [ $RUNNER_OS = "macOS" ]
+          then curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
+          fi
+          unzip protoc.zip -d $HOME/.local
+
+      - name: Install required rustc targets
+        run: rustup target add $TARGET
+
+      - name: Build CLI
+        run: cargo build -F rag,vllm,spnl-api --release -p spnl-cli --target $TARGET
+
+      - name: Upload release artifact
+        if: ${{ startsWith(github.ref, 'refs/tags/') && !github.event.release.prerelease }}
+        run: |
+          mv ./target/$TARGET/spnl ./target/$TARGET/spnl-$TARGET
+          gh release upload $TAG ./target/$TARGET/spnl-$TARGET'#'"$LABEL"
