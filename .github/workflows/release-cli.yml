@@ -106,11 +106,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
-
       - name: Install cross-compilation tool
         if: matrix.platform.use_cross
         shell: bash
