@@ -4,8 +4,8 @@ on:
   release:
     types: [published]
   # Uncomment for debugging:
-  # pull_request:
-  #   branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 # Cancel any prior runs for this workflow and this PR (or branch)
 concurrency:
@@ -46,30 +46,30 @@ jobs:
             use_cross: false
           
           # musl builds (static binaries)
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            platform: linux
-            arch: x86_64
-            libc: musl
-            name: Linux x86_64 musl (static)
-            use_cross: true
+          # - runner: ubuntu-latest
+          #   target: x86_64-unknown-linux-musl
+          #   platform: linux
+          #   arch: x86_64
+          #   libc: musl
+          #   name: Linux x86_64 musl (static)
+          #   use_cross: true
           
-          - runner: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            platform: linux
-            arch: aarch64
-            libc: musl
-            name: Linux ARM64 musl (static)
-            use_cross: true
+          # - runner: ubuntu-latest
+          #   target: aarch64-unknown-linux-musl
+          #   platform: linux
+          #   arch: aarch64
+          #   libc: musl
+          #   name: Linux ARM64 musl (static)
+          #   use_cross: true
           
           # macOS builds
-          - runner: macos-latest
-            target: x86_64-apple-darwin
-            platform: macos
-            arch: x86_64
-            libc: ""
-            name: macOS x86_64
-            use_cross: false
+          # - runner: macos-latest
+          #   target: x86_64-apple-darwin
+          #   platform: macos
+          #   arch: x86_64
+          #   libc: ""
+          #   name: macOS x86_64
+          #   use_cross: false
           
           - runner: macos-latest
             target: aarch64-apple-darwin
@@ -80,13 +80,13 @@ jobs:
             use_cross: false
           
           # Windows build
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-            platform: windows
-            arch: x86_64
-            libc: ""
-            name: Windows x86_64
-            use_cross: false
+          # - runner: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   platform: windows
+          #   arch: x86_64
+          #   libc: ""
+          #   name: Windows x86_64
+          #   use_cross: false
 
     env:
       TARGET: ${{ matrix.platform.target }}
@@ -121,7 +121,7 @@ jobs:
           cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Setup protoc (Linux)
-        if: runner.os == 'Linux' && !matrix.platform.use_cross
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           if [ "$RUNNER_ARCH" = "X64" ]; then
@@ -243,6 +243,7 @@ jobs:
           ls -lh
 
       - name: Upload release assets
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
