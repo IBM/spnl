@@ -21,8 +21,44 @@ env:
   CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
 
 jobs:
+  # Check if relevant files have changed
+  # This job always succeeds, but sets outputs to indicate if we should run builds
+  check_changes:
+    name: Check if relevant files changed
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check for relevant changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # For release events, always run
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            # For pull requests, check if any non-ignored files changed
+            git fetch origin ${{ github.base_ref }}
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+            
+            # Filter out ignored patterns (markdown files and docker directory)
+            RELEVANT_FILES=$(echo "$CHANGED_FILES" | grep -v '\.md$' | grep -v '^docker/' || true)
+            
+            if [ -z "$RELEVANT_FILES" ]; then
+              echo "Only ignored files changed (markdown or docker/), skipping builds"
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            else
+              echo "Relevant files changed, running builds"
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   pypi_build_linux:
     name: Build linux wheel
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -95,6 +131,8 @@ jobs:
 
   pypi_build_windows:
     name: Build Windows wheel
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -127,6 +165,8 @@ jobs:
 
   pypi_build_macos:
     name: Build macOS wheel
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -157,6 +197,8 @@ jobs:
 
   pypi_build_sdist:
     name: Build pypi sdist
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

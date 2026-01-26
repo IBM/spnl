@@ -15,12 +15,50 @@ permissions:
   contents: read
 
 jobs:
+  # Check if relevant files have changed
+  # This job always succeeds, but sets outputs to indicate if we should run builds
+  check_changes:
+    name: Check if relevant files changed
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check for relevant changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # For release events, always run
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            # For pull requests, check if relevant files changed
+            git fetch origin ${{ github.base_ref }}
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+            
+            # Check if any files match our include patterns
+            RELEVANT_FILES=$(echo "$CHANGED_FILES" | grep -E '^docker/vllm/llmd/|^\.github/workflows/cli-image-build.*\.yml$' || true)
+            
+            if [ -z "$RELEVANT_FILES" ]; then
+              echo "No relevant files changed (docker/vllm/llmd/ or workflow files), skipping builds"
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            else
+              echo "Relevant files changed, running builds"
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   checkout:
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
   call_image_builder:
+    needs: check_changes
+    if: needs.check_changes.outputs.should_run == 'true'
     strategy:
       matrix:
         containerfile:
