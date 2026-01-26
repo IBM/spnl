@@ -107,9 +107,12 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          source "$HOME/.cargo/env"
+          rustup target add ${{ matrix.platform.target }}
 
       - name: Install cross-compilation tool
         if: matrix.platform.use_cross

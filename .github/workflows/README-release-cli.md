@@ -200,9 +200,9 @@ sha256sum -c checksums.txt
 
 ## Maintenance
 
-- **Rust version**: Uses stable Rust via `dtolnay/rust-toolchain@stable`
+- **Rust version**: Uses stable Rust via official rustup installer
 - **Protobuf version**: Currently pinned to v31.1
-- **Actions versions**: Keep actions up to date (checkout@v4, upload-artifact@v4, etc.)
+- **Actions versions**: All actions are from GitHub's verified marketplace (checkout@v4, upload-artifact@v4, download-artifact@v4)
 
 ## Related Files
 
