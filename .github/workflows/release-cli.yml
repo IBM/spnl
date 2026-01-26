@@ -1,0 +1,261 @@
+name: Build and Publish CLI to Release
+
+on:
+  release:
+    types: [published]
+  # Uncomment for debugging:
+  # pull_request:
+  #   branches: [ main ]
+
+# Cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
+  CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
+
+jobs:
+  build-and-upload:
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # GNU libc builds (dynamic linking)
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x86_64
+            libc: gnu
+            name: Linux x86_64 GNU
+            use_cross: false
+          
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            platform: linux
+            arch: aarch64
+            libc: gnu
+            name: Linux ARM64 GNU
+            use_cross: false
+          
+          # musl builds (static binaries)
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            platform: linux
+            arch: x86_64
+            libc: musl
+            name: Linux x86_64 musl (static)
+            use_cross: true
+          
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            platform: linux
+            arch: aarch64
+            libc: musl
+            name: Linux ARM64 musl (static)
+            use_cross: true
+          
+          # macOS builds
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: x86_64
+            libc: ""
+            name: macOS x86_64
+            use_cross: false
+          
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: aarch64
+            libc: ""
+            name: macOS ARM64
+            use_cross: false
+          
+          # Windows build
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: x86_64
+            libc: ""
+            name: Windows x86_64
+            use_cross: false
+
+    env:
+      TARGET: ${{ matrix.platform.target }}
+      PLATFORM: ${{ matrix.platform.platform }}
+      ARCH: ${{ matrix.platform.arch }}
+      LIBC: ${{ matrix.platform.libc }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from release
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install cross-compilation tool
+        if: matrix.platform.use_cross
+        shell: bash
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Setup protoc (Linux)
+        if: runner.os == 'Linux' && !matrix.platform.use_cross
+        shell: bash
+        run: |
+          if [ "$RUNNER_ARCH" = "X64" ]; then
+            arch=x86_64
+          elif [ "$RUNNER_ARCH" = "ARM64" ]; then
+            arch=aarch_64
+          else
+            echo "Unsupported arch for protoc"
+            exit 1
+          fi
+          curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-linux-$arch.zip
+          unzip protoc.zip -d $HOME/.local
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup protoc (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-osx-universal_binary.zip
+          unzip protoc.zip -d $HOME/.local
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup protoc (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-win64.zip
+          unzip protoc.zip -d $HOME/.local
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build CLI (native)
+        if: ${{ !matrix.platform.use_cross }}
+        shell: bash
+        run: |
+          cargo build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+
+      - name: Build CLI (cross)
+        if: matrix.platform.use_cross
+        shell: bash
+        run: |
+          cross build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+
+      - name: Prepare binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd target/$TARGET/release
+          BINARY_NAME="spnl"
+          if [ "$LIBC" != "" ]; then
+            ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC.tar.gz"
+          else
+            ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH.tar.gz"
+          fi
+          tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Prepare binary (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd target/$TARGET/release
+          BINARY_NAME="spnl.exe"
+          ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH.zip"
+          7z a "$ARCHIVE_NAME" "$BINARY_NAME"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Generate checksum
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            certutil -hashfile "$ARCHIVE_PATH" SHA256 | grep -v "hash" | tr -d '\r\n ' > "$ARCHIVE_PATH.sha256"
+          else
+            shasum -a 256 "$ARCHIVE_PATH" | awk '{print $1}' > "$ARCHIVE_PATH.sha256"
+          fi
+          echo "Checksum for $ARCHIVE_NAME:"
+          cat "$ARCHIVE_PATH.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: |
+            ${{ env.ARCHIVE_PATH }}
+            ${{ env.ARCHIVE_PATH }}.sha256
+          if-no-files-found: error
+
+  upload-to-release:
+    name: Upload assets to release
+    needs: build-and-upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from release
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          
+          # Create combined checksums file
+          cd release-assets
+          cat *.sha256 > checksums.txt
+          echo "Release assets:"
+          ls -lh
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd release-assets
+          
+          # Upload all archives and checksums
+          for file in *.tar.gz *.zip checksums.txt; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file..."
+              gh release upload "$VERSION" "$file" --clobber
+            fi
+          done
+          
+          echo "✅ All assets uploaded successfully!"
+          gh release view "$VERSION"
+
+# Made with Bob
