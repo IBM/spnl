@@ -160,6 +160,44 @@ To change compression level or format, modify the "Prepare binary" steps.
 - **Checksums**: SHA256 checksums are generated for all binaries
 - **Verification**: Users can verify downloads using the checksums.txt file
 - **Static linking**: musl builds have no external dependencies
+- **macOS Code Signing**: macOS binaries are signed with Apple Developer certificate (optional)
+- **macOS Notarization**: macOS binaries are notarized by Apple for Gatekeeper compatibility (optional)
+
+### Optional: macOS Code Signing
+
+**Note**: macOS code signing and notarization are **optional**. The workflow will build unsigned macOS binaries if the secrets are not configured. Unsigned binaries will work but may show Gatekeeper warnings to users.
+
+To enable macOS code signing and notarization, configure these repository secrets:
+
+| Secret Name | Description |
+|-------------|-------------|
+| `APPLE_CERTIFICATE` | Base64-encoded .p12 certificate file |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the .p12 certificate |
+| `KEYCHAIN_PASSWORD` | Password for temporary CI keychain (generate any secure random string) |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_TEAM_ID` | Your Apple Developer Team ID |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
+
+**Note**: `KEYCHAIN_PASSWORD` is NOT your Mac's keychain password. It's a password you create specifically for the temporary keychain that GitHub Actions creates during the build. You can generate any secure random string (e.g., using `openssl rand -base64 32`).
+
+#### Setting Up Apple Secrets
+
+1. **Export Certificate**:
+   ```bash
+   # Export from Keychain Access as .p12 file
+   # Then encode to base64:
+   base64 -i YourCertificate.p12 | pbcopy
+   # Paste into APPLE_CERTIFICATE secret
+   ```
+
+2. **Get Team ID**:
+   - Visit https://developer.apple.com/account
+   - Find your Team ID in Membership section
+
+3. **Create App-Specific Password**:
+   - Visit https://appleid.apple.com
+   - Sign in and go to Security section
+   - Generate app-specific password for notarization
 
 ## Example Usage
 

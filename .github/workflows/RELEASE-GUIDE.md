@@ -110,14 +110,137 @@ Before publishing a release:
 - [ ] Release notes prepared
 - [ ] Tag follows `vX.Y.Z` format
 - [ ] All CI checks passing on main branch
+- [ ] Apple Developer secrets configured (optional, for macOS signing)
 
 After publishing:
 
 - [ ] Workflow completed successfully
 - [ ] All 7 platform binaries uploaded
+- [ ] macOS binaries signed and notarized
 - [ ] Checksums file present
 - [ ] Release notes are clear and complete
 - [ ] Announcement made (if applicable)
+
+## macOS Code Signing Setup (Optional)
+
+**Note**: macOS code signing is **optional**. The workflow will build unsigned macOS binaries if these secrets are not configured. Unsigned binaries will work but may show Gatekeeper warnings to users.
+
+### Repository Secrets (Optional)
+
+Before the first release, configure these secrets in your repository settings:
+
+1. **APPLE_CERTIFICATE**: Base64-encoded .p12 certificate
+   ```bash
+   base64 -i YourCertificate.p12 | pbcopy
+   ```
+
+2. **APPLE_CERTIFICATE_PASSWORD**: Password for the .p12 file
+
+3. **KEYCHAIN_PASSWORD**: Any secure password for temporary keychain
+
+4. **APPLE_ID**: Your Apple ID email address
+
+5. **APPLE_TEAM_ID**: Found at https://developer.apple.com/account
+
+6. **APPLE_APP_SPECIFIC_PASSWORD**: Generate at https://appleid.apple.com
+   - Go to Security → App-Specific Passwords
+   - Create password for "GitHub Actions Notarization"
+
+### Obtaining Apple Developer Certificate
+
+#### Prerequisites
+1. **Join Apple Developer Program** ($99/year)
+   - Visit https://developer.apple.com/programs/
+   - Required for code signing and notarization
+
+#### Step-by-Step Certificate Creation
+
+**Option 1: Using Xcode (Recommended)**
+
+1. Open Xcode
+2. Go to **Xcode → Settings → Accounts**
+3. Click **+** to add your Apple ID
+4. Select your account → Click **Manage Certificates**
+5. Click **+** → Select **Developer ID Application**
+6. Certificate will be created and installed in your Keychain
+
+**Option 2: Using Apple Developer Portal**
+
+1. Visit https://developer.apple.com/account/resources/certificates/list
+2. Click **+** to create a new certificate
+3. Select **Developer ID Application** (under "Software")
+4. Follow prompts to create a Certificate Signing Request (CSR):
+   ```bash
+   # On your Mac, open Keychain Access
+   # Menu: Keychain Access → Certificate Assistant → Request a Certificate from a Certificate Authority
+   # Enter your email, select "Saved to disk"
+   ```
+5. Upload the CSR file
+6. Download the certificate (.cer file)
+7. Double-click to install in Keychain Access
+
+#### Exporting Certificate for GitHub Actions
+
+1. Open **Keychain Access** app on your Mac
+2. In the left sidebar, select **login** keychain
+3. Select **My Certificates** category
+4. Find your **Developer ID Application** certificate
+5. Right-click → **Export "Developer ID Application: Your Name"**
+6. Save as: `certificate.p12`
+7. **Set a password** (this becomes `APPLE_CERTIFICATE_PASSWORD`)
+8. Encode to base64:
+   ```bash
+   base64 -i certificate.p12 | pbcopy
+   ```
+9. Paste into GitHub repository secret `APPLE_CERTIFICATE`
+
+#### Finding Your Team ID
+
+1. Visit https://developer.apple.com/account
+2. Click on **Membership** in the sidebar
+3. Your **Team ID** is displayed (10-character alphanumeric)
+4. Add this to `APPLE_TEAM_ID` secret
+
+#### Creating App-Specific Password
+
+1. Visit https://appleid.apple.com
+2. Sign in with your Apple ID
+3. Go to **Security** section
+4. Under **App-Specific Passwords**, click **Generate Password**
+5. Label it: "GitHub Actions Notarization"
+6. Copy the generated password
+7. Add to `APPLE_APP_SPECIFIC_PASSWORD` secret
+
+#### Summary of Secrets
+
+After completing the above steps, you'll have:
+
+```
+APPLE_CERTIFICATE=<base64 of certificate.p12>
+APPLE_CERTIFICATE_PASSWORD=<password you set when exporting>
+KEYCHAIN_PASSWORD=<any secure random string, e.g., openssl rand -base64 32>
+APPLE_ID=<your Apple ID email>
+APPLE_TEAM_ID=<10-character team ID from developer portal>
+APPLE_APP_SPECIFIC_PASSWORD=<app-specific password from appleid.apple.com>
+```
+
+Add all these to your GitHub repository:
+- Go to repository **Settings → Secrets and variables → Actions**
+- Click **New repository secret** for each one
+
+### Testing Signed Binaries
+
+After release, verify the signature:
+```bash
+# Download macOS binary
+tar xzf spnl-v0.13.0-macos-aarch64.tar.gz
+
+# Verify signature
+codesign --verify --verbose spnl
+
+# Check notarization
+spctl --assess --verbose spnl
+```
 
 ## Versioning
 

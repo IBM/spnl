@@ -161,6 +161,72 @@ jobs:
         run: |
           cross build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
 
+      - name: Check for Apple signing secrets
+        if: runner.os == 'macOS'
+        id: check_secrets
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo "has_signing_secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_signing_secrets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Import Apple Code Signing Certificate
+        if: runner.os == 'macOS' && steps.check_secrets.outputs.has_signing_secrets == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Import certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k $KEYCHAIN_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Add keychain to search list
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Clean up certificate file
+          rm certificate.p12
+
+      - name: Sign and Notarize macOS Binary
+        if: runner.os == 'macOS' && steps.check_secrets.outputs.has_signing_secrets == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          BINARY_PATH="target/$TARGET/release/spnl"
+          
+          # Sign the binary
+          codesign --force --options runtime --sign "$APPLE_TEAM_ID" --timestamp "$BINARY_PATH"
+          
+          # Verify signature
+          codesign --verify --verbose "$BINARY_PATH"
+          
+          # Create a zip for notarization (required by Apple)
+          ditto -c -k --keepParent "$BINARY_PATH" spnl-notarize.zip
+          
+          # Submit for notarization
+          xcrun notarytool submit spnl-notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+          
+          # Clean up notarization zip
+          rm spnl-notarize.zip
+          
+          echo "✅ macOS binary signed and notarized successfully"
+
       - name: Prepare binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
