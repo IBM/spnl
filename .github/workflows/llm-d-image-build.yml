@@ -53,8 +53,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: ${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease }}
-          cache-from: type=gha                              # Use github action mechanisms to cache layers
-          cache-to: type=gha                                # Use github action mechanisms to cache layers
+          #cache-from: type=gha                              # Use github action mechanisms to cache layers
+          #cache-to: type=gha                                # Use github action mechanisms to cache layers
           file: docker/vllm/llm-d/Containerfile.${{ matrix.gpu }}
           tags: ghcr.io/ibm/spnl-llm-d-${{ matrix.gpu }}:${{ env.RELEASE_VERSION }},ghcr.io/ibm/spnl-llm-d-${{ matrix.gpu }}:latest
           build-args: |
