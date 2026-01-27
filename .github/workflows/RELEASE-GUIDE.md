@@ -230,7 +230,7 @@ Add all these to your GitHub repository:
 
 ### Testing Signed Binaries
 
-After release, verify the signature:
+After release, verify the signature and notarization:
 ```bash
 # Download macOS binary
 tar xzf spnl-v0.13.0-macos-aarch64.tar.gz
@@ -240,7 +240,13 @@ codesign --verify --verbose spnl
 
 # Check notarization
 spctl --assess --verbose spnl
+
+# Verify stapling (notarization ticket is embedded)
+stapler validate spnl
 ```
+
+**What is stapling?**
+Stapling embeds the notarization ticket directly into the binary. This allows macOS to verify the notarization even when offline, providing a better user experience.
 
 ## Versioning
 

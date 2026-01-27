@@ -225,7 +225,13 @@ jobs:
           # Clean up notarization zip
           rm spnl-notarize.zip
           
-          echo "✅ macOS binary signed and notarized successfully"
+          # Staple the notarization ticket to the binary
+          xcrun stapler staple "$BINARY_PATH"
+          
+          # Verify stapling
+          xcrun stapler validate "$BINARY_PATH"
+          
+          echo "✅ macOS binary signed, notarized, and stapled successfully"
 
       - name: Prepare binary (Unix)
         if: runner.os != 'Windows'
