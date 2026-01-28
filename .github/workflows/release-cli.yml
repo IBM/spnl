@@ -205,27 +205,7 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
           BINARY_PATH="target/$TARGET/release/spnl"
-          
-          # Sign the binary
-          codesign --force --options runtime --sign "$APPLE_TEAM_ID" --timestamp "$BINARY_PATH"
-          
-          # Verify signature
-          codesign --verify --verbose "$BINARY_PATH"
-          
-          # Create a zip for notarization (required by Apple)
-          ditto -c -k --keepParent "$BINARY_PATH" spnl-notarize.zip
-          
-          # Submit for notarization
-          xcrun notarytool submit spnl-notarize.zip \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --wait
-          
-          # Clean up notarization zip
-          rm spnl-notarize.zip
-          
-          echo "✅ macOS binary signed and notarized successfully"
+          .github/scripts/sign-and-notarize-macos.sh "$BINARY_PATH" "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_SPECIFIC_PASSWORD"
 
       - name: Prepare binary (Unix)
         if: runner.os != 'Windows'
