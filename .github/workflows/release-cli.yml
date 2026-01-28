@@ -45,23 +45,6 @@ jobs:
             name: Linux ARM64 GNU
             use_cross: false
           
-          # musl builds (static binaries)
-          # - runner: ubuntu-latest
-          #   target: x86_64-unknown-linux-musl
-          #   platform: linux
-          #   arch: x86_64
-          #   libc: musl
-          #   name: Linux x86_64 musl (static)
-          #   use_cross: true
-          
-          # - runner: ubuntu-latest
-          #   target: aarch64-unknown-linux-musl
-          #   platform: linux
-          #   arch: aarch64
-          #   libc: musl
-          #   name: Linux ARM64 musl (static)
-          #   use_cross: true
-          
           # macOS builds
           # - runner: macos-latest
           #   target: x86_64-apple-darwin
@@ -253,9 +236,95 @@ jobs:
             ${{ env.ARCHIVE_PATH }}.sha256
           if-no-files-found: error
 
+  build-musl:
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+    container:
+      image: ${{ matrix.platform.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # musl builds (static binaries) - using Alpine Linux containers
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            platform: linux
+            arch: x86_64
+            libc: musl
+            name: Linux x86_64 musl (static)
+            container: rust:alpine
+          
+          # - runner: ubuntu-24.04-arm
+          #   target: aarch64-unknown-linux-musl
+          #   platform: linux
+          #   arch: aarch64
+          #   libc: musl
+          #   name: Linux ARM64 musl (static)
+          #   container: rust:alpine
+
+    env:
+      TARGET: ${{ matrix.platform.target }}
+      PLATFORM: ${{ matrix.platform.platform }}
+      ARCH: ${{ matrix.platform.arch }}
+      LIBC: ${{ matrix.platform.libc }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Get version from release
+        id: version
+        shell: sh
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Install build dependencies (Alpine)
+        if: matrix.platform.arch == 'x86_64'
+        shell: sh
+        run: |
+          apk add --no-cache musl-dev gcc protobuf-dev curl unzip perl make
+
+      - name: Setup Rust toolchain
+        shell: sh
+        run: |
+          rustup target add ${{ matrix.platform.target }}
+
+      - name: Build CLI
+        shell: sh
+        run: |
+          cargo build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+
+      - name: Prepare binary
+        shell: sh
+        run: |
+          cd target/$TARGET/release
+          BINARY_NAME="spnl"
+          ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC.tar.gz"
+          tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Generate checksum
+        shell: sh
+        run: |
+          sha256sum "$ARCHIVE_PATH" | awk '{print $1}' > "$ARCHIVE_PATH.sha256"
+          echo "Checksum for $ARCHIVE_NAME:"
+          cat "$ARCHIVE_PATH.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: |
+            ${{ env.ARCHIVE_PATH }}
+            ${{ env.ARCHIVE_PATH }}.sha256
+          if-no-files-found: error
+
   upload-to-release:
     name: Upload assets to release
-    needs: build-and-upload
+    needs: [build-and-upload, build-musl]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

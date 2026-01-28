@@ -32,10 +32,14 @@
 ### Step 3: Wait for Builds
 
 The workflow will automatically:
-- ✅ Build binaries for 7 platforms (takes ~10-20 minutes)
+- ✅ Build GNU libc binaries natively (Linux x86_64, ARM64)
+- ✅ Build musl binaries in containers (Linux x86_64, ARM64 static)
+- ✅ Build macOS binaries (x86_64, ARM64)
+- ✅ Build Windows binary (x86_64)
 - ✅ Create compressed archives
 - ✅ Generate SHA256 checksums
 - ✅ Upload all files to the release
+- ⏱️ Total time: ~10-20 minutes
 
 ### Step 4: Verify Release
 
@@ -53,7 +57,10 @@ Check that all files are attached to the release:
 
 1. Go to: https://github.com/IBM/spnl/actions
 2. Click on the "Build and Publish CLI to Release" workflow
-3. Monitor the progress of all 7 build jobs
+3. Monitor the progress of all build jobs:
+   - **build-and-upload**: GNU libc, macOS, and Windows builds
+   - **build-musl**: Containerized musl builds
+   - **upload-to-release**: Final upload step
 
 ## If Something Goes Wrong
 
@@ -81,12 +88,14 @@ If some files are missing:
 **Recommend GNU builds for:**
 - Standard Linux distributions (Ubuntu, Debian, RHEL, Fedora)
 - Users with glibc 2.31+ installed
+- Built natively on GitHub-hosted runners
 
 **Recommend musl builds for:**
 - Alpine Linux
 - Docker containers (especially minimal images)
 - Maximum portability across distributions
 - Embedded systems
+- Built in isolated containers for consistency
 
 ### macOS
 

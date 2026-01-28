@@ -58,23 +58,32 @@ Each binary is built with the following Cargo features enabled:
 
 ## Architecture
 
-### Two-Job Design
+### Three-Job Design
 
 1. **build-and-upload** (parallel matrix job)
-   - Builds binaries for all 7 platforms in parallel
+   - Builds binaries for GNU libc, macOS, and Windows platforms in parallel
    - Creates compressed archives (.tar.gz or .zip)
    - Generates SHA256 checksums
    - Uploads artifacts to GitHub Actions
 
-2. **upload-to-release** (sequential job)
-   - Downloads all build artifacts
+2. **build-musl** (parallel containerized job)
+   - Builds static musl binaries using Docker containers
+   - Runs in isolated Alpine Linux and cross-compilation containers
+   - Creates compressed archives (.tar.gz)
+   - Generates SHA256 checksums
+   - Uploads artifacts to GitHub Actions
+
+3. **upload-to-release** (sequential job)
+   - Downloads all build artifacts from both build jobs
    - Creates combined checksums.txt file
    - Uploads all files to the GitHub release
 
 ### Build Methods
 
-- **Native builds**: Used for most platforms (faster)
-- **Cross-compilation**: Used for musl builds via `cross-rs/cross` tool
+- **Native builds**: Used for GNU libc, macOS, and Windows platforms (faster)
+- **Containerized builds**: Used for musl builds via Docker containers
+  - `rust:alpine` for x86_64-unknown-linux-musl (on ubuntu-latest)
+  - `rust:alpine` for aarch64-unknown-linux-musl (on ubuntu-24.04-arm native ARM64 runner)
 
 ## GNU vs musl Builds
 
@@ -82,11 +91,13 @@ Each binary is built with the following Cargo features enabled:
 - **Pros**: Smaller file size, faster build time
 - **Cons**: Requires compatible glibc version on target system
 - **Use case**: Standard Linux distributions (Ubuntu, Debian, RHEL, etc.)
+- **Build method**: Native compilation on GitHub-hosted runners
 
 ### musl builds (static)
 - **Pros**: Fully portable, works on any Linux distro, no dependencies
 - **Cons**: Slightly larger file size, longer build time
 - **Use case**: Alpine Linux, containers, embedded systems, maximum portability
+- **Build method**: Containerized builds using Alpine Linux and cross-compilation images
 
 ## Debugging
 
@@ -141,7 +152,8 @@ To change compression level or format, modify the "Prepare binary" steps.
 
 1. **Protobuf errors**: Ensure protoc is properly installed for the platform
 2. **OpenSSL errors**: The `openssl-vendored` feature should handle this
-3. **Cross-compilation errors**: Check the `cross-rs/cross` tool compatibility
+3. **Container errors**: Check Docker container availability and compatibility
+4. **musl build errors**: Verify Alpine packages are correctly installed in containers
 
 ### Upload Failures
 
