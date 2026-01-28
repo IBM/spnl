@@ -240,13 +240,7 @@ codesign --verify --verbose spnl
 
 # Check notarization
 spctl --assess --verbose spnl
-
-# Verify stapling (notarization ticket is embedded)
-stapler validate spnl
 ```
-
-**What is stapling?**
-Stapling embeds the notarization ticket directly into the binary. This allows macOS to verify the notarization even when offline, providing a better user experience.
 
 ## Versioning
 

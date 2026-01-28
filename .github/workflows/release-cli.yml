@@ -198,7 +198,7 @@ jobs:
           rm certificate.p12
 
       - name: Sign and Notarize macOS Binary
-        if: runner.os == 'macOS' && steps.check_secrets.outputs.has_signing_secrets == 'true'
+        if: runner.os == 'macOS' && steps.check_secrets.outputs.has_signing_secrets == 'true' && startsWith(github.ref, 'refs/tags/')
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -225,13 +225,7 @@ jobs:
           # Clean up notarization zip
           rm spnl-notarize.zip
           
-          # Staple the notarization ticket to the binary
-          xcrun stapler staple "$BINARY_PATH"
-          
-          # Verify stapling
-          xcrun stapler validate "$BINARY_PATH"
-          
-          echo "✅ macOS binary signed, notarized, and stapled successfully"
+          echo "✅ macOS binary signed and notarized successfully"
 
       - name: Prepare binary (Unix)
         if: runner.os != 'Windows'

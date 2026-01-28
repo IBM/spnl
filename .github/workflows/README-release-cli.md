@@ -162,7 +162,6 @@ To change compression level or format, modify the "Prepare binary" steps.
 - **Static linking**: musl builds have no external dependencies
 - **macOS Code Signing**: macOS binaries are signed with Apple Developer certificate (optional)
 - **macOS Notarization**: macOS binaries are notarized by Apple for Gatekeeper compatibility (optional)
-- **macOS Stapling**: Notarization ticket is stapled to the binary for offline verification (optional)
 
 ### Optional: macOS Code Signing
 
