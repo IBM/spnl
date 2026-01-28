@@ -48,7 +48,7 @@ resource "google_compute_instance" "spnl-test-big" {
 
   metadata = {
     enable-osconfig = "TRUE",
-    user-data = templatefile("cloud-config.yaml", {run_id=local.run_id,hf_token=var.hf_token,model=var.model,gcs_bucket=var.gcs_bucket,spnl_github=var.spnl_github,spnl_github_sha=var.spnl_github_sha,spnl_github_ref=var.spnl_github_ref,vllm_org=var.vllm_org,vllm_repo=var.vllm_repo,vllm_branch=var.vllm_branch,setup_script=indent(6, file("setup.sh")),vllm_patch_b64=filebase64("../../vllm/patches/${var.vllm_patch}")})
+    user-data = templatefile("cloud-config.yaml", {run_id=local.run_id,hf_token=var.hf_token,model=var.model,gcs_bucket=var.gcs_bucket,spnl_github=var.spnl_github,spnl_github_sha=var.spnl_github_sha,spnl_github_ref=var.spnl_github_ref,vllm_org=var.vllm_org,vllm_repo=var.vllm_repo,vllm_branch=var.vllm_branch,setup_script=indent(6, file("setup.sh")),vllm_patch_b64=filebase64("../../vllm/llm.d/patches/${var.vllm_patch}")})
   }
 
   name = "spnl-test-big-${local.run_id}"
