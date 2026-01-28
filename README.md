@@ -41,6 +41,18 @@ queries. The library is surfaced for consumption as:
 [**vLLM image**](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda) **|** [**vLLM patch**](docker/vllm/llm-d/patches/0.4.0) **|** [**CLI image**](https://github.com/IBM/spnl/pkgs/container/spnl) **|** [**CLI image
   with  Ollama**](https://github.com/IBM/spnl/pkgs/container/spnl-ollama) **|** [**Rust crate**](https://crates.io/crates/spnl) **|** [**Python pip**](https://pypi.org/project/spnl) **|** [**Playground**](https://ibm.github.io/spnl/?qv=false)
 
+### Installing via Homebrew
+
+```bash
+# Add the tap
+brew tap IBM/spnl https://github.com/IBM/spnl
+
+# Install spnl
+brew install spnl
+```
+
+### Quick Start with Docker
+
 To kick the tires with SPNL running [Ollama](https://ollama.com/):
 ```shell
 podman run --rm -it ghcr.io/ibm/spnl-ollama --verbose
