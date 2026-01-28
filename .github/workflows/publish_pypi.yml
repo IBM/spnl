@@ -11,6 +11,9 @@ on:
   # uncomment for debugging:
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - 'docker/**'
 
 permissions:
   contents: read
