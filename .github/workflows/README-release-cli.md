@@ -6,7 +6,7 @@ The `release-cli.yml` workflow automatically builds and publishes the SPNL CLI b
 
 ## Supported Platforms
 
-The workflow builds binaries for **7 platform configurations**:
+The workflow builds binaries for **8 platform configurations**:
 
 ### Linux (4 builds)
 - **x86_64 GNU** - Dynamic linking with glibc (most common)
@@ -18,8 +18,9 @@ The workflow builds binaries for **7 platform configurations**:
 - **x86_64** - Intel Macs
 - **ARM64** - Apple Silicon (M1/M2/M3)
 
-### Windows (1 build)
-- **x86_64** - 64-bit Windows
+### Windows (2 builds)
+- **x86_64** - 64-bit Windows (Intel/AMD)
+- **ARM64** - 64-bit Windows on ARM (Surface Pro X, etc.)
 
 ## Trigger
 
@@ -44,7 +45,8 @@ spnl-v0.13.0-linux-aarch64-gnu.tar.gz      # Linux ARM64 (glibc)
 spnl-v0.13.0-linux-aarch64-musl.tar.gz     # Linux ARM64 (static)
 spnl-v0.13.0-macos-x86_64.tar.gz           # macOS Intel
 spnl-v0.13.0-macos-aarch64.tar.gz          # macOS Apple Silicon
-spnl-v0.13.0-windows-x86_64.zip            # Windows 64-bit
+spnl-v0.13.0-windows-x86_64.zip            # Windows x86_64
+spnl-v0.13.0-windows-aarch64.zip           # Windows ARM64
 checksums.txt                               # SHA256 checksums for all files
 ```
 
@@ -54,7 +56,8 @@ Each binary is built with the following Cargo features enabled:
 - `rag` - RAG (Retrieval-Augmented Generation) support
 - `vllm` - vLLM integration
 - `spnl-api` - SPNL API support
-- `openssl-vendored` - Statically linked OpenSSL
+
+**Note**: The `openssl-vendored` feature (statically linked OpenSSL) is only used for musl builds to create fully static binaries. All other platforms (GNU Linux, macOS, Windows) use system OpenSSL for faster builds and smaller binaries.
 
 ## Architecture
 
@@ -151,9 +154,11 @@ To change compression level or format, modify the "Prepare binary" steps.
 ### Build Failures
 
 1. **Protobuf errors**: Ensure protoc is properly installed for the platform
-2. **OpenSSL errors**: The `openssl-vendored` feature should handle this
+2. **OpenSSL errors**:
+   - For musl builds: The `openssl-vendored` feature builds OpenSSL from source
+   - For other platforms: Ensure system OpenSSL is available (usually pre-installed)
 3. **Container errors**: Check Docker container availability and compatibility
-4. **musl build errors**: Verify Alpine packages are correctly installed in containers
+4. **musl build errors**: Verify Alpine packages (including perl and make for OpenSSL) are correctly installed in containers
 
 ### Upload Failures
 
@@ -163,7 +168,7 @@ To change compression level or format, modify the "Prepare binary" steps.
 
 ## Performance
 
-- **Parallel builds**: All 7 platforms build simultaneously
+- **Parallel builds**: All 8 platforms build simultaneously
 - **Build time**: ~10-20 minutes total (depending on GitHub Actions queue)
 - **Caching**: Rust toolchain and dependencies are cached between runs
 

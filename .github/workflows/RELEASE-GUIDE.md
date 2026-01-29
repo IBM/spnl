@@ -35,7 +35,7 @@ The workflow will automatically:
 - ✅ Build GNU libc binaries natively (Linux x86_64, ARM64)
 - ✅ Build musl binaries in containers (Linux x86_64, ARM64 static)
 - ✅ Build macOS binaries (x86_64, ARM64)
-- ✅ Build Windows binary (x86_64)
+- ✅ Build Windows binaries (x86_64, ARM64)
 - ✅ Create compressed archives
 - ✅ Generate SHA256 checksums
 - ✅ Upload all files to the release
@@ -51,6 +51,7 @@ Check that all files are attached to the release:
 - [ ] `spnl-v0.14.0-macos-x86_64.tar.gz`
 - [ ] `spnl-v0.14.0-macos-aarch64.tar.gz`
 - [ ] `spnl-v0.14.0-windows-x86_64.zip`
+- [ ] `spnl-v0.14.0-windows-aarch64.zip`
 - [ ] `checksums.txt`
 
 ## Monitoring the Workflow
@@ -106,8 +107,10 @@ Users on Apple Silicon can run either version (Rosetta 2 compatibility).
 
 ### Windows
 
-- Only 64-bit Windows is supported
-- Requires Windows 10 or later
+- **x86_64**: For Intel/AMD processors (most common)
+- **aarch64**: For ARM64 processors (Surface Pro X, Snapdragon laptops)
+- Both builds require Windows 10 or later
+- ARM64 build is cross-compiled from x86_64 runner
 
 ## Release Checklist
 
@@ -124,7 +127,7 @@ Before publishing a release:
 After publishing:
 
 - [ ] Workflow completed successfully
-- [ ] All 7 platform binaries uploaded
+- [ ] All 8 platform binaries uploaded
 - [ ] macOS binaries signed and notarized
 - [ ] Checksums file present
 - [ ] Release notes are clear and complete
@@ -322,7 +325,8 @@ Download the appropriate binary for your platform from the assets below.
 - **aarch64**: Apple Silicon (M1/M2/M3)
 
 ### Windows
-- **x86_64**: 64-bit Windows 10+
+- **x86_64**: Intel/AMD processors (most common)
+- **aarch64**: ARM64 processors (Surface Pro X, Snapdragon laptops)
 
 ## Verification
 

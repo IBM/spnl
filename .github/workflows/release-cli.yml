@@ -17,6 +17,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  BUILD_RELEASE_ARG: ${{ startsWith(github.ref, 'refs/tags/') && '--release' || '' }}
+  BUILD_DIR: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || 'debug' }}
   CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
   CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
 
@@ -62,14 +64,22 @@ jobs:
             name: macOS ARM64
             use_cross: false
           
-          # Windows build
-          # - runner: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   platform: windows
-          #   arch: x86_64
-          #   libc: ""
-          #   name: Windows x86_64
-          #   use_cross: false
+          # Windows builds
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: x86_64
+            libc: ""
+            name: Windows x86_64
+            use_cross: false
+          
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            platform: windows
+            arch: aarch64
+            libc: ""
+            name: Windows ARM64
+            use_cross: false
 
     env:
       TARGET: ${{ matrix.platform.target }}
@@ -92,6 +102,13 @@ jobs:
       - name: Setup Rust toolchain
         shell: bash
         run: |
+          # On Windows, rustup is already in PATH and doesn't need sourcing
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            # Source cargo env if it exists (Linux/macOS)
+            if [ -f "$HOME/.cargo/env" ]; then
+              source "$HOME/.cargo/env"
+            fi
+          fi
           rustup target add ${{ matrix.platform.target }}
 
       - name: Install cross-compilation tool
@@ -128,21 +145,34 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
+          # Create a local directory for protoc
+          mkdir -p "$RUNNER_TEMP/protoc"
+          
+          # Download and extract protoc
           curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-win64.zip
-          unzip protoc.zip -d $HOME/.local
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          unzip protoc.zip -d "$RUNNER_TEMP/protoc"
+          
+          # Add to PATH using Windows-style path
+          echo "$RUNNER_TEMP/protoc/bin" >> $GITHUB_PATH
+          
+          # Verify protoc is available (will be available in next step)
+          ls -la "$RUNNER_TEMP/protoc/bin"
 
       - name: Build CLI (native)
         if: ${{ !matrix.platform.use_cross }}
         shell: bash
         run: |
-          cargo build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+          # Only use openssl-vendored for musl builds (static linking)
+          # Other platforms use system OpenSSL
+          cargo build --features rag,vllm,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Build CLI (cross)
         if: matrix.platform.use_cross
         shell: bash
         run: |
-          cross build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+          # Only use openssl-vendored for musl builds (static linking)
+          # Other platforms use system OpenSSL
+          cross build --features rag,vllm,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Check for Apple signing secrets
         if: runner.os == 'macOS'
@@ -187,14 +217,14 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
-          BINARY_PATH="target/$TARGET/release/spnl"
+          BINARY_PATH="target/$TARGET/$BUILD_DIR/spnl"
           .github/scripts/sign-and-notarize-macos.sh "$BINARY_PATH" "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_SPECIFIC_PASSWORD"
 
       - name: Prepare binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cd target/$TARGET/release
+          cd target/$TARGET/$BUILD_DIR
           BINARY_NAME="spnl"
           if [ "$LIBC" != "" ]; then
             ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC.tar.gz"
@@ -203,18 +233,18 @@ jobs:
           fi
           tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
-          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Prepare binary (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          cd target/$TARGET/release
+          cd target/$TARGET/$BUILD_DIR
           BINARY_NAME="spnl.exe"
           ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH.zip"
           7z a "$ARCHIVE_NAME" "$BINARY_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
-          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Generate checksum
         shell: bash
@@ -294,17 +324,17 @@ jobs:
       - name: Build CLI
         shell: sh
         run: |
-          cargo build --features rag,vllm,spnl-api,openssl-vendored --release --package spnl-cli --target $TARGET
+          cargo build --features rag,vllm,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Prepare binary
         shell: sh
         run: |
-          cd target/$TARGET/release
+          cd target/$TARGET/$BUILD_DIR
           BINARY_NAME="spnl"
           ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC.tar.gz"
           tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
-          echo "ARCHIVE_PATH=target/$TARGET/release/$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Generate checksum
         shell: sh
