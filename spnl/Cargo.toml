@@ -26,7 +26,7 @@ run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini
 tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:futures","dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
-k8s = ["dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid"]
+k8s = ["dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid","dep:tokio-stream"]
 vllm = ["k8s","yaml"]
 
 [dependencies]
@@ -35,7 +35,7 @@ k8s-openapi = { version = "0.27.0", features = ["latest", "schemars"], optional 
 schemars = { version = "1", optional = true }
 # at some point, we could change ring to aws-lc-rs, but request 0.12 currently relies on ring, and async-openai still relies on request 0.12)
 rustls = { version = "0.23.36", default-features = false, features = ["ring"], optional = true }
-kube = { version = "3.0.0", default-features = false, features = ["client", "runtime", "rustls-tls", "ring"], optional = true }
+kube = { version = "3.0.0", default-features = false, features = ["client", "runtime", "rustls-tls", "ring", "ws"], optional = true }
 
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"], optional = true }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -44,7 +44,8 @@ async-openai = { version = "0.32.0", features=["embedding","chat-completion","co
 async-recursion = {version = "1.1.1", optional = true }
 futures = { version = "0.3.31", optional = true }
 indicatif = { version = "0.18.0", optional = true }
-tokio = { version = "1.44.1", features = ["io-std", "io-util"], optional = true }
+tokio = { version = "1.44.1", features = ["io-std", "io-util", "signal"], optional = true }
+tokio-stream = { version = "0.1.18", features = ["net"], optional = true }
 tokio-util = { version = "0.7.16", optional = true }
 anyhow = { version = "1.0.98" }
 lancedb = { version = "0.23.0", optional = true }

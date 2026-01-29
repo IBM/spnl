@@ -140,6 +140,14 @@ pub enum VllmCommands {
         /// HuggingFace token, used to pull model weights
         #[arg(short = 't', long, env = "HF_TOKEN", required = true)]
         hf_token: String,
+
+        /// Local port for port forwarding (defaults to 8000)
+        #[arg(short = 'p', long, default_value = "8000")]
+        local_port: Option<u16>,
+
+        /// Remote port for port forwarding (defaults to 8000)
+        #[arg(short = 'r', long, default_value = "8000")]
+        remote_port: u16,
     },
     Down {
         #[command(flatten)]

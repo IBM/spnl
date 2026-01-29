@@ -1,10 +1,11 @@
-use futures::{AsyncBufReadExt, TryStreamExt};
+use futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
     Client, ResourceExt,
     api::{Api, DeleteParams, ListParams, LogParams, PostParams},
+    runtime::wait::{await_condition, conditions::is_deployment_completed},
 };
 
 #[derive(derive_builder::Builder)]
@@ -24,6 +25,14 @@ pub struct UpArgs {
     /// HuggingFace api token
     #[builder(setter(into))]
     hf_token: String,
+
+    /// Local port for port forwarding
+    #[builder(default = "Some(8000)")]
+    local_port: Option<u16>,
+
+    /// Remote port for port forwarding (defaults to 8000)
+    #[builder(default = "8000")]
+    remote_port: u16,
 }
 
 fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::Uuid)> {
@@ -36,7 +45,7 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::U
     {
         if let Some(image) = &spec.containers[0].image {
             spec.containers[0].image =
-                Some(format!("{}:{}", image, ::std::env!("CARGO_PKG_VERSION")));
+                Some(format!("{}:v{}", image, ::std::env!("CARGO_PKG_VERSION")));
         }
 
         if let Some(ml) = &ospec.selector.match_labels {
@@ -105,9 +114,12 @@ where
 
 pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     let name = &args.name.clone();
+    let local_port = args.local_port;
+    let remote_port = args.remote_port;
+    let namespace = args.namespace.clone();
     let c = client().await?;
-    let d = api::<Deployment>(c.clone(), &args.namespace)?;
-    let p = api::<Pod>(client().await?, &args.namespace)?;
+    let d = api::<Deployment>(c.clone(), &namespace)?;
+    let p = api::<Pod>(client().await?, &namespace)?;
     let (manifest, id) = load_deployment_manifest(args)?;
     d.create(&PostParams::default(), &manifest).await?;
 
@@ -128,6 +140,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     };
 
     let join_handles: Vec<tokio::task::JoinHandle<_>> = pods
+        .clone()
         .into_iter()
         .map(|pod| {
             tokio::spawn({
@@ -184,16 +197,113 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
         .collect();
 
     // why the loop? see https://github.com/kube-rs/kube/issues/1915
-    /* eprintln!("Awaiting deployment completion");
+    eprintln!("Awaiting deployment completion");
     loop {
-        if await_condition(d.clone(), name, is_deployment_completed()).await.is_ok() {
+        if await_condition(d.clone(), name, is_deployment_completed())
+            .await
+            .is_ok()
+        {
             eprintln!("READY");
-            break
+            break;
         }
-    }*/
+    }
 
-    futures::future::try_join_all(join_handles).await?;
+    // Set up port forwarding if local_port is specified
+    if let Some(local_port) = local_port {
+        // Select any ready pod from the deployment for port forwarding
+        let ready_pod = loop {
+            let pod_list = p
+                .list(
+                    &ListParams::default().labels(
+                        format!("app.kubernetes.io/name={name},app.kubernetes.io/instance={id}")
+                            .as_str(),
+                    ),
+                )
+                .await?;
 
+            if let Some(pod) = pod_list.items.iter().find(|pod| {
+                if let Some(status) = &pod.status
+                    && let Some(conditions) = &status.conditions
+                {
+                    return conditions
+                        .iter()
+                        .any(|c| c.type_ == "Ready" && c.status == "True");
+                }
+                false
+            }) {
+                break pod.name_any();
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        };
+
+        eprintln!(
+            "Setting up port forward: localhost:{} -> {}:{}",
+            local_port, ready_pod, remote_port
+        );
+
+        let addr = ::std::net::SocketAddr::from(([127, 0, 0, 1], local_port));
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        eprintln!(
+            "Port forwarding: localhost:{} -> {}:{}",
+            local_port, ready_pod, remote_port
+        );
+
+        let p_clone = p.clone();
+        let ready_pod_clone = ready_pod.clone();
+        tokio::spawn(async move {
+            let server = tokio_stream::wrappers::TcpListenerStream::new(listener)
+                .take_until(tokio::signal::ctrl_c())
+                .try_for_each(|client_conn| async {
+                    let pods = p_clone.clone();
+                    let pod_name = ready_pod_clone.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) =
+                            forward_connection(&pods, &pod_name, remote_port, client_conn).await
+                        {
+                            eprintln!("Failed to forward connection: {}", e);
+                        }
+                    });
+                    Ok(())
+                });
+
+            if let Err(e) = server.await {
+                eprintln!("Port forwarding error: {}", e);
+            } else {
+                eprintln!("Port forwarding stopped");
+            }
+        });
+
+        // Give port forwarding a moment to establish
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    }
+
+    // Wait for either all log handles to complete or Ctrl+C
+    tokio::select! {
+        result = futures::future::try_join_all(join_handles) => {
+            result?;
+        }
+        _ = tokio::signal::ctrl_c() => {
+            eprintln!("Received Ctrl+C, shutting down...");
+        }
+    }
+
+    Ok(())
+}
+
+async fn forward_connection(
+    pods: &Api<Pod>,
+    pod_name: &str,
+    port: u16,
+    mut client_conn: impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+) -> anyhow::Result<()> {
+    let mut forwarder = pods.portforward(pod_name, &[port]).await?;
+    let mut upstream_conn = forwarder
+        .take_stream(port)
+        .ok_or_else(|| anyhow::anyhow!("port not found in forwarder"))?;
+    tokio::io::copy_bidirectional(&mut client_conn, &mut upstream_conn).await?;
+    drop(upstream_conn);
+    forwarder.join().await?;
     Ok(())
 }
 

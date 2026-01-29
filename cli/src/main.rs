@@ -34,6 +34,8 @@ async fn main() -> Result<(), SpnlError> {
                     name,
                     model,
                     hf_token,
+                    local_port,
+                    remote_port,
                 },
         } => {
             vllm::up(
@@ -42,6 +44,8 @@ async fn main() -> Result<(), SpnlError> {
                     .namespace(name.namespace)
                     .model(model)
                     .hf_token(hf_token)
+                    .local_port(local_port)
+                    .remote_port(remote_port)
                     .build()?,
             )
             .await
