@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: vllm
-          image: ghcr.io/ibm/spnl-llm-d-cuda:v0.12.9
+          image: ghcr.io/ibm/spnl-llm-d-cuda
           command:
             - /bin/sh
             - "-c"
