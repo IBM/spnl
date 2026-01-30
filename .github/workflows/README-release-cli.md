@@ -36,19 +36,21 @@ The workflow will start immediately and build all platform binaries.
 
 ## Output Artifacts
 
-After the workflow completes, the following files will be attached to your release:
+After the workflow completes, the following files will be attached to your release with user-friendly display names:
 
-```
-spnl-v0.13.0-linux-x86_64-gnu.tar.gz       # Linux x86_64 (glibc)
-spnl-v0.13.0-linux-x86_64-musl.tar.gz      # Linux x86_64 (static)
-spnl-v0.13.0-linux-aarch64-gnu.tar.gz      # Linux ARM64 (glibc)
-spnl-v0.13.0-linux-aarch64-musl.tar.gz     # Linux ARM64 (static)
-spnl-v0.13.0-macos-x86_64.tar.gz           # macOS Intel
-spnl-v0.13.0-macos-aarch64.tar.gz          # macOS Apple Silicon
-spnl-v0.13.0-windows-x86_64.zip            # Windows x86_64
-spnl-v0.13.0-windows-aarch64.zip           # Windows ARM64
-checksums.txt                               # SHA256 checksums for all files
-```
+| File | Display Name |
+|------|--------------|
+| `spnl-v0.13.0-linux-x86_64-gnu.tar.gz` | **Linux x86_64 (GNU)** |
+| `spnl-v0.13.0-linux-x86_64-musl.tar.gz` | **Linux x86_64 (musl static)** |
+| `spnl-v0.13.0-linux-aarch64-gnu.tar.gz` | **Linux ARM64 (GNU)** |
+| `spnl-v0.13.0-linux-aarch64-musl.tar.gz` | **Linux ARM64 (musl static)** |
+| `spnl-v0.13.0-macos-x86_64.tar.gz` | **macOS x86_64** |
+| `spnl-v0.13.0-macos-aarch64.tar.gz` | **macOS Apple Silicon** |
+| `spnl-v0.13.0-windows-x86_64.zip` | **Windows x86_64** |
+| `spnl-v0.13.0-windows-aarch64.zip` | **Windows ARM64** |
+| `checksums.txt` | **SHA256 Checksums** |
+
+The display names make it easier for users to identify the right binary for their platform in the GitHub release UI.
 
 ## Build Features
 

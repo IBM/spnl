@@ -43,16 +43,18 @@ The workflow will automatically:
 
 ### Step 4: Verify Release
 
-Check that all files are attached to the release:
-- [ ] `spnl-v0.14.0-linux-x86_64-gnu.tar.gz`
-- [ ] `spnl-v0.14.0-linux-x86_64-musl.tar.gz`
-- [ ] `spnl-v0.14.0-linux-aarch64-gnu.tar.gz`
-- [ ] `spnl-v0.14.0-linux-aarch64-musl.tar.gz`
-- [ ] `spnl-v0.14.0-macos-x86_64.tar.gz`
-- [ ] `spnl-v0.14.0-macos-aarch64.tar.gz`
-- [ ] `spnl-v0.14.0-windows-x86_64.zip`
-- [ ] `spnl-v0.14.0-windows-aarch64.zip`
-- [ ] `checksums.txt`
+Check that all files are attached to the release with their display names:
+- [ ] **Linux x86_64 (GNU)** - `spnl-v0.14.0-linux-x86_64-gnu.tar.gz`
+- [ ] **Linux x86_64 (musl static)** - `spnl-v0.14.0-linux-x86_64-musl.tar.gz`
+- [ ] **Linux ARM64 (GNU)** - `spnl-v0.14.0-linux-aarch64-gnu.tar.gz`
+- [ ] **Linux ARM64 (musl static)** - `spnl-v0.14.0-linux-aarch64-musl.tar.gz`
+- [ ] **macOS x86_64** - `spnl-v0.14.0-macos-x86_64.tar.gz`
+- [ ] **macOS Apple Silicon** - `spnl-v0.14.0-macos-aarch64.tar.gz`
+- [ ] **Windows x86_64** - `spnl-v0.14.0-windows-x86_64.zip`
+- [ ] **Windows ARM64** - `spnl-v0.14.0-windows-aarch64.zip`
+- [ ] **SHA256 Checksums** - `checksums.txt`
+
+Note: The display names shown in bold are what users will see in the GitHub release UI, making it easier to identify the right binary for their platform.
 
 ## Monitoring the Workflow
 

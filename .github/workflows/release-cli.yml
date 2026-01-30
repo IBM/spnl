@@ -393,11 +393,69 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           cd release-assets
           
-          # Upload all archives and checksums
+          # Function to generate pretty name from filename
+          get_pretty_name() {
+            local file="$1"
+            
+            # Handle checksums.txt specially
+            if [ "$file" = "checksums.txt" ]; then
+              echo "SHA256 Checksums"
+              return
+            fi
+            
+            # Parse the filename: spnl-VERSION-PLATFORM-ARCH[-LIBC].EXT
+            local basename="${file%.tar.gz}"
+            basename="${basename%.zip}"
+            
+            # Extract components after version
+            local parts="${basename#spnl-$VERSION-}"
+            
+            # Parse platform, arch, and libc
+            if [[ "$parts" =~ ^([^-]+)-([^-]+)-([^-]+)$ ]]; then
+              # Has libc: platform-arch-libc
+              local platform="${BASH_REMATCH[1]}"
+              local arch="${BASH_REMATCH[2]}"
+              local libc="${BASH_REMATCH[3]}"
+            elif [[ "$parts" =~ ^([^-]+)-([^-]+)$ ]]; then
+              # No libc: platform-arch
+              local platform="${BASH_REMATCH[1]}"
+              local arch="${BASH_REMATCH[2]}"
+              local libc=""
+            fi
+            
+            # Convert to pretty names
+            case "$platform" in
+              linux) platform="Linux" ;;
+              macos) platform="macOS" ;;
+              windows) platform="Windows" ;;
+            esac
+            
+            case "$arch" in
+              x86_64) arch="x86_64" ;;
+              aarch64)
+                if [ "$platform" = "macOS" ]; then
+                  arch="Apple Silicon"
+                else
+                  arch="ARM64"
+                fi
+                ;;
+            esac
+            
+            case "$libc" in
+              gnu) libc=" (GNU)" ;;
+              musl) libc=" (musl static)" ;;
+              *) libc="" ;;
+            esac
+            
+            echo "$platform $arch$libc"
+          }
+          
+          # Upload all archives and checksums with pretty names
           for file in *.tar.gz *.zip checksums.txt; do
             if [ -f "$file" ]; then
-              echo "Uploading $file..."
-              gh release upload "$VERSION" "$file" --clobber
+              pretty_name=$(get_pretty_name "$file")
+              echo "Uploading $file as '$pretty_name'..."
+              gh release upload "$VERSION" "$file#$pretty_name" --clobber
             fi
           done
           
