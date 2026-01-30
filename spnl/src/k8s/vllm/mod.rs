@@ -26,12 +26,16 @@ pub struct UpArgs {
     #[builder(setter(into))]
     hf_token: String,
 
+    /// Number of GPUs to request
+    #[builder(default = 1)]
+    gpus: u32,
+
     /// Local port for port forwarding
-    #[builder(default = "Some(8000)")]
+    #[builder(default = Some(8000))]
     local_port: Option<u16>,
 
     /// Remote port for port forwarding (defaults to 8000)
-    #[builder(default = "8000")]
+    #[builder(default = 8000)]
     remote_port: u16,
 }
 
@@ -88,6 +92,15 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::U
                     ));
                 }
             };
+        }
+
+        // Set GPU count in resources.limits
+        if let Some(ref mut resources) = spec.containers[0].resources
+            && let Some(ref mut limits) = resources.limits
+            && let Some(gpu_limit) = limits.get_mut("nvidia.com/gpu")
+        {
+            *gpu_limit =
+                k8s_openapi::apimachinery::pkg::api::resource::Quantity(args.gpus.to_string());
         }
     }
     Ok((d, id))

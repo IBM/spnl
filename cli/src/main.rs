@@ -34,6 +34,7 @@ async fn main() -> Result<(), SpnlError> {
                     name,
                     model,
                     hf_token,
+                    gpus,
                     local_port,
                     remote_port,
                 },
@@ -44,6 +45,7 @@ async fn main() -> Result<(), SpnlError> {
                     .namespace(name.namespace)
                     .model(model)
                     .hf_token(hf_token)
+                    .gpus(gpus)
                     .local_port(local_port)
                     .remote_port(remote_port)
                     .build()?,
