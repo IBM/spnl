@@ -27,6 +27,7 @@ tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:futures","dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
 k8s = ["dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid","dep:tokio-stream"]
+gce = ["dep:google-cloud-compute-v1","dep:google-cloud-lro","dep:tokio","dep:base64","dep:flate2","dep:uuid","dep:rustls","yaml"]
 vllm = ["k8s","yaml"]
 
 [dependencies]
@@ -36,6 +37,8 @@ schemars = { version = "1", optional = true }
 # at some point, we could change ring to aws-lc-rs, but request 0.12 currently relies on ring, and async-openai still relies on request 0.12)
 rustls = { version = "0.23.36", default-features = false, features = ["ring"], optional = true }
 kube = { version = "3.0.0", default-features = false, features = ["client", "runtime", "rustls-tls", "ring", "ws"], optional = true }
+google-cloud-compute-v1 = { version = "2.1.0", features = ["instances"], optional = true }
+google-cloud-lro = { version = "1.3.0", optional = true }
 
 ptree = { version = "0.5.2", default-features = false, features = ["ansi"], optional = true }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -67,6 +70,8 @@ thiserror = { version = "2.0.14", optional = true }
 clap = { version = "4.5.45", features = ["derive","env"] }
 regex = { version = "1.11.1", optional = true }
 rand = { version = "0.9.2", features = ["os_rng"], optional = true }
+base64 = { version = "0.22", optional = true }
+flate2 = { version = "1.0", optional = true }
 
 [dev-dependencies]
 cargo-husky.workspace = true

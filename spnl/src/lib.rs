@@ -26,3 +26,6 @@ pub use augment::{AugmentOptionsBuilder, Indexer, windowing};
 
 #[cfg(feature = "k8s")]
 pub mod k8s;
+
+#[cfg(feature = "gce")]
+pub mod gce;

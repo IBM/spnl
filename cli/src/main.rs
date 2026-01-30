@@ -7,9 +7,11 @@ use spnl::{
 };
 
 #[cfg(feature = "vllm")]
-use crate::args::VllmCommands;
-#[cfg(feature = "vllm")]
-use spnl::k8s::vllm;
+use crate::args::{VllmCommands, VllmTarget};
+#[cfg(all(feature = "vllm", feature = "gce"))]
+use spnl::gce::vllm as gce_vllm;
+#[cfg(all(feature = "vllm", feature = "k8s"))]
+use spnl::k8s::vllm as k8s_vllm;
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
@@ -31,6 +33,7 @@ async fn main() -> Result<(), SpnlError> {
         Commands::Vllm {
             command:
                 VllmCommands::Up {
+                    target,
                     name,
                     model,
                     hf_token,
@@ -38,24 +41,43 @@ async fn main() -> Result<(), SpnlError> {
                     local_port,
                     remote_port,
                 },
-        } => {
-            vllm::up(
-                vllm::UpArgsBuilder::default()
-                    .name(name.name)
-                    .namespace(name.namespace)
-                    .model(model)
-                    .hf_token(hf_token)
-                    .gpus(gpus)
-                    .local_port(local_port)
-                    .remote_port(remote_port)
-                    .build()?,
-            )
-            .await
-        }
+        } => match target {
+            #[cfg(feature = "k8s")]
+            VllmTarget::K8s => {
+                k8s_vllm::up(
+                    k8s_vllm::UpArgsBuilder::default()
+                        .name(name.name)
+                        .namespace(name.namespace)
+                        .model(model)
+                        .hf_token(hf_token)
+                        .gpus(gpus)
+                        .local_port(local_port)
+                        .remote_port(remote_port)
+                        .build()?,
+                )
+                .await
+            }
+            #[cfg(feature = "gce")]
+            VllmTarget::Gce => {
+                gce_vllm::up(
+                    gce_vllm::UpArgsBuilder::default()
+                        .name(name.name)
+                        .model(model)
+                        .hf_token(hf_token)
+                        .build()?,
+                )
+                .await
+            }
+        },
         #[cfg(feature = "vllm")]
         Commands::Vllm {
-            command: VllmCommands::Down { name },
-        } => vllm::down(&name.name, name.namespace).await,
+            command: VllmCommands::Down { target, name },
+        } => match target {
+            #[cfg(feature = "k8s")]
+            VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace).await,
+            #[cfg(feature = "gce")]
+            VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace).await,
+        },
     }
 }
 
