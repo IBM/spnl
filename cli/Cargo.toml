@@ -13,6 +13,7 @@ spnl-api = ["spnl/spnl-api"]
 rag-deep-debug = ["spnl/rag-deep-debug"]
 openssl-vendored = ["spnl/openssl-vendored"]
 k8s = ["spnl/k8s"]
+gce = ["spnl/gce"]
 vllm = ["k8s","spnl/vllm"]
 
 [dependencies]

@@ -127,9 +127,22 @@ pub struct Args {
 }
 
 #[cfg(feature = "vllm")]
+#[derive(clap::ValueEnum, Clone, Debug, serde::Serialize)]
+pub enum VllmTarget {
+    #[cfg(feature = "k8s")]
+    K8s,
+    #[cfg(feature = "gce")]
+    Gce,
+}
+
+#[cfg(feature = "vllm")]
 #[derive(Subcommand, Debug, serde::Serialize)]
 pub enum VllmCommands {
     Up {
+        /// Target platform (k8s or gce)
+        #[arg(long, default_value = "k8s")]
+        target: VllmTarget,
+
         #[command(flatten)]
         name: K8sNameArgs,
 
@@ -154,6 +167,10 @@ pub enum VllmCommands {
         remote_port: u16,
     },
     Down {
+        /// Target platform (k8s or gce)
+        #[arg(long, default_value = "k8s")]
+        target: VllmTarget,
+
         #[command(flatten)]
         name: K8sNameArgs,
     },
