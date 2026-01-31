@@ -14,7 +14,7 @@ pub enum Commands {
     Run(Args),
 
     /// Bring up vLLM in a Kubernetes cluster
-    #[cfg(feature = "vllm")]
+    #[cfg(any(feature = "k8s", feature = "gce"))]
     Vllm {
         #[command(subcommand)]
         command: VllmCommands,
@@ -126,7 +126,7 @@ pub struct Args {
     pub dry_run: bool,
 }
 
-#[cfg(feature = "vllm")]
+#[cfg(any(feature = "k8s", feature = "gce"))]
 #[derive(clap::ValueEnum, Clone, Debug, serde::Serialize)]
 pub enum VllmTarget {
     #[cfg(feature = "k8s")]
@@ -135,7 +135,7 @@ pub enum VllmTarget {
     Gce,
 }
 
-#[cfg(feature = "vllm")]
+#[cfg(any(feature = "k8s", feature = "gce"))]
 #[derive(Subcommand, Debug, serde::Serialize)]
 pub enum VllmCommands {
     Up {
@@ -144,7 +144,7 @@ pub enum VllmCommands {
         target: VllmTarget,
 
         #[command(flatten)]
-        name: K8sNameArgs,
+        name: NameArgs,
 
         /// Model to serve
         #[arg(short = 'm', long, env = "SPNL_MODEL")]
@@ -172,18 +172,18 @@ pub enum VllmCommands {
         target: VllmTarget,
 
         #[command(flatten)]
-        name: K8sNameArgs,
+        name: NameArgs,
     },
 }
 
-#[cfg(feature = "k8s")]
+#[cfg(any(feature = "k8s", feature = "gce"))]
 #[derive(clap::Args, Debug, serde::Serialize)]
-pub struct K8sNameArgs {
-    /// Name of Kubernetes Deployment resource
+pub struct NameArgs {
+    /// Name of the deployment/instance
     #[arg(required = true)]
     pub name: String,
 
-    /// Namespace of Kubernetes Deployment resource
+    /// Namespace (k8s only)
     #[arg(short = 'n', long)]
     pub namespace: Option<String>,
 }

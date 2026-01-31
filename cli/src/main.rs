@@ -6,11 +6,11 @@ use spnl::{
     ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
 };
 
-#[cfg(feature = "vllm")]
+#[cfg(any(feature = "k8s", feature = "gce"))]
 use crate::args::{VllmCommands, VllmTarget};
-#[cfg(all(feature = "vllm", feature = "gce"))]
+#[cfg(feature = "gce")]
 use spnl::gce::vllm as gce_vllm;
-#[cfg(all(feature = "vllm", feature = "k8s"))]
+#[cfg(feature = "k8s")]
 use spnl::k8s::vllm as k8s_vllm;
 
 #[cfg(feature = "rag")]
@@ -29,7 +29,7 @@ async fn main() -> Result<(), SpnlError> {
     match args.command {
         Commands::Run(run_args) => run(run_args).await,
 
-        #[cfg(feature = "vllm")]
+        #[cfg(any(feature = "k8s", feature = "gce"))]
         Commands::Vllm {
             command:
                 VllmCommands::Up {
@@ -69,7 +69,7 @@ async fn main() -> Result<(), SpnlError> {
                 .await
             }
         },
-        #[cfg(feature = "vllm")]
+        #[cfg(any(feature = "k8s", feature = "gce"))]
         Commands::Vllm {
             command: VllmCommands::Down { target, name },
         } => match target {

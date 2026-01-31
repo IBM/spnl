@@ -26,9 +26,9 @@ run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini
 tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:futures","dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
-k8s = ["dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid","dep:tokio-stream"]
-gce = ["dep:google-cloud-compute-v1","dep:google-cloud-lro","dep:tokio","dep:base64","dep:flate2","dep:uuid","dep:rustls","yaml"]
-vllm = ["k8s","yaml"]
+vllm = ["yaml"]
+k8s = ["vllm","dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid","dep:tokio-stream"]
+gce = ["vllm","dep:google-cloud-compute-v1","dep:google-cloud-lro","dep:tokio","dep:base64","dep:flate2","dep:uuid","dep:rustls","yaml"]
 
 [dependencies]
 uuid = { version = "1.19.0", features = ["v4"], optional = true }

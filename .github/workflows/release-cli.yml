@@ -164,7 +164,7 @@ jobs:
         run: |
           # Only use openssl-vendored for musl builds (static linking)
           # Other platforms use system OpenSSL
-          cargo build --features rag,vllm,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --features rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Build CLI (cross)
         if: matrix.platform.use_cross
@@ -172,7 +172,7 @@ jobs:
         run: |
           # Only use openssl-vendored for musl builds (static linking)
           # Other platforms use system OpenSSL
-          cross build --features rag,vllm,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cross build --features rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Check for Apple signing secrets
         if: runner.os == 'macOS'
@@ -324,7 +324,7 @@ jobs:
       - name: Build CLI
         shell: sh
         run: |
-          cargo build --features rag,vllm,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --features rag,k8s,gce,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Prepare binary
         shell: sh

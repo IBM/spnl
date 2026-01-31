@@ -40,8 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN" # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
-      - uses: hashicorp/setup-terraform@v3
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
 
       - id: auth
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
@@ -64,18 +62,26 @@ jobs:
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: gcloud info
 
-      - name: Initialize terraform
+      - name: Install spnl CLI
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
-        working-directory: docker/gce/vllm/
-        run: terraform init
+        run: |
+          cargo build --features gce
+          sudo cp target/debug/spnl /usr/local/bin/
         
-      - name: Launch GCE VM via Terraform
+      - name: Launch GCE VM
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
-        working-directory: docker/gce/vllm/
-        run: ./up.sh
+        run: |
+          spnl vllm up --target=gce \
+            "vllm-$RUN_ID" \
+            --hf-token="$HF_TOKEN" \
+            --model="$MODEL"
 
       # Use `if: always()` to ensure the GCE VM is always torn down, no matter what happens above
       - name: Destroy VM
         if: always() # this gives us a "finally" block
         run: |
-          [ -n "$GCP_CREDENTIALS" ] && [ -n "$HF_TOKEN" ] && ./docker/gce/vllm/down.sh || echo "Nothing to destroy"
+          if [ -n "$GCP_CREDENTIALS" ] && [ -n "$HF_TOKEN" ]; then
+            spnl vllm down --target=gce "vllm-$RUN_ID"
+          else
+            echo "Nothing to destroy"
+          fi
