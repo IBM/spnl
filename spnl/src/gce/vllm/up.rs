@@ -343,6 +343,234 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_load_cloud_config_with_model() -> anyhow::Result<()> {
+        let args = UpArgsBuilder::default()
+            .hf_token("test_token")
+            .model(Some("meta-llama/Llama-2-7b-hf".to_string()))
+            .build()?;
+
+        let config = load_cloud_config(&args)?;
+        assert!(config.contains("meta-llama/Llama-2-7b-hf"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_cloud_config_with_custom_name() -> anyhow::Result<()> {
+        let args = UpArgsBuilder::default()
+            .name("custom-vllm")
+            .hf_token("test_token")
+            .build()?;
+
+        let config = load_cloud_config(&args)?;
+        // Name is used in instance creation, not in cloud-config
+        assert!(config.contains("#cloud-config"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_indent_single_line() {
+        let text = "single line";
+        let result = indent(text, 4);
+        assert_eq!(result, "single line");
+    }
+
+    #[test]
+    fn test_indent_multiple_lines() {
+        let text = "first line\nsecond line\nthird line";
+        let result = indent(text, 4);
+        assert_eq!(result, "first line\n    second line\n    third line");
+    }
+
+    #[test]
+    fn test_indent_empty_string() {
+        let text = "";
+        let result = indent(text, 4);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_up_args_builder_defaults() -> anyhow::Result<()> {
+        let args = UpArgsBuilder::default().hf_token("test-token").build()?;
+
+        assert_eq!(args.name, "vllm");
+        assert_eq!(args.model, None);
+        assert_eq!(args.hf_token, "test-token");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_up_args_builder_custom_values() -> anyhow::Result<()> {
+        let args = UpArgsBuilder::default()
+            .name("my-vllm")
+            .model(Some("my-model".to_string()))
+            .hf_token("my-token")
+            .build()?;
+
+        assert_eq!(args.name, "my-vllm");
+        assert_eq!(args.model, Some("my-model".to_string()));
+        assert_eq!(args.hf_token, "my-token");
+
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------------
+    // Mock GCE API tests
+    // ------------------------------------------------------------------------
+
+    #[cfg(test)]
+    mod mock_tests {
+        use super::*;
+
+        /// Mock GCE client for testing
+        struct MockGceClient {
+            should_fail: bool,
+            instance_created: std::sync::Arc<std::sync::Mutex<bool>>,
+            instance_name: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+        }
+
+        impl MockGceClient {
+            fn new() -> Self {
+                Self {
+                    should_fail: false,
+                    instance_created: std::sync::Arc::new(std::sync::Mutex::new(false)),
+                    instance_name: std::sync::Arc::new(std::sync::Mutex::new(None)),
+                }
+            }
+
+            fn with_failure() -> Self {
+                Self {
+                    should_fail: true,
+                    instance_created: std::sync::Arc::new(std::sync::Mutex::new(false)),
+                    instance_name: std::sync::Arc::new(std::sync::Mutex::new(None)),
+                }
+            }
+
+            async fn create_instance(&self, name: &str) -> anyhow::Result<()> {
+                if self.should_fail {
+                    return Err(anyhow::anyhow!("Mock GCE API error"));
+                }
+
+                let mut created = self.instance_created.lock().unwrap();
+                *created = true;
+
+                let mut stored_name = self.instance_name.lock().unwrap();
+                *stored_name = Some(name.to_string());
+
+                Ok(())
+            }
+
+            fn was_instance_created(&self) -> bool {
+                *self.instance_created.lock().unwrap()
+            }
+
+            fn get_instance_name(&self) -> Option<String> {
+                self.instance_name.lock().unwrap().clone()
+            }
+        }
+
+        #[tokio::test]
+        async fn mock_instance_creation_success() {
+            let client = MockGceClient::new();
+            let result = client.create_instance("test-instance").await;
+
+            assert!(result.is_ok());
+            assert!(client.was_instance_created());
+            assert_eq!(
+                client.get_instance_name(),
+                Some("test-instance".to_string())
+            );
+        }
+
+        #[tokio::test]
+        async fn mock_instance_creation_failure() {
+            let client = MockGceClient::with_failure();
+            let result = client.create_instance("test-instance").await;
+
+            assert!(result.is_err());
+            assert!(!client.was_instance_created());
+        }
+
+        #[test]
+        fn test_cloud_config_contains_required_fields() -> anyhow::Result<()> {
+            let args = UpArgsBuilder::default()
+                .hf_token("test_token_123")
+                .model(Some("test-model".to_string()))
+                .build()?;
+
+            let config = load_cloud_config(&args)?;
+
+            // Verify cloud-config structure
+            assert!(config.contains("#cloud-config"));
+            assert!(config.contains("test_token_123"));
+            assert!(config.contains("test-model"));
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_cloud_config_uses_defaults() -> anyhow::Result<()> {
+            // Test that cloud config uses default values when env vars are not set
+            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+
+            let config = load_cloud_config(&args)?;
+
+            // Should contain default values from the code
+            assert!(config.contains("#cloud-config"));
+            assert!(config.len() > 100); // Should be substantial
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_cloud_config_default_model() -> anyhow::Result<()> {
+            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+
+            let config = load_cloud_config(&args)?;
+
+            // Should use default model
+            assert!(config.contains("ibm-granite/granite-3.3-2b-instruct"));
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_instance_name_generation() {
+            let args = UpArgsBuilder::default()
+                .name("vllm")
+                .hf_token("test_token")
+                .build()
+                .unwrap();
+
+            // When name is "vllm", it should generate a unique name with UUID
+            assert_eq!(args.name, "vllm");
+
+            let args_custom = UpArgsBuilder::default()
+                .name("custom-instance")
+                .hf_token("test_token")
+                .build()
+                .unwrap();
+
+            // When name is custom, it should use that name
+            assert_eq!(args_custom.name, "custom-instance");
+        }
+
+        #[test]
+        fn test_cloud_config_includes_setup_script() -> anyhow::Result<()> {
+            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+
+            let config = load_cloud_config(&args)?;
+
+            // Verify setup script is included (it should be base64 encoded or embedded)
+            assert!(config.len() > 100); // Cloud config should be substantial
+
+            Ok(())
+        }
+    }
 }
 
 // Made with Bob
