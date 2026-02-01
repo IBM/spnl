@@ -41,55 +41,42 @@ queries. The library is surfaced for consumption as:
 [**vLLM image**](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda) **|** [**vLLM patch**](docker/vllm/llm-d/patches/0.4.0) **|** [**CLI image**](https://github.com/IBM/spnl/pkgs/container/spnl) **|** [**CLI image
   with  Ollama**](https://github.com/IBM/spnl/pkgs/container/spnl-ollama) **|** [**Rust crate**](https://crates.io/crates/spnl) **|** [**Python pip**](https://pypi.org/project/spnl) **|** [**Playground**](https://ibm.github.io/spnl/?qv=false)
 
-### Installing via Homebrew
+## Using the `spnl` CLI
+
+The `spnl` CLI provides commands for running span queries and managing vLLM deployments. For macOS users, you can install via Homebrew:
 
 ```bash
 # Add the tap
 brew tap IBM/spnl https://github.com/IBM/spnl
 
-# Install spnl
+# Install the spnl CLI
 brew install spnl
+```
+
+For other platforms, you can download the latest `spnl` CLI from the [SPNL releases page](https://github.com/IBM/spnl/releases/latest).
+
+### Managing vLLM Deployments
+
+The `spnl` CLI provides commands to easily deploy and manage vLLM inference servers on Kubernetes or Google Compute Engine. See the [vLLM documentation](./docs/vllm.md) for detailed instructions.
+
+Quick example:
+```shell
+# Bring up a vLLM server on Kubernetes (requires HuggingFace token)
+spnl vllm up my-deployment --target k8s --hf-token YOUR_HF_TOKEN
+
+# Bring down the vLLM server
+spnl vllm down my-deployment --target k8s
 ```
 
 ### Quick Start with Docker
 
-To kick the tires with SPNL running [Ollama](https://ollama.com/):
+To kick the tires with the `spnl` CLI running [Ollama](https://ollama.com/):
 ```shell
 podman run --rm -it ghcr.io/ibm/spnl-ollama --verbose
 ```
 
 This will run a judge/generator email example. You also can point it
 to a JSON file containing a [span query](./docs/about).
-### Quick Start with vLLM
-
-SPNL provides commands to easily deploy and manage vLLM inference servers on Kubernetes or Google Compute Engine:
-
-```shell
-# Bring up a vLLM server on Kubernetes (requires HuggingFace token)
-spnl vllm up my-deployment --target k8s --hf-token YOUR_HF_TOKEN
-
-# Optionally specify a different model from HuggingFace (default: ibm-granite/granite-3.3-8b-instruct)
-spnl vllm up my-deployment --target k8s --model meta-llama/Llama-3.1-8B-Instruct --hf-token YOUR_HF_TOKEN
-
-# Bring down the vLLM server
-spnl vllm down my-deployment --target k8s
-```
-
-The `up` command deploys a vLLM server with a model from [HuggingFace](https://huggingface.co/models) and automatically sets up port forwarding to `localhost:8000`. You can customize the number of GPUs with `--gpus` and ports with `--local-port` and `--remote-port`. The `down` command tears down the deployment.
-
-For Google Compute Engine (`--target gce`), you must set the following environment variables:
-- `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT`: Your GCP project ID
-- `GCP_SERVICE_ACCOUNT`: Service account name for the instance
-- `GOOGLE_APPLICATION_CREDENTIALS` (optional): Path to your service account key file, only needed if not already logged in via `gcloud auth login` (see [GCP authentication docs](https://docs.cloud.google.com/docs/authentication/application-default-credentials#GAC))
-
-
-### Building SPNL
-
-First, [configure your
-environment](./https://www.rust-lang.org/tools/install) for Rust.  Now
-you can build the CLI with `cargo build -p spnl-cli`, which will
-produce `./target/debug/spnl`. Adding `--release` will produce a build
-with source code optimizations in `./target/release/spnl`.
 
 ### CLI Usage
 
@@ -108,3 +95,11 @@ spnl --help
 spnl run --help
 spnl vllm --help
 ```
+
+## Building SPNL
+
+First, [configure your
+environment](./https://www.rust-lang.org/tools/install) for Rust.  Now
+you can build the CLI with `cargo build -p spnl-cli`, which will
+produce `./target/debug/spnl`. Adding `--release` will produce a build
+with source code optimizations in `./target/release/spnl`.

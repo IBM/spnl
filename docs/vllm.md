@@ -1,39 +1,25 @@
-# Spans on vLLM
+# Managing vLLM Deployments with the SPNL CLI
 
-> [!WARNING]
-> To see the benefits of relocatable blocks currently requires a
-> branch of vLLM. Stay tuned!
+The SPNL CLI provides commands to easily deploy and manage vLLM inference servers on Kubernetes or Google Compute Engine.
 
-When using this branch of vLLM, you may launch the OpenAI-compatible
-vLLM model serving endpoint with spans enabled:
+## Quick Start
 
-```bash
-VLLM_SPNL=True \
-    VLLM_USE_V1=1 \
-    VLLM_V1_SPANS_ENABLED=True
-    VLLM_V1_SPANS_TOKEN=10
-    VLLM_V1_SPANS_TOKEN_RECOMPUTE=31
-    HF_TOKEN=...
-    vllm serve ldsjmdy/Tulu3-Block-FT
+```shell
+# Bring up a vLLM server on Kubernetes (requires HuggingFace token)
+spnl vllm up my-deployment --target k8s --hf-token YOUR_HF_TOKEN
+
+# Optionally specify a different model from HuggingFace (default: ibm-granite/granite-3.3-8b-instruct)
+spnl vllm up my-deployment --target k8s --model meta-llama/Llama-3.1-8B-Instruct --hf-token YOUR_HF_TOKEN
+
+# Bring down the vLLM server
+spnl vllm down my-deployment --target k8s
 ```
 
-## Direct REST Calls
+The `up` command deploys a vLLM server with a model from [HuggingFace](https://huggingface.co/models) and automatically sets up port forwarding to `localhost:8000`. You can customize the number of GPUs with `--gpus` and ports with `--local-port` and `--remote-port`. The `down` command tears down the deployment.
 
-To send a query with curl or any other REST-capable client, first prepare the query shape:
+## Google Compute Engine Deployment
 
-```bash
-curl -s -XPOST http://localhost:8000/v1/query/prepare --data @./query.json -o /dev/null -w "%{time_total}\n"
-1.504452
-```
-
-And then you can execute the query, and you should see millisecond-level TTFT:
-
-```bash
-curl -s -XPOST http://localhost:8000/v1/query/execute --data @./querya.json -o /dev/null -w "%{time_total}\n"
-0.077699
-```
-
-## Using the SPNL Demo CLI
-
-Coming soon.
-
+For Google Compute Engine (`--target gce`), you must set the following environment variables:
+- `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT`: Your GCP project ID
+- `GCP_SERVICE_ACCOUNT`: Service account name for the instance
+- `GOOGLE_APPLICATION_CREDENTIALS` (optional): Path to your service account key file, only needed if not already logged in via `gcloud auth login` (see [GCP authentication docs](https://docs.cloud.google.com/docs/authentication/application-default-credentials#GAC))
