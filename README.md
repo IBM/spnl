@@ -60,6 +60,28 @@ podman run --rm -it ghcr.io/ibm/spnl-ollama --verbose
 
 This will run a judge/generator email example. You also can point it
 to a JSON file containing a [span query](./docs/about).
+### Quick Start with vLLM
+
+SPNL provides commands to easily deploy and manage vLLM inference servers on Kubernetes or Google Compute Engine:
+
+```shell
+# Bring up a vLLM server on Kubernetes (requires HuggingFace token)
+spnl vllm up my-deployment --target k8s --hf-token YOUR_HF_TOKEN
+
+# Optionally specify a different model from HuggingFace (default: ibm-granite/granite-3.3-8b-instruct)
+spnl vllm up my-deployment --target k8s --model meta-llama/Llama-3.1-8B-Instruct --hf-token YOUR_HF_TOKEN
+
+# Bring down the vLLM server
+spnl vllm down my-deployment --target k8s
+```
+
+The `up` command deploys a vLLM server with a model from [HuggingFace](https://huggingface.co/models) and automatically sets up port forwarding to `localhost:8000`. You can customize the number of GPUs with `--gpus` and ports with `--local-port` and `--remote-port`. The `down` command tears down the deployment.
+
+For Google Compute Engine (`--target gce`), you must set the following environment variables:
+- `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT`: Your GCP project ID
+- `GCP_SERVICE_ACCOUNT`: Service account name for the instance
+- `GOOGLE_APPLICATION_CREDENTIALS` (optional): Path to your service account key file, only needed if not already logged in via `gcloud auth login` (see [GCP authentication docs](https://docs.cloud.google.com/docs/authentication/application-default-credentials#GAC))
+
 
 ### Building SPNL
 
@@ -71,53 +93,18 @@ with source code optimizations in `./target/release/spnl`.
 
 ### CLI Usage
 
+For comprehensive CLI documentation including all commands, options, and examples, see [docs/cli.md](./docs/cli.md).
+
+Quick reference:
 ```bash
-Usage: spnl [OPTIONS] [FILE]
+# Run a query
+spnl run [OPTIONS]
 
-Arguments:
-  [FILE]  File to process
+# Manage vLLM deployments
+spnl vllm <up|down> [OPTIONS]
 
-Options:
-  -b, --builtin <BUILTIN>
-          Builtin to run [env: SPNL_BUILTIN=] [possible values: bulkmap, email, email2, email3, sweagent, gsm8k, rag, spans]
-  -m, --model <MODEL>
-          Generative Model [env: SPNL_MODEL=] [default: ollama/granite3.3:2b]
-  -e, --embedding-model <EMBEDDING_MODEL>
-          Embedding Model [env: SPNL_EMBEDDING_MODEL=] [default: ollama/mxbai-embed-large:335m]
-  -t, --temperature <TEMPERATURE>
-          Temperature [default: 0.5]
-  -l, --max-tokens <MAX_TOKENS>
-          Max Completion/Generated Tokens [default: 100]
-  -n, --n <N>
-          Number of candidates to consider [default: 5]
-  -k, --chunk-size <CHUNK_SIZE>
-          Chunk size
-      --vecdb-uri <VECDB_URI>
-          Vector DB Url [default: data/spnl]
-  -r, --reverse
-          Reverse order
-      --prepare
-          Prepare query
-  -p, --prompt <PROMPT>
-          Question to pose
-  -d, --document <DOCUMENT>
-          Document(s) that will augment the question
-  -x, --max-aug <MAX_AUG>
-          Max augmentations to add to the query [env: SPNL_RAG_MAX_MATCHES=]
-      --shuffle
-          Randomly shuffle order of fragments
-  -i, --indexer <INDEXER>
-          The RAG indexing scheme [possible values: simple-embed-retrieve, raptor]
-  -s, --show-query
-          Re-emit the compiled query
-      --time <TIME>
-          Report query execution time to stderr [possible values: all, gen, gen1]
-  -v, --verbose
-          Verbose output
-      --dry-run
-          Dry run (do not execute query)?
-  -h, --help
-          Print help (see more with '--help')
-  -V, --version
-          Print version
+# Get help
+spnl --help
+spnl run --help
+spnl vllm --help
 ```
