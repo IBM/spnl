@@ -26,7 +26,7 @@ run_py = ["run","pypi","pyo3/experimental-async","run","ollama","openai","gemini
 tok = ["dep:pyo3","dep:itertools","dep:moka","dep:tokenizers"]
 spnl-api = ["dep:futures","dep:reqwest"]
 yaml = ["dep:serde_yaml2"]
-vllm = ["yaml"]
+vllm = ["yaml", "dep:flate2"]
 k8s = ["vllm","dep:kube","dep:k8s-openapi","dep:schemars","dep:rustls","dep:uuid","dep:tokio-stream","dep:tokio","dep:futures"]
 gce = ["vllm","dep:google-cloud-compute-v1","dep:google-cloud-lro","dep:tokio","dep:base64","dep:flate2","dep:uuid","dep:rustls","yaml"]
 

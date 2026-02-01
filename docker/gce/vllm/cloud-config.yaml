@@ -1,10 +1,5 @@
 #cloud-config
-packages:
-  - build-essential
-  - pkg-config
-  - libssl-dev
-  - protobuf-compiler
-  - python3-dev
+${packages_section}
 
 write_files:
   - path: /etc/environment
@@ -17,6 +12,7 @@ write_files:
       SPNL_GITHUB=${spnl_github}
       GITHUB_SHA=${spnl_github_sha}
       GITHUB_REF=${spnl_github_ref}
+      SPNL_RELEASE=${spnl_release}
       VLLM_ORG=${vllm_org}
       VLLM_REPO=${vllm_repo}
       VLLM_BRANCH=${vllm_branch}
