@@ -1,42 +1,70 @@
 /// Delete a GCE instance
 ///
-/// This function deletes a GCE instance by name. Currently not fully implemented,
-/// provides instructions for manual deletion using gcloud CLI.
+/// This function deletes a GCE instance by name using the Google Cloud Compute API.
 pub async fn down(name: &str, _namespace: Option<String>) -> anyhow::Result<()> {
-    // Get zone from environment (default from terraform variables.tf)
+    use google_cloud_compute_v1::client::Instances;
+    use google_cloud_lro::Poller;
+
+    // Get configuration from environment variables (matching terraform defaults)
+    let project = std::env::var("GCP_PROJECT")
+        .or_else(|_| std::env::var("GOOGLE_CLOUD_PROJECT"))
+        .map_err(|_| {
+            anyhow::anyhow!("GCP_PROJECT or GOOGLE_CLOUD_PROJECT environment variable must be set")
+        })?;
     let zone = std::env::var("GCE_ZONE").unwrap_or_else(|_| "us-west1-a".to_string());
 
-    // TODO: Implement GCE instance deletion using google-cloud-compute-v1
-    // The API is complex and requires proper stub type configuration
-    eprintln!("GCE instance deletion not yet implemented");
-    eprintln!("Would delete instance '{}'", name);
-    eprintln!(
-        "Use: gcloud compute instances delete {} --zone={}",
-        name, zone
-    );
+    eprintln!("Deleting GCE instance:");
+    eprintln!("  Name: {}", name);
+    eprintln!("  Project: {}", project);
+    eprintln!("  Zone: {}", zone);
+
+    // Create the client
+    let client = Instances::builder().build().await?;
+
+    // Check if instance exists first
+    match client
+        .get()
+        .set_project(&project)
+        .set_zone(&zone)
+        .set_instance(name)
+        .send()
+        .await
+    {
+        Ok(_) => {
+            eprintln!("Instance '{}' found, proceeding with deletion...", name);
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "Instance '{}' not found in zone '{}': {}",
+                name,
+                zone,
+                e
+            ));
+        }
+    }
+
+    // Delete the instance
+    eprintln!("Submitting instance deletion request...");
+    let operation = client
+        .delete()
+        .set_project(&project)
+        .set_zone(&zone)
+        .set_instance(name)
+        .poller()
+        .until_done()
+        .await?
+        .to_result()?;
+
+    eprintln!("Instance '{}' deleted successfully", name);
+    eprintln!("Operation: {:?}", operation);
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_down_returns_ok() -> anyhow::Result<()> {
-        // Test that down function completes without error
-        let result = down("test-instance", None).await;
-        assert!(result.is_ok());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_down_with_namespace_ignored() -> anyhow::Result<()> {
-        // Namespace parameter is ignored for GCE (used for K8s compatibility)
-        let result = down("test-instance", Some("test-namespace".to_string())).await;
-        assert!(result.is_ok());
-        Ok(())
-    }
+    // Note: Integration tests that call the actual down() function have been removed
+    // as they require real GCE credentials. The mock tests below provide proper unit test coverage.
 
     // ------------------------------------------------------------------------
     // Mock GCE API tests for deletion
