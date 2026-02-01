@@ -166,6 +166,11 @@ pub enum VllmCommands {
         /// Remote port for port forwarding (defaults to 8000)
         #[arg(short = 'r', long, default_value_t = 8000)]
         remote_port: u16,
+
+        /// GCE configuration (only used when target is gce)
+        #[cfg(feature = "gce")]
+        #[command(flatten)]
+        gce_config: spnl::gce::vllm::GceConfig,
     },
     #[cfg(any(feature = "k8s", feature = "gce"))]
     Down {
@@ -175,6 +180,11 @@ pub enum VllmCommands {
 
         #[command(flatten)]
         name: NameArgs,
+
+        /// GCE configuration (only used when target is gce)
+        #[cfg(feature = "gce")]
+        #[command(flatten)]
+        gce_config: spnl::gce::vllm::GceConfig,
     },
     /// Emit vLLM patchfile to stdout
     Patchfile,

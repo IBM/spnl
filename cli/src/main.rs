@@ -44,6 +44,8 @@ async fn main() -> Result<(), SpnlError> {
                     gpus: _gpus,
                     local_port: _local_port,
                     remote_port: _remote_port,
+                    #[cfg(feature = "gce")]
+                    gce_config,
                 },
         } => match target {
             #[cfg(feature = "k8s")]
@@ -68,6 +70,7 @@ async fn main() -> Result<(), SpnlError> {
                         .name(name.name)
                         .model(model)
                         .hf_token(hf_token)
+                        .config(gce_config)
                         .build()?,
                 )
                 .await
@@ -75,12 +78,18 @@ async fn main() -> Result<(), SpnlError> {
         },
         #[cfg(any(feature = "k8s", feature = "gce"))]
         Commands::Vllm {
-            command: VllmCommands::Down { target, name },
+            command:
+                VllmCommands::Down {
+                    target,
+                    name,
+                    #[cfg(feature = "gce")]
+                    gce_config,
+                },
         } => match target {
             #[cfg(feature = "k8s")]
             VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace).await,
             #[cfg(feature = "gce")]
-            VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace).await,
+            VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace, gce_config).await,
         },
         #[cfg(feature = "vllm")]
         Commands::Vllm {

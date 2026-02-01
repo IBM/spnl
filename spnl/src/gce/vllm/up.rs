@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use super::args::GceConfig;
+
 #[derive(derive_builder::Builder)]
 pub struct UpArgs {
     /// Name of resource
@@ -13,6 +15,10 @@ pub struct UpArgs {
     /// HuggingFace api token
     #[builder(setter(into))]
     pub(crate) hf_token: String,
+
+    /// GCE configuration
+    #[builder(default)]
+    pub(crate) config: GceConfig,
 }
 
 /// Indent each line of text by the specified number of spaces, except the first line
@@ -51,23 +57,22 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
     // Generate a unique run ID
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    // Default values from terraform variables.tf
-    let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_else(|_| "spnl-test".to_string());
+    // Get configuration from args
+    let gcs_bucket = &args.config.gcs_bucket;
 
-    // If SPNL_GITHUB is not set, use the compiled version as a release
-    let spnl_release = match std::env::var("SPNL_GITHUB") {
-        Ok(_) => String::new(),
-        Err(_) => format!("v{}", env!("CARGO_PKG_VERSION")),
+    // If SPNL_GITHUB is default, use the compiled version as a release
+    let spnl_release = if args.config.spnl_github == "https://github.com/IBM/spnl.git" {
+        format!("v{}", env!("CARGO_PKG_VERSION"))
+    } else {
+        String::new()
     };
 
-    let spnl_github = std::env::var("SPNL_GITHUB")
-        .unwrap_or_else(|_| "https://github.com/IBM/spnl.git".to_string());
-    let spnl_github_sha = std::env::var("GITHUB_SHA").unwrap_or_default();
-    let spnl_github_ref = std::env::var("GITHUB_REF").unwrap_or_default();
-    let vllm_org = std::env::var("VLLM_ORG").unwrap_or_else(|_| "neuralmagic".to_string());
-    let vllm_repo = std::env::var("VLLM_REPO").unwrap_or_else(|_| "vllm".to_string());
-    let vllm_branch =
-        std::env::var("VLLM_BRANCH").unwrap_or_else(|_| "llm-d-release-0.4".to_string());
+    let spnl_github = &args.config.spnl_github;
+    let spnl_github_sha = args.config.get_github_sha();
+    let spnl_github_ref = args.config.get_github_ref();
+    let vllm_org = &args.config.vllm_org;
+    let vllm_repo = &args.config.vllm_repo;
+    let vllm_branch = &args.config.vllm_branch;
     let model = args
         .model
         .clone()
@@ -105,8 +110,8 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
     substitutions.insert("hf_token", args.hf_token.as_str());
     substitutions.insert("gcs_bucket", gcs_bucket.as_str());
     substitutions.insert("spnl_github", spnl_github.as_str());
-    substitutions.insert("spnl_github_sha", spnl_github_sha.as_str());
-    substitutions.insert("spnl_github_ref", spnl_github_ref.as_str());
+    substitutions.insert("spnl_github_sha", &spnl_github_sha);
+    substitutions.insert("spnl_github_ref", &spnl_github_ref);
     substitutions.insert("spnl_release", spnl_release.as_str());
     substitutions.insert("vllm_org", vllm_org.as_str());
     substitutions.insert("vllm_repo", vllm_repo.as_str());
@@ -150,18 +155,12 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     eprintln!("{}", cloud_config);
     eprintln!("---\n");
 
-    // Get configuration from environment variables (matching terraform defaults)
-    let project = std::env::var("GCP_PROJECT")
-        .or_else(|_| std::env::var("GOOGLE_CLOUD_PROJECT"))
-        .map_err(|_| {
-            anyhow::anyhow!("GCP_PROJECT or GOOGLE_CLOUD_PROJECT environment variable must be set")
-        })?;
-    let service_account = std::env::var("GCP_SERVICE_ACCOUNT")
-        .map_err(|_| anyhow::anyhow!("GCP_SERVICE_ACCOUNT environment variable must be set"))?;
-    let region = std::env::var("GCE_REGION").unwrap_or_else(|_| "us-west1".to_string());
-    let zone = std::env::var("GCE_ZONE").unwrap_or_else(|_| "us-west1-a".to_string());
-    let machine_type =
-        std::env::var("GCE_MACHINE_TYPE").unwrap_or_else(|_| "g2-standard-4".to_string());
+    // Get configuration from args
+    let project = args.config.get_project()?;
+    let service_account = args.config.get_service_account()?;
+    let region = &args.config.region;
+    let zone = &args.config.zone;
+    let machine_type = &args.config.machine_type;
 
     // Generate a unique run ID for this instance (or use provided name)
     let run_id = uuid::Uuid::new_v4().to_string();
@@ -251,7 +250,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     let operation = client
         .insert()
         .set_project(&project)
-        .set_zone(&zone)
+        .set_zone(zone)
         .set_body(instance)
         .poller()
         .until_done()
@@ -265,7 +264,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     let instance_info = client
         .get()
         .set_project(&project)
-        .set_zone(&zone)
+        .set_zone(zone)
         .set_instance(&instance_name)
         .send()
         .await?;
@@ -285,7 +284,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     eprintln!("\nStreaming cloud-init output log...\n");
 
     // Stream the cloud-init output log
-    stream_cloud_init_log(&instance_name, &zone, &project).await?;
+    stream_cloud_init_log(&instance_name, zone, &project).await?;
 
     Ok(())
 }
@@ -370,38 +369,49 @@ mod tests {
 
     #[test]
     fn test_load_cloud_config() -> anyhow::Result<()> {
-        let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+        let mut config = GceConfig::new();
+        config.project = Some("test-project".to_string());
+        let args = UpArgsBuilder::default()
+            .hf_token("test_token")
+            .config(config)
+            .build()?;
 
-        let config = load_cloud_config(&args)?;
-        assert!(config.contains("#cloud-config"));
-        assert!(config.contains("test_token"));
+        let cloud_config = load_cloud_config(&args)?;
+        assert!(cloud_config.contains("#cloud-config"));
+        assert!(cloud_config.contains("test_token"));
 
         Ok(())
     }
 
     #[test]
     fn test_load_cloud_config_with_model() -> anyhow::Result<()> {
+        let mut config = GceConfig::new();
+        config.project = Some("test-project".to_string());
         let args = UpArgsBuilder::default()
             .hf_token("test_token")
             .model(Some("meta-llama/Llama-2-7b-hf".to_string()))
+            .config(config)
             .build()?;
 
-        let config = load_cloud_config(&args)?;
-        assert!(config.contains("meta-llama/Llama-2-7b-hf"));
+        let cloud_config = load_cloud_config(&args)?;
+        assert!(cloud_config.contains("meta-llama/Llama-2-7b-hf"));
 
         Ok(())
     }
 
     #[test]
     fn test_load_cloud_config_with_custom_name() -> anyhow::Result<()> {
+        let mut config = GceConfig::new();
+        config.project = Some("test-project".to_string());
         let args = UpArgsBuilder::default()
             .name("custom-vllm")
             .hf_token("test_token")
+            .config(config)
             .build()?;
 
-        let config = load_cloud_config(&args)?;
+        let cloud_config = load_cloud_config(&args)?;
         // Name is used in instance creation, not in cloud-config
-        assert!(config.contains("#cloud-config"));
+        assert!(cloud_config.contains("#cloud-config"));
 
         Ok(())
     }
@@ -434,21 +444,30 @@ mod tests {
         assert_eq!(args.name, "vllm");
         assert_eq!(args.model, None);
         assert_eq!(args.hf_token, "test-token");
+        assert_eq!(args.config.region, "us-west1");
+        assert_eq!(args.config.zone, "us-west1-a");
 
         Ok(())
     }
 
     #[test]
     fn test_up_args_builder_custom_values() -> anyhow::Result<()> {
+        let mut config = GceConfig::new();
+        config.region = "us-east1".to_string();
+        config.zone = "us-east1-b".to_string();
+
         let args = UpArgsBuilder::default()
             .name("my-vllm")
             .model(Some("my-model".to_string()))
             .hf_token("my-token")
+            .config(config)
             .build()?;
 
         assert_eq!(args.name, "my-vllm");
         assert_eq!(args.model, Some("my-model".to_string()));
         assert_eq!(args.hf_token, "my-token");
+        assert_eq!(args.config.region, "us-east1");
+        assert_eq!(args.config.zone, "us-east1-b");
 
         Ok(())
     }
@@ -532,9 +551,12 @@ mod tests {
 
         #[test]
         fn test_cloud_config_contains_required_fields() -> anyhow::Result<()> {
+            let mut gce_config = GceConfig::new();
+            gce_config.project = Some("test-project".to_string());
             let args = UpArgsBuilder::default()
                 .hf_token("test_token_123")
                 .model(Some("test-model".to_string()))
+                .config(gce_config)
                 .build()?;
 
             let config = load_cloud_config(&args)?;
@@ -549,8 +571,13 @@ mod tests {
 
         #[test]
         fn test_cloud_config_uses_defaults() -> anyhow::Result<()> {
-            // Test that cloud config uses default values when env vars are not set
-            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+            // Test that cloud config uses default values
+            let mut gce_config = GceConfig::new();
+            gce_config.project = Some("test-project".to_string());
+            let args = UpArgsBuilder::default()
+                .hf_token("test_token")
+                .config(gce_config)
+                .build()?;
 
             let config = load_cloud_config(&args)?;
 
@@ -563,7 +590,12 @@ mod tests {
 
         #[test]
         fn test_cloud_config_default_model() -> anyhow::Result<()> {
-            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+            let mut gce_config = GceConfig::new();
+            gce_config.project = Some("test-project".to_string());
+            let args = UpArgsBuilder::default()
+                .hf_token("test_token")
+                .config(gce_config)
+                .build()?;
 
             let config = load_cloud_config(&args)?;
 
@@ -596,7 +628,12 @@ mod tests {
 
         #[test]
         fn test_cloud_config_includes_setup_script() -> anyhow::Result<()> {
-            let args = UpArgsBuilder::default().hf_token("test_token").build()?;
+            let mut gce_config = GceConfig::new();
+            gce_config.project = Some("test-project".to_string());
+            let args = UpArgsBuilder::default()
+                .hf_token("test_token")
+                .config(gce_config)
+                .build()?;
 
             let config = load_cloud_config(&args)?;
 

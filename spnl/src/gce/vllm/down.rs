@@ -1,17 +1,15 @@
+use crate::gce::vllm::GceConfig;
+
 /// Delete a GCE instance
 ///
 /// This function deletes a GCE instance by name using the Google Cloud Compute API.
-pub async fn down(name: &str, _namespace: Option<String>) -> anyhow::Result<()> {
+pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> anyhow::Result<()> {
     use google_cloud_compute_v1::client::Instances;
     use google_cloud_lro::Poller;
 
-    // Get configuration from environment variables (matching terraform defaults)
-    let project = std::env::var("GCP_PROJECT")
-        .or_else(|_| std::env::var("GOOGLE_CLOUD_PROJECT"))
-        .map_err(|_| {
-            anyhow::anyhow!("GCP_PROJECT or GOOGLE_CLOUD_PROJECT environment variable must be set")
-        })?;
-    let zone = std::env::var("GCE_ZONE").unwrap_or_else(|_| "us-west1-a".to_string());
+    // Get configuration from the provided config
+    let project = config.get_project()?;
+    let zone = &config.zone;
 
     eprintln!("Deleting GCE instance:");
     eprintln!("  Name: {}", name);
@@ -25,7 +23,7 @@ pub async fn down(name: &str, _namespace: Option<String>) -> anyhow::Result<()> 
     match client
         .get()
         .set_project(&project)
-        .set_zone(&zone)
+        .set_zone(zone)
         .set_instance(name)
         .send()
         .await
@@ -48,7 +46,7 @@ pub async fn down(name: &str, _namespace: Option<String>) -> anyhow::Result<()> 
     let operation = client
         .delete()
         .set_project(&project)
-        .set_zone(&zone)
+        .set_zone(zone)
         .set_instance(name)
         .poller()
         .until_done()

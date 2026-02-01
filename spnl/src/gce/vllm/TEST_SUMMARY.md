@@ -66,15 +66,16 @@ The current implementation uses `std::env::var()` to read configuration from env
 
 ## TODO: Future Refactoring and Enhancements
 
-### 1. Refactor Environment Variable Handling
+### 1. Refactor Environment Variable Handling ✅ COMPLETED
 **Priority: High**
+**Resolved in:** [PR #744](https://github.com/IBM/spnl/pull/744)
 
-Currently, both `up.rs` and `down.rs` read configuration directly from environment variables using `std::env::var()`. This should be refactored to use clap's environment variable support.
+~~Currently, both `up.rs` and `down.rs` read configuration directly from environment variables using `std::env::var()`. This should be refactored to use clap's environment variable support.~~
 
 **Action Items:**
-- [ ] Create `args.rs` module in `gce/vllm/`
-- [ ] Define configuration structs using clap's `#[arg(env = "...")]` attribute
-- [ ] Move all environment variable reading to args structs:
+- [x] Create `args.rs` module in `gce/vllm/`
+- [x] Define configuration structs using clap's `#[arg(env = "...")]` attribute
+- [x] Move all environment variable reading to args structs:
   - `GCP_PROJECT` / `GOOGLE_CLOUD_PROJECT`
   - `GCP_SERVICE_ACCOUNT`
   - `GCE_REGION` (default: "us-west1")
@@ -87,15 +88,15 @@ Currently, both `up.rs` and `down.rs` read configuration directly from environme
   - `VLLM_ORG` (default: "neuralmagic")
   - `VLLM_REPO` (default: "vllm")
   - `VLLM_BRANCH` (default: "llm-d-release-0.4")
-- [ ] Update `UpArgs` to include these configuration fields
-- [ ] Update `down()` to accept configuration args instead of reading env vars directly
-- [ ] Update `load_cloud_config()` to accept configuration from args
+- [x] Update `UpArgs` to include these configuration fields
+- [x] Update `down()` to accept configuration args instead of reading env vars directly
+- [x] Update `load_cloud_config()` to accept configuration from args
 
 **Benefits:**
-- Cleaner separation of concerns
-- Better testability (can pass different configs without env vars)
-- Consistent with clap patterns used elsewhere in the codebase
-- Type-safe configuration with validation
+- ✅ Cleaner separation of concerns
+- ✅ Better testability (can pass different configs without env vars)
+- ✅ Consistent with clap patterns used elsewhere in the codebase
+- ✅ Type-safe configuration with validation
 
 ### 2. Enhanced Test Coverage for Configuration Overrides
 **Priority: Medium**
