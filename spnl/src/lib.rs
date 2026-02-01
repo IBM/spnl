@@ -29,3 +29,6 @@ pub mod k8s;
 
 #[cfg(feature = "gce")]
 pub mod gce;
+
+#[cfg(feature = "vllm")]
+pub mod vllm;

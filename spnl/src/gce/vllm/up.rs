@@ -53,6 +53,13 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
 
     // Default values from terraform variables.tf
     let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_else(|_| "spnl-test".to_string());
+
+    // If SPNL_GITHUB is not set, use the compiled version as a release
+    let spnl_release = match std::env::var("SPNL_GITHUB") {
+        Ok(_) => String::new(),
+        Err(_) => format!("v{}", env!("CARGO_PKG_VERSION")),
+    };
+
     let spnl_github = std::env::var("SPNL_GITHUB")
         .unwrap_or_else(|_| "https://github.com/IBM/spnl.git".to_string());
     let spnl_github_sha = std::env::var("GITHUB_SHA").unwrap_or_default();
@@ -66,6 +73,32 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
         .clone()
         .unwrap_or_else(|| "ibm-granite/granite-3.3-2b-instruct".to_string());
 
+    // Conditionally include packages section (only needed when building from source)
+    let packages = if spnl_release.is_empty() {
+        vec![
+            "build-essential",
+            "pkg-config",
+            "libssl-dev",
+            "protobuf-compiler",
+            "python3-dev",
+        ]
+    } else {
+        vec![]
+    };
+
+    let packages_section = if packages.is_empty() {
+        "# Packages not needed when using release binaries".to_string()
+    } else {
+        format!(
+            "packages:\n{}",
+            packages
+                .iter()
+                .map(|p| format!("  - {}", p))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    };
+
     // Create substitution map
     let mut substitutions = HashMap::new();
     substitutions.insert("run_id", run_id.as_str());
@@ -74,10 +107,12 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
     substitutions.insert("spnl_github", spnl_github.as_str());
     substitutions.insert("spnl_github_sha", spnl_github_sha.as_str());
     substitutions.insert("spnl_github_ref", spnl_github_ref.as_str());
+    substitutions.insert("spnl_release", spnl_release.as_str());
     substitutions.insert("vllm_org", vllm_org.as_str());
     substitutions.insert("vllm_repo", vllm_repo.as_str());
     substitutions.insert("vllm_branch", vllm_branch.as_str());
     substitutions.insert("model", model.as_str());
+    substitutions.insert("packages_section", &packages_section);
 
     // Indent setup_script and vllm_patch_b64 by 6 spaces for proper YAML formatting
     let setup_script_indented = indent(setup_script, 6);

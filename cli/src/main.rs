@@ -6,12 +6,16 @@ use spnl::{
     ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
 };
 
+#[cfg(feature = "vllm")]
+use crate::args::VllmCommands;
 #[cfg(any(feature = "k8s", feature = "gce"))]
-use crate::args::{VllmCommands, VllmTarget};
+use crate::args::VllmTarget;
 #[cfg(feature = "gce")]
 use spnl::gce::vllm as gce_vllm;
 #[cfg(feature = "k8s")]
 use spnl::k8s::vllm as k8s_vllm;
+#[cfg(feature = "vllm")]
+use spnl::vllm;
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;
@@ -37,9 +41,9 @@ async fn main() -> Result<(), SpnlError> {
                     name,
                     model,
                     hf_token,
-                    gpus,
-                    local_port,
-                    remote_port,
+                    gpus: _gpus,
+                    local_port: _local_port,
+                    remote_port: _remote_port,
                 },
         } => match target {
             #[cfg(feature = "k8s")]
@@ -50,9 +54,9 @@ async fn main() -> Result<(), SpnlError> {
                         .namespace(name.namespace)
                         .model(model)
                         .hf_token(hf_token)
-                        .gpus(gpus)
-                        .local_port(local_port)
-                        .remote_port(remote_port)
+                        .gpus(_gpus)
+                        .local_port(_local_port)
+                        .remote_port(_remote_port)
                         .build()?,
                 )
                 .await
@@ -78,6 +82,10 @@ async fn main() -> Result<(), SpnlError> {
             #[cfg(feature = "gce")]
             VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace).await,
         },
+        #[cfg(feature = "vllm")]
+        Commands::Vllm {
+            command: VllmCommands::Patchfile,
+        } => vllm::patchfile().await,
     }
 }
 

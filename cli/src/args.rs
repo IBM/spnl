@@ -14,7 +14,7 @@ pub enum Commands {
     Run(Args),
 
     /// Bring up vLLM in a Kubernetes cluster
-    #[cfg(any(feature = "k8s", feature = "gce"))]
+    #[cfg(feature = "vllm")]
     Vllm {
         #[command(subcommand)]
         command: VllmCommands,
@@ -135,9 +135,10 @@ pub enum VllmTarget {
     Gce,
 }
 
-#[cfg(any(feature = "k8s", feature = "gce"))]
+#[cfg(feature = "vllm")]
 #[derive(Subcommand, Debug, serde::Serialize)]
 pub enum VllmCommands {
+    #[cfg(any(feature = "k8s", feature = "gce"))]
     Up {
         /// Target platform (k8s or gce)
         #[arg(long, default_value = "k8s")]
@@ -166,6 +167,7 @@ pub enum VllmCommands {
         #[arg(short = 'r', long, default_value_t = 8000)]
         remote_port: u16,
     },
+    #[cfg(any(feature = "k8s", feature = "gce"))]
     Down {
         /// Target platform (k8s or gce)
         #[arg(long, default_value = "k8s")]
@@ -174,6 +176,8 @@ pub enum VllmCommands {
         #[command(flatten)]
         name: NameArgs,
     },
+    /// Emit vLLM patchfile to stdout
+    Patchfile,
 }
 
 #[cfg(any(feature = "k8s", feature = "gce"))]
