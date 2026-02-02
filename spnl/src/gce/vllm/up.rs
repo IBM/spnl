@@ -393,30 +393,30 @@ fn extract_run_id_from_cloud_config(cloud_config: &str) -> anyhow::Result<String
 
 /// Fetch the exit code from Google Cloud Storage
 async fn fetch_exit_code_from_gcs(bucket: &str, run_id: &str) -> anyhow::Result<i32> {
-    use google_cloud_storage::client::{Client, ClientConfig};
-    use google_cloud_storage::http::objects::delete::DeleteObjectRequest;
-    use google_cloud_storage::http::objects::download::Range;
-    use google_cloud_storage::http::objects::get::GetObjectRequest;
+    use google_cloud_storage::client::{Storage, StorageControl};
 
-    // Create GCS client
-    let config = ClientConfig::default().with_auth().await?;
-    let client = Client::new(config);
+    // Create GCS clients
+    let storage_client = Storage::builder().build().await?;
+    let control_client = StorageControl::builder().build().await?;
 
     // Path to the exit code file in GCS
     let object_name = format!("runs/{}/status/exit_code", run_id);
+    // Format bucket name as required by v1 API (projects/_/buckets/{bucket})
+    // The underscore means "globally unique bucket" without specifying project ID
+    let bucket_path = format!("projects/_/buckets/{}", bucket);
 
     // Download the exit code file
     eprintln!("Downloading gs://{}/{}", bucket, object_name);
-    let data = client
-        .download_object(
-            &GetObjectRequest {
-                bucket: bucket.to_string(),
-                object: object_name.clone(),
-                ..Default::default()
-            },
-            &Range::default(),
-        )
+    let mut response = storage_client
+        .read_object(&bucket_path, &object_name)
+        .send()
         .await?;
+
+    // Collect all chunks into a single buffer
+    let mut data = Vec::new();
+    while let Some(chunk) = response.next().await {
+        data.extend_from_slice(&chunk?);
+    }
 
     // Parse the exit code
     let exit_code_str = String::from_utf8(data)?;
@@ -424,12 +424,11 @@ async fn fetch_exit_code_from_gcs(bucket: &str, run_id: &str) -> anyhow::Result<
 
     // Delete the exit code file from GCS (matching the original script behavior)
     eprintln!("Deleting gs://{}/{}", bucket, object_name);
-    client
-        .delete_object(&DeleteObjectRequest {
-            bucket: bucket.to_string(),
-            object: object_name,
-            ..Default::default()
-        })
+    control_client
+        .delete_object()
+        .set_bucket(bucket_path)
+        .set_object(object_name)
+        .send()
         .await?;
 
     Ok(exit_code)
