@@ -219,7 +219,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
                     .set_value("TRUE"),
                 MetadataItems::default()
                     .set_key("user-data")
-                    .set_value(cloud_config),
+                    .set_value(&cloud_config),
             ]))
         .set_scheduling(Scheduling::new()
             .set_automatic_restart(false)
@@ -284,10 +284,26 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     eprintln!("The instance will automatically shut down when setup completes");
     eprintln!("\nStreaming cloud-init output log...\n");
 
+    // Extract run_id from cloud_config to fetch exit code later
+    let run_id = extract_run_id_from_cloud_config(&cloud_config)?;
+    let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_else(|_| "spnl-test".to_string());
+
     // Stream the cloud-init output log
     stream_cloud_init_log(&instance_name, &zone, &project).await?;
 
-    Ok(())
+    // Fetch the exit code from GCS
+    eprintln!("\nFetching exit code from GCS...");
+    let exit_code = fetch_exit_code_from_gcs(&gcs_bucket, &run_id).await?;
+
+    if exit_code == 0 {
+        eprintln!("Setup completed successfully (exit code: 0)");
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Setup failed with exit code: {}",
+            exit_code
+        ))
+    }
 }
 
 async fn stream_cloud_init_log(
@@ -362,6 +378,62 @@ async fn stream_cloud_init_log(
     }
 
     Ok(())
+}
+
+/// Extract run_id from the cloud-config YAML
+fn extract_run_id_from_cloud_config(cloud_config: &str) -> anyhow::Result<String> {
+    // The run_id is embedded in the cloud-config as an environment variable
+    // Look for a line like: RUN_ID=<uuid>
+    for line in cloud_config.lines() {
+        if let Some(stripped) = line.trim().strip_prefix("RUN_ID=") {
+            return Ok(stripped.trim().to_string());
+        }
+    }
+    Err(anyhow::anyhow!("Could not find RUN_ID in cloud-config"))
+}
+
+/// Fetch the exit code from Google Cloud Storage
+async fn fetch_exit_code_from_gcs(bucket: &str, run_id: &str) -> anyhow::Result<i32> {
+    use google_cloud_storage::client::{Client, ClientConfig};
+    use google_cloud_storage::http::objects::delete::DeleteObjectRequest;
+    use google_cloud_storage::http::objects::download::Range;
+    use google_cloud_storage::http::objects::get::GetObjectRequest;
+
+    // Create GCS client
+    let config = ClientConfig::default().with_auth().await?;
+    let client = Client::new(config);
+
+    // Path to the exit code file in GCS
+    let object_name = format!("runs/{}/status/exit_code", run_id);
+
+    // Download the exit code file
+    eprintln!("Downloading gs://{}/{}", bucket, object_name);
+    let data = client
+        .download_object(
+            &GetObjectRequest {
+                bucket: bucket.to_string(),
+                object: object_name.clone(),
+                ..Default::default()
+            },
+            &Range::default(),
+        )
+        .await?;
+
+    // Parse the exit code
+    let exit_code_str = String::from_utf8(data)?;
+    let exit_code = exit_code_str.trim().parse::<i32>()?;
+
+    // Delete the exit code file from GCS (matching the original script behavior)
+    eprintln!("Deleting gs://{}/{}", bucket, object_name);
+    client
+        .delete_object(&DeleteObjectRequest {
+            bucket: bucket.to_string(),
+            object: object_name,
+            ..Default::default()
+        })
+        .await?;
+
+    Ok(exit_code)
 }
 
 #[cfg(test)]
