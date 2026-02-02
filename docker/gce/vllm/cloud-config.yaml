@@ -1,4 +1,12 @@
 #cloud-config
+
+${cloud_init_modules_section}
+
+# SSH enabled for tunneling to vLLM and Ollama ports
+ssh_pwauth: false
+disable_root: false
+
+# Template variable - will be replaced at runtime
 ${packages_section}
 
 write_files:
@@ -18,10 +26,11 @@ write_files:
       VLLM_BRANCH=${vllm_branch}
       MODEL=${model}
       VLLM_PATCHFILE=/tmp/vllm.patch
-  - path: /tmp/setup.sh
+${vllm_config_section}
+  - path: /tmp/setup-dev.sh
     permissions: '0755'
     content: |
-      ${setup_script}
+      ${setup_dev_script}
   - path: /tmp/vllm.patch
     # cloudinit will also base64 decode this for us. https://docs.cloud-init.io/en/latest/reference/yaml_examples/write_files.html#provide-gzipped-binary-content
     encoding: gzip
@@ -29,7 +38,6 @@ write_files:
     content: !!binary |
       ${vllm_patch_b64}
 
-runcmd:
-  - /tmp/setup.sh
-  - echo "Shutting down"
-  - sudo /sbin/shutdown -h now
+${runcmd_section}
+
+# Made with Bob

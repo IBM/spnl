@@ -32,13 +32,9 @@ pub struct GceConfig {
     #[arg(long, env = "GCS_BUCKET", default_value = "spnl-test")]
     pub gcs_bucket: String,
 
-    /// SPNL GitHub repository URL
-    #[arg(
-        long,
-        env = "SPNL_GITHUB",
-        default_value = "https://github.com/IBM/spnl.git"
-    )]
-    pub spnl_github: String,
+    /// SPNL GitHub repository URL (for dev mode - building from source)
+    #[arg(long, env = "SPNL_GITHUB")]
+    pub spnl_github: Option<String>,
 
     /// SPNL GitHub commit SHA
     #[arg(long, env = "GITHUB_SHA")]
@@ -71,7 +67,7 @@ impl GceConfig {
             zone: "us-west1-a".to_string(),
             machine_type: "g2-standard-4".to_string(),
             gcs_bucket: "spnl-test".to_string(),
-            spnl_github: "https://github.com/IBM/spnl.git".to_string(),
+            spnl_github: None,
             github_sha: None,
             github_ref: None,
             vllm_org: "neuralmagic".to_string(),
@@ -127,7 +123,7 @@ mod tests {
         assert_eq!(config.zone, "us-west1-a");
         assert_eq!(config.machine_type, "g2-standard-4");
         assert_eq!(config.gcs_bucket, "spnl-test");
-        assert_eq!(config.spnl_github, "https://github.com/IBM/spnl.git");
+        assert_eq!(config.spnl_github, None);
         assert_eq!(config.vllm_org, "neuralmagic");
         assert_eq!(config.vllm_repo, "vllm");
         assert_eq!(config.vllm_branch, "llm-d-release-0.4");

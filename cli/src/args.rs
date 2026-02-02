@@ -186,8 +186,45 @@ pub enum VllmCommands {
         #[command(flatten)]
         gce_config: spnl::gce::vllm::GceConfig,
     },
+    /// Manage custom images with vLLM pre-installed
+    #[cfg(feature = "gce")]
+    Image {
+        #[command(subcommand)]
+        command: ImageCommands,
+    },
     /// Emit vLLM patchfile to stdout
     Patchfile,
+}
+
+#[cfg(feature = "gce")]
+#[derive(Subcommand, Debug, serde::Serialize)]
+pub enum ImageCommands {
+    /// Create a custom image with vLLM pre-installed
+    Create {
+        /// Target platform (only gce is supported)
+        #[arg(long, default_value = "gce")]
+        target: VllmTarget,
+
+        /// Force overwrite of existing image with the same name
+        #[arg(short = 'f', long)]
+        force: bool,
+
+        /// Custom image name (defaults to auto-generated from hash)
+        #[arg(long)]
+        image_name: Option<String>,
+
+        /// Image family
+        #[arg(long, default_value = "vllm-spnl")]
+        image_family: String,
+
+        /// LLM-D version for patch file
+        #[arg(long, default_value = "0.4.0")]
+        llmd_version: String,
+
+        /// GCE configuration
+        #[command(flatten)]
+        gce_config: spnl::gce::vllm::GceConfig,
+    },
 }
 
 #[cfg(any(feature = "k8s", feature = "gce"))]

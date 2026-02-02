@@ -6,6 +6,8 @@ use spnl::{
     ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
 };
 
+#[cfg(feature = "gce")]
+use crate::args::ImageCommands;
 #[cfg(feature = "vllm")]
 use crate::args::VllmCommands;
 #[cfg(any(feature = "k8s", feature = "gce"))]
@@ -70,6 +72,7 @@ async fn main() -> Result<(), SpnlError> {
                         .name(name.name)
                         .model(model)
                         .hf_token(hf_token)
+                        .local_port(_local_port)
                         .config(gce_config)
                         .build()?,
                 )
@@ -90,6 +93,43 @@ async fn main() -> Result<(), SpnlError> {
             VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace).await,
             #[cfg(feature = "gce")]
             VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace, gce_config).await,
+        },
+        #[cfg(feature = "gce")]
+        Commands::Vllm {
+            command:
+                VllmCommands::Image {
+                    command:
+                        ImageCommands::Create {
+                            target,
+                            force,
+                            image_name,
+                            image_family,
+                            llmd_version,
+                            gce_config,
+                        },
+                },
+        } => match target {
+            VllmTarget::Gce => {
+                let image_name = gce_vllm::create_image(
+                    gce_vllm::ImageCreateArgsBuilder::default()
+                        .force_overwrite(force)
+                        .image_name(image_name)
+                        .image_family(image_family)
+                        .llmd_version(llmd_version)
+                        .vllm_org(gce_config.vllm_org.clone())
+                        .vllm_repo(gce_config.vllm_repo.clone())
+                        .vllm_branch(gce_config.vllm_branch.clone())
+                        .config(gce_config)
+                        .build()?,
+                )
+                .await?;
+                println!("Image created successfully: {}", image_name);
+                Ok(())
+            }
+            #[cfg(feature = "k8s")]
+            VllmTarget::K8s => Err(anyhow::anyhow!(
+                "Image creation is only supported for GCE target"
+            )),
         },
         #[cfg(feature = "vllm")]
         Commands::Vllm {

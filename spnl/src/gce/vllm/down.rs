@@ -1,4 +1,5 @@
 use crate::gce::vllm::GceConfig;
+use tabled::{Table, Tabled, settings::Style};
 
 /// Delete a GCE instance
 ///
@@ -11,10 +12,34 @@ pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> 
     let project = config.get_project()?;
     let zone = &config.zone;
 
-    eprintln!("Deleting GCE instance:");
-    eprintln!("  Name: {}", name);
-    eprintln!("  Project: {}", project);
-    eprintln!("  Zone: {}", zone);
+    #[derive(Tabled)]
+    struct InstanceInfo {
+        #[tabled(rename = "Property")]
+        property: String,
+        #[tabled(rename = "Value")]
+        value: String,
+    }
+
+    let info = vec![
+        InstanceInfo {
+            property: "Name".to_string(),
+            value: name.to_string(),
+        },
+        InstanceInfo {
+            property: "Project".to_string(),
+            value: project.clone(),
+        },
+        InstanceInfo {
+            property: "Zone".to_string(),
+            value: zone.clone(),
+        },
+    ];
+
+    let mut table = Table::new(info);
+    table.with(Style::sharp());
+
+    eprintln!("\nDeleting GCE Instance:");
+    eprintln!("{}\n", table);
 
     // Create the client
     let client = Instances::builder().build().await?;
@@ -43,7 +68,7 @@ pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> 
 
     // Delete the instance
     eprintln!("Submitting instance deletion request...");
-    let operation = client
+    let _operation = client
         .delete()
         .set_project(&project)
         .set_zone(zone)
@@ -54,7 +79,7 @@ pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> 
         .to_result()?;
 
     eprintln!("Instance '{}' deleted successfully", name);
-    eprintln!("Operation: {:?}", operation);
+    // eprintln!("Operation: {:?}", _operation);
 
     Ok(())
 }
