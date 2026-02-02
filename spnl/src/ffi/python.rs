@@ -11,7 +11,7 @@ fn handle_serde_err(e: serde_json::Error) -> PyErr {
 }
 
 #[cfg(feature = "run_py")]
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct UsageStats {
     #[pyo3(get)]

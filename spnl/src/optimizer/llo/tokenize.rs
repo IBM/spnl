@@ -171,7 +171,7 @@ pub fn init(max_capacity: u64) -> TokenizerState {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TokenizedChatCompletionQuery {
     #[pyo3(get)]
@@ -185,7 +185,7 @@ pub struct TokenizedChatCompletionQuery {
     messages_: Vec<u32>,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct CompletionRequest {
     #[pyo3(get)]
