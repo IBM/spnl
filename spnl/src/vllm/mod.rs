@@ -1,5 +1,7 @@
+#[cfg(feature = "vllm")]
 mod patch;
 
+#[cfg(feature = "vllm")]
 pub use patch::patchfile;
 
 #[cfg(feature = "gce")]
