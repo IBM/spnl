@@ -37,7 +37,6 @@ jobs:
             arch: x86_64
             libc: gnu
             name: Linux x86_64 GNU
-            use_cross: false
           
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
@@ -45,7 +44,6 @@ jobs:
             arch: aarch64
             libc: gnu
             name: Linux ARM64 GNU
-            use_cross: false
           
           # macOS builds
           # - runner: macos-latest
@@ -54,7 +52,6 @@ jobs:
           #   arch: x86_64
           #   libc: ""
           #   name: macOS x86_64
-          #   use_cross: false
           
           - runner: macos-latest
             target: aarch64-apple-darwin
@@ -62,7 +59,6 @@ jobs:
             arch: aarch64
             libc: ""
             name: macOS ARM64
-            use_cross: false
           
           # Windows builds
           - runner: windows-latest
@@ -71,7 +67,6 @@ jobs:
             arch: x86_64
             libc: ""
             name: Windows x86_64
-            use_cross: false
           
           - runner: windows-latest
             target: aarch64-pc-windows-msvc
@@ -79,7 +74,6 @@ jobs:
             arch: aarch64
             libc: ""
             name: Windows ARM64
-            use_cross: false
 
     env:
       TARGET: ${{ matrix.platform.target }}
@@ -110,12 +104,6 @@ jobs:
             fi
           fi
           rustup target add ${{ matrix.platform.target }}
-
-      - name: Install cross-compilation tool
-        if: matrix.platform.use_cross
-        shell: bash
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Setup protoc (Linux)
         if: runner.os == 'Linux'
@@ -158,21 +146,12 @@ jobs:
           # Verify protoc is available (will be available in next step)
           ls -la "$RUNNER_TEMP/protoc/bin"
 
-      - name: Build CLI (native)
-        if: ${{ !matrix.platform.use_cross }}
+      - name: Build CLI
         shell: bash
         run: |
           # Only use openssl-vendored for musl builds (static linking)
           # Other platforms use system OpenSSL
           cargo build --features rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
-
-      - name: Build CLI (cross)
-        if: matrix.platform.use_cross
-        shell: bash
-        run: |
-          # Only use openssl-vendored for musl builds (static linking)
-          # Other platforms use system OpenSSL
-          cross build --features rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Check for Apple signing secrets
         if: runner.os == 'macOS'
