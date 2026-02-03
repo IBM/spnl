@@ -39,10 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN" # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN" # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
 
       - id: auth
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ vars.GCP_PROJECT }}
@@ -53,23 +53,23 @@ jobs:
           # service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         uses: google-github-actions/setup-gcloud@v3
         with:
           version: '>= 363.0.0'
 
       - name: Use gcloud CLI
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: gcloud info
 
       - name: Install spnl CLI
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: |
           cargo build --features gce
           sudo cp target/debug/spnl /usr/local/bin/
         
       - name: Launch GCE VM
-        if: "!contains(github.event.pull_request.title, 'chore(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: |
           spnl vllm up --target=gce \
             "vllm-$RUN_ID" \
