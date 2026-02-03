@@ -61,11 +61,11 @@ spnl run [OPTIONS]
 - `-k, --chunk-size <CHUNK_SIZE>` - Chunk size for document processing
 - `--vecdb-uri <VECDB_URI>` - Vector database URL
   - Default: `data/spnl`
+- `--shuffle` - Randomly shuffle order of fragments
 
 #### Query Execution Options
 
 - `-r, --reverse` - Reverse order
-- `--shuffle` - Randomly shuffle order of fragments
 - `--prepare` - Prepare query without executing
 - `--dry-run` - Dry run (do not execute query)
 
@@ -103,6 +103,8 @@ spnl vllm <COMMAND>
 
 - `up` - Bring up a vLLM server
 - `down` - Tear down a vLLM server
+- `image` - Manage custom images with vLLM pre-installed (GCE only)
+- `patchfile` - Emit vLLM patchfile to stdout
 - `help` - Print help message
 
 ---
@@ -149,9 +151,33 @@ spnl vllm up [OPTIONS] --hf-token <HF_TOKEN> <NAME>
 - `-r, --remote-port <REMOTE_PORT>` - Remote port for port forwarding
   - Default: `8000`
 
+#### Google Compute Engine Configuration
+
+When using `--target gce`, the following options are available:
+
+- `--project <PROJECT>` - GCP project ID (env: `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT`) (required)
+- `--service-account <SERVICE_ACCOUNT>` - GCP service account email without @PROJECT.iam.gserviceaccount.com (env: `GCP_SERVICE_ACCOUNT`) (required)
+- `--region <REGION>` - GCE region (env: `GCE_REGION`)
+  - Default: `us-west1`
+- `--zone <ZONE>` - GCE zone (env: `GCE_ZONE`)
+  - Default: `us-west1-a`
+- `--machine-type <MACHINE_TYPE>` - GCE machine type (env: `GCE_MACHINE_TYPE`)
+  - Default: `g2-standard-4`
+- `--gcs-bucket <GCS_BUCKET>` - GCS bucket for storing artifacts (env: `GCS_BUCKET`)
+  - Default: `spnl-test`
+- `--spnl-github <SPNL_GITHUB>` - SPNL GitHub repository URL for dev mode (env: `SPNL_GITHUB`)
+- `--github-sha <GITHUB_SHA>` - SPNL GitHub commit SHA (env: `GITHUB_SHA`)
+- `--github-ref <GITHUB_REF>` - SPNL GitHub ref (branch/tag) (env: `GITHUB_REF`)
+- `--vllm-org <VLLM_ORG>` - vLLM organization on GitHub (env: `VLLM_ORG`)
+  - Default: `neuralmagic`
+- `--vllm-repo <VLLM_REPO>` - vLLM repository name (env: `VLLM_REPO`)
+  - Default: `vllm`
+- `--vllm-branch <VLLM_BRANCH>` - vLLM branch to use (env: `VLLM_BRANCH`)
+  - Default: `llm-d-release-0.4`
+
 ### Google Compute Engine Requirements
 
-When using `--target gce`, the following environment variables must be set:
+When using `--target gce`, you must set:
 
 - `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT` - Your GCP project ID (required)
 - `GCP_SERVICE_ACCOUNT` - Service account name for the instance (required)
@@ -175,6 +201,16 @@ spnl vllm up my-deployment --target gce --hf-token YOUR_HF_TOKEN
 
 # Deploy with custom ports
 spnl vllm up my-deployment --target k8s --hf-token YOUR_HF_TOKEN --local-port 8080 --remote-port 8000
+
+# Deploy on GCE with custom configuration
+spnl vllm up my-deployment --target gce \
+  --hf-token YOUR_HF_TOKEN \
+  --project my-gcp-project \
+  --service-account my-sa \
+  --region us-central1 \
+  --zone us-central1-a \
+  --machine-type g2-standard-8 \
+  --gpus 2
 ```
 
 ---
@@ -198,6 +234,10 @@ spnl vllm down [OPTIONS] <NAME>
   - Default: `k8s`
 - `-n, --namespace <NAMESPACE>` - Namespace of the Kubernetes deployment
 
+#### Google Compute Engine Configuration
+
+When using `--target gce`, the same GCE configuration options from `vllm up` are available.
+
 ### Examples
 
 ```bash
@@ -210,6 +250,72 @@ spnl vllm down my-deployment --target gce
 # Tear down with specific namespace
 spnl vllm down my-deployment --target k8s --namespace my-namespace
 ```
+
+---
+
+## `spnl vllm image` - Manage Custom vLLM Images (GCE Only)
+
+Create and manage custom GCE images with vLLM pre-installed.
+
+```bash
+spnl vllm image <COMMAND>
+```
+
+### Commands
+
+- `create` - Create a custom image with vLLM pre-installed
+
+---
+
+## `spnl vllm image create` - Create Custom vLLM Image
+
+Create a custom GCE image with vLLM pre-installed for faster instance startup.
+
+```bash
+spnl vllm image create [OPTIONS]
+```
+
+### Options
+
+- `--target <TARGET>` - Target platform (only `gce` is supported)
+  - Default: `gce`
+- `-f, --force` - Force overwrite of existing image with the same name
+- `--image-name <IMAGE_NAME>` - Custom image name (defaults to auto-generated from hash)
+- `--image-family <IMAGE_FAMILY>` - Image family
+  - Default: `vllm-spnl`
+- `--llmd-version <LLMD_VERSION>` - LLM-D version for patch file
+  - Default: `0.4.0`
+
+#### Google Compute Engine Configuration
+
+The same GCE configuration options from `vllm up` are available.
+
+### Examples
+
+```bash
+# Create a custom image with default settings
+spnl vllm image create --project my-project --service-account my-sa
+
+# Create with custom image name and force overwrite
+spnl vllm image create --project my-project --service-account my-sa \
+  --image-name my-vllm-image --force
+
+# Create with custom vLLM version
+spnl vllm image create --project my-project --service-account my-sa \
+  --vllm-branch main --llmd-version 0.5.0
+```
+
+---
+
+## `spnl vllm patchfile` - Emit vLLM Patchfile
+
+Output the vLLM patchfile to stdout.
+
+```bash
+spnl vllm patchfile
+```
+
+This command outputs the patchfile used to modify vLLM for SPNL integration.
 
 ---
 
@@ -227,9 +333,22 @@ The following environment variables can be used to configure SPNL:
 ### vLLM Deployment
 
 - `HF_TOKEN` - HuggingFace token for model access
-- `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT` - GCP project ID (for GCE deployments)
-- `GCP_SERVICE_ACCOUNT` - GCP service account name (for GCE deployments)
-- `GOOGLE_APPLICATION_CREDENTIALS` - Path to GCP service account key file (for GCE deployments)
+
+### Google Compute Engine
+
+- `GCP_PROJECT` or `GOOGLE_CLOUD_PROJECT` - GCP project ID (required for GCE)
+- `GCP_SERVICE_ACCOUNT` - GCP service account name (required for GCE)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to GCP service account key file
+- `GCE_REGION` - GCE region (default: `us-west1`)
+- `GCE_ZONE` - GCE zone (default: `us-west1-a`)
+- `GCE_MACHINE_TYPE` - GCE machine type (default: `g2-standard-4`)
+- `GCS_BUCKET` - GCS bucket for artifacts (default: `spnl-test`)
+- `SPNL_GITHUB` - SPNL GitHub repository URL (for dev mode)
+- `GITHUB_SHA` - SPNL GitHub commit SHA
+- `GITHUB_REF` - SPNL GitHub ref (branch/tag)
+- `VLLM_ORG` - vLLM organization on GitHub (default: `neuralmagic`)
+- `VLLM_REPO` - vLLM repository name (default: `vllm`)
+- `VLLM_BRANCH` - vLLM branch to use (default: `llm-d-release-0.4`)
 
 ---
 
