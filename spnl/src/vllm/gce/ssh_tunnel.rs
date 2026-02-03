@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
-use russh::client::{self, Handle};
+use russh::client::{self, AuthResult, Handle};
+use russh::keys::{PrivateKey, PrivateKeyWithHashAlg, PublicKey};
 use russh::*;
-use russh_keys::key;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,13 +11,12 @@ use tokio::sync::Mutex;
 /// SSH client handler
 struct Client;
 
-#[async_trait::async_trait]
 impl client::Handler for Client {
     type Error = russh::Error;
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &key::PublicKey,
+        _server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
         // Accept any server key (equivalent to StrictHostKeyChecking=no)
         Ok(true)
@@ -92,14 +91,34 @@ impl SshTunnel {
 
         let mut session = session.unwrap();
 
-        // Authenticate
+        // Authenticate - convert PrivateKey to PrivateKeyWithHashAlg
+        // For RSA keys, use SHA-256 instead of legacy SHA-1 (None defaults to SHA-1)
+        use russh::keys::HashAlg;
+        let hash_alg = if key_pair.algorithm().is_rsa() {
+            Some(HashAlg::Sha256)
+        } else {
+            None
+        };
+        let key_with_alg = PrivateKeyWithHashAlg::new(Arc::new(key_pair), hash_alg);
         let auth_res = session
-            .authenticate_publickey(username, Arc::new(key_pair))
+            .authenticate_publickey(username, key_with_alg)
             .await
             .context("SSH authentication failed")?;
 
-        if !auth_res {
-            return Err(anyhow::anyhow!("SSH authentication rejected by server"));
+        match auth_res {
+            AuthResult::Success => {
+                eprintln!("SSH authentication successful");
+            }
+            AuthResult::Failure {
+                remaining_methods,
+                partial_success,
+            } => {
+                return Err(anyhow::anyhow!(
+                    "SSH authentication rejected by server. Partial success: {}, Remaining methods: {:?}",
+                    partial_success,
+                    remaining_methods
+                ));
+            }
         }
 
         eprintln!("SSH connection established to {}:{}", host, port);
@@ -142,13 +161,13 @@ impl SshTunnel {
     }
 
     /// Load private key from file
-    async fn load_private_key(path: &PathBuf) -> Result<key::KeyPair> {
+    async fn load_private_key(path: &PathBuf) -> Result<PrivateKey> {
         let key_data = tokio::fs::read_to_string(path)
             .await
             .context("Failed to read SSH key file")?;
 
-        // Try to decode the key (russh-keys handles various formats)
-        russh_keys::decode_secret_key(&key_data, None).context("Failed to decode SSH private key")
+        // Try to decode the key (russh uses its own key types)
+        russh::keys::decode_secret_key(&key_data, None).context("Failed to decode SSH private key")
     }
 
     /// Start the tunnel (listen on local port and forward connections)
