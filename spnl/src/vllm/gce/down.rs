@@ -1,4 +1,4 @@
-use crate::gce::vllm::GceConfig;
+use crate::vllm::gce::GceConfig;
 use tabled::{Table, Tabled, settings::Style};
 
 /// Delete a GCE instance

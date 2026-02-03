@@ -12,12 +12,12 @@ use crate::args::ImageCommands;
 use crate::args::VllmCommands;
 #[cfg(any(feature = "k8s", feature = "gce"))]
 use crate::args::VllmTarget;
-#[cfg(feature = "gce")]
-use spnl::gce::vllm as gce_vllm;
-#[cfg(feature = "k8s")]
-use spnl::k8s::vllm as k8s_vllm;
 #[cfg(feature = "vllm")]
 use spnl::vllm;
+#[cfg(feature = "gce")]
+use spnl::vllm::gce as gce_vllm;
+#[cfg(feature = "k8s")]
+use spnl::vllm::k8s as k8s_vllm;
 
 #[cfg(feature = "rag")]
 use spnl::AugmentOptionsBuilder;

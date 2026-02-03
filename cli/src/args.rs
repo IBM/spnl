@@ -170,7 +170,7 @@ pub enum VllmCommands {
         /// GCE configuration (only used when target is gce)
         #[cfg(feature = "gce")]
         #[command(flatten)]
-        gce_config: spnl::gce::vllm::GceConfig,
+        gce_config: spnl::vllm::gce::GceConfig,
     },
     #[cfg(any(feature = "k8s", feature = "gce"))]
     Down {
@@ -184,7 +184,7 @@ pub enum VllmCommands {
         /// GCE configuration (only used when target is gce)
         #[cfg(feature = "gce")]
         #[command(flatten)]
-        gce_config: spnl::gce::vllm::GceConfig,
+        gce_config: spnl::vllm::gce::GceConfig,
     },
     /// Manage custom images with vLLM pre-installed
     #[cfg(feature = "gce")]
@@ -223,7 +223,7 @@ pub enum ImageCommands {
 
         /// GCE configuration
         #[command(flatten)]
-        gce_config: spnl::gce::vllm::GceConfig,
+        gce_config: spnl::vllm::gce::GceConfig,
     },
 }
 

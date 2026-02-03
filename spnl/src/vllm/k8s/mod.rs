@@ -729,7 +729,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            let (manifest, _id) = crate::k8s::vllm::load_deployment_manifest(args).unwrap();
+            let (manifest, _id) = crate::vllm::k8s::load_deployment_manifest(args).unwrap();
 
             // Test just the deployment creation part
             let d = api::<Deployment>(client, &None).unwrap();
