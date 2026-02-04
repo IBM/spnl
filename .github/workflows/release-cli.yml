@@ -444,4 +444,139 @@ jobs:
           echo "✅ All assets uploaded successfully!"
           gh release view "$VERSION"
 
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags/')
+    needs: [upload-to-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version from release
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          # Remove 'v' prefix if present
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Extract checksums
+        id: checksums
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          
+          # Find and read the checksum files
+          MACOS_ARM64_SHA256=$(cat artifacts/spnl-${TAG}-macos-aarch64.tar.gz/spnl-${TAG}-macos-aarch64.tar.gz.sha256)
+          LINUX_ARM64_SHA256=$(cat artifacts/spnl-${TAG}-linux-aarch64-gnu.tar.gz/spnl-${TAG}-linux-aarch64-gnu.tar.gz.sha256)
+          LINUX_X86_64_SHA256=$(cat artifacts/spnl-${TAG}-linux-x86_64-gnu.tar.gz/spnl-${TAG}-linux-x86_64-gnu.tar.gz.sha256)
+          
+          echo "macos_arm64_sha256=$MACOS_ARM64_SHA256" >> $GITHUB_OUTPUT
+          echo "linux_arm64_sha256=$LINUX_ARM64_SHA256" >> $GITHUB_OUTPUT
+          echo "linux_x86_64_sha256=$LINUX_X86_64_SHA256" >> $GITHUB_OUTPUT
+          
+          echo "Checksums extracted:"
+          echo "  macOS ARM64: $MACOS_ARM64_SHA256"
+          echo "  Linux ARM64: $LINUX_ARM64_SHA256"
+          echo "  Linux x86_64: $LINUX_X86_64_SHA256"
+
+      - name: Update Homebrew formula
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MACOS_ARM64_SHA256="${{ steps.checksums.outputs.macos_arm64_sha256 }}"
+          LINUX_ARM64_SHA256="${{ steps.checksums.outputs.linux_arm64_sha256 }}"
+          LINUX_X86_64_SHA256="${{ steps.checksums.outputs.linux_x86_64_sha256 }}"
+          
+          # Update the formula file using sed
+          sed -i "s/version \".*\"/version \"$VERSION\"/" Formula/spnl.rb
+          sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-macos-aarch64.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-macos-aarch64.tar.gz\"|" Formula/spnl.rb
+          sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-linux-aarch64-gnu.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-linux-aarch64-gnu.tar.gz\"|" Formula/spnl.rb
+          sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-linux-x86_64-gnu.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-linux-x86_64-gnu.tar.gz\"|" Formula/spnl.rb
+          
+          # Update SHA256 checksums - find the line after each URL and replace it
+          # macOS ARM64
+          awk -v sha="$MACOS_ARM64_SHA256" '/macos-aarch64\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
+          # Linux ARM64
+          awk -v sha="$LINUX_ARM64_SHA256" '/linux-aarch64-gnu\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
+          # Linux x86_64
+          awk -v sha="$LINUX_X86_64_SHA256" '/linux-x86_64-gnu\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
+          
+          echo "Formula updated:"
+          cat Formula/spnl.rb
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH_NAME="homebrew-formula-v${VERSION}"
+          MACOS_SHA="${{ steps.checksums.outputs.macos_arm64_sha256 }}"
+          LINUX_ARM_SHA="${{ steps.checksums.outputs.linux_arm64_sha256 }}"
+          LINUX_X86_SHA="${{ steps.checksums.outputs.linux_x86_64_sha256 }}"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+          
+          # Add and commit changes
+          git add Formula/spnl.rb
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git commit -m "chore: update Homebrew formula to v${VERSION}"
+          
+          # Push branch
+          git push origin "$BRANCH_NAME"
+          
+          # Create PR body file
+          cat > /tmp/pr-body.md << EOF
+          This PR updates the Homebrew formula to version v${VERSION}.
+          
+          ## Changes
+          - Updated version to ${VERSION}
+          - Updated SHA256 checksums for all platforms:
+            - macOS ARM64: ${MACOS_SHA}
+            - Linux ARM64: ${LINUX_ARM_SHA}
+            - Linux x86_64: ${LINUX_X86_SHA}
+          
+          ## Testing
+          The formula can be tested with:
+          \`\`\`bash
+          brew install --build-from-source Formula/spnl.rb
+          spnl --version
+          \`\`\`
+          
+          ---
+          *This PR was automatically generated by the release workflow.*
+          EOF
+          
+          # Create PR
+          gh pr create \
+            --title "chore: update Homebrew formula to v${VERSION}" \
+            --body-file /tmp/pr-body.md \
+            --base main \
+            --head "$BRANCH_NAME"
+          
+          echo "✅ Pull request created for Homebrew formula update to v${VERSION}"
+
 # Made with Bob
