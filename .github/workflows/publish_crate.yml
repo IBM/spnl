@@ -8,6 +8,9 @@ name: publish_pypi
 on:
   release:
     types: [published]
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -19,6 +22,8 @@ jobs:
   publish_crate:
     name: Publish crate
     runs-on: ubuntu-latest
+    env:
+      DRY_RUN: ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
     steps:
       - uses: actions/checkout@v6
       - name: Setup protoc
@@ -39,6 +44,6 @@ jobs:
           fi
           unzip protoc.zip -d $HOME/.local
       - name: Publish
-        run: cargo publish -p spnl --all-features
+        run: cargo publish -p spnl --all-features $DRY_RUN
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
