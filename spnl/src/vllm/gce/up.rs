@@ -45,7 +45,7 @@ fn indent(text: &str, spaces: usize) -> String {
 }
 
 fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
-    let cloud_config_template = include_str!("../../../../docker/gce/vllm/cloud-config.yaml");
+    let cloud_config_template = include_str!("../../../docker/gce/vllm/cloud-config.yaml");
 
     // Generate a unique run ID
     let run_id = uuid::Uuid::new_v4().to_string();
@@ -106,7 +106,7 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
         cloud_init_modules_section,
         runcmd_section,
     ) = if is_dev_mode {
-        let setup_dev_script = include_str!("../../../../docker/gce/vllm/setup-dev.sh");
+        let setup_dev_script = include_str!("../../../docker/gce/vllm/setup-dev.sh");
 
         // Read vllm patch file if it exists
         let vllm_patch_path = std::path::Path::new("../git/spnl/docker/gce/vllm/vllm.patch");
