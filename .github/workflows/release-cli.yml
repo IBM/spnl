@@ -237,6 +237,7 @@ jobs:
           cat "$ARCHIVE_PATH.sha256"
 
       - name: Upload artifact
+        if: github.event_name == 'release'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARCHIVE_NAME }}
@@ -323,6 +324,7 @@ jobs:
           cat "$ARCHIVE_PATH.sha256"
 
       - name: Upload artifact
+        if: github.event_name == 'release'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARCHIVE_NAME }}
@@ -333,6 +335,7 @@ jobs:
 
   upload-to-release:
     name: Upload assets to release
+    if: github.event_name == 'release'
     needs: [build-and-upload, build-musl]
     runs-on: ubuntu-latest
     steps:
