@@ -3,6 +3,8 @@
 /target.cross
 history.txt
 
+*.backup
+
 # vector db for manual testing
 data/
 

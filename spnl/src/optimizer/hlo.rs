@@ -213,7 +213,7 @@ pub async fn optimize(query: &Query, po: &Options) -> anyhow::Result<Query> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{Augment, Document, GenerateMetadataBuilder, Message::*, Query::Message};
+    use crate::ir::{GenerateMetadataBuilder, Message::*, Query::Message};
 
     fn nested_gen_query(model: &str) -> anyhow::Result<(Query, Generate, Query, Query, Query)> {
         let s2 = Message(System("outer system".into()));
@@ -265,6 +265,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "rag")]
     #[tokio::test] // <-- needed for async tests
     async fn retrieve() -> anyhow::Result<()> {
         let model = "spnl/m"; // This should work, because we use SimpleEmbedRetrieve which won't do any generation
@@ -272,10 +273,13 @@ mod tests {
         let d = "I know all about Hello and stuff";
         let outer_generate = GenerateBuilder::default()
             .metadata(GenerateMetadataBuilder::default().model(model).build()?)
-            .input(Box::new(Query::Augment(Augment {
+            .input(Box::new(Query::Augment(crate::ir::Augment {
                 embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
                 body: Box::new(q),
-                doc: ("path/to/doc.txt".to_string(), Document::Text(d.to_string())),
+                doc: (
+                    "path/to/doc.txt".to_string(),
+                    crate::ir::Document::Text(d.to_string()),
+                ),
             })))
             .build()?;
 

@@ -71,11 +71,24 @@ jobs:
           fi
           wait # for disk space cleanup
 
-      - name: cargo test and clippy
+      - name: cargo test
         run: |
-          cargo test --all-features -p spnl -p spnl-cli -- --nocapture & \
-          cargo clippy --workspace --all-features --tests --no-deps -- -D warnings
-          wait
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # Test all features on macOS, including candle-metal
+            cargo test --all-features -p spnl -p spnl-cli -- --nocapture
+          else
+            # Test default features on Linux (candle works on Linux, but --all-features
+            # includes candle-metal which is macOS-only)
+            cargo test -p spnl -p spnl-cli -- --nocapture
+          fi
+
+      - name: cargo clippy
+        # Only run clippy on macOS to validate all features including candle-metal.
+        # Clippy is linting/static analysis (OS-independent), so running once is sufficient.
+        # The candle-metal feature is macOS-only and causes `cargo publish --all-features`
+        # to fail on Linux runners with "objc2 only works on Apple platforms" error.
+        if: runner.os == 'macOS'
+        run: cargo clippy --workspace --all-features --tests --no-deps -- -D warnings
 
       - name: rustfmt
         run: cargo fmt --all -- --check

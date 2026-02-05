@@ -1,5 +1,5 @@
 #[cfg(feature = "tok")]
-mod llir;
+pub(crate) mod llir;
 
 #[cfg(feature = "tok")]
 pub mod tokenize;

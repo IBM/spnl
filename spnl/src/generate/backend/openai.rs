@@ -74,7 +74,7 @@ pub async fn generate_completion(
     };
     let quiet = m.is_some() || start_time.is_some();
 
-    let pbs = super::progress::bars(n_prompts, &spec.metadata, &m)?;
+    let pbs = super::progress::bars(n_prompts, &spec.metadata, &m, None)?;
 
     let request = CreateCompletionRequestArgs::default()
         .model(spec.metadata.model)
@@ -182,7 +182,7 @@ pub async fn generate_chat(
     };
     let quiet = m.is_some() || start_time.is_some();
 
-    let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m)?;
+    let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m, None)?;
 
     let mut request_builder_0 = CreateChatCompletionRequestArgs::default();
     let request_builder_1 = request_builder_0

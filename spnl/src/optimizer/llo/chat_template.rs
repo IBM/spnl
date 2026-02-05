@@ -64,7 +64,7 @@ pub enum ChatTemplate {
 use ChatTemplate::*;
 
 pub fn detect(m: &str) -> anyhow::Result<ChatTemplate> {
-    if m.contains("chatml") {
+    if m.contains("chatml") || m.contains("Qwen") {
         Ok(Chatml)
     }
     /*else if m.contains("llama2-sys-bos")  {Ok(Llama2SysBos)}

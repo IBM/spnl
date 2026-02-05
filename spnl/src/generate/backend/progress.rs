@@ -5,7 +5,9 @@ pub fn bars(
     n: usize,
     metadata: &GenerateMetadata,
     m: &Option<&MultiProgress>,
+    multiplier: Option<u64>,
 ) -> anyhow::Result<Option<Vec<ProgressBar>>> {
+    let multiplier = multiplier.unwrap_or(4);
     let style = ProgressStyle::with_template(
         "{msg} {wide_bar:.yellow/orange} {pos:>7}/{len:7} [{elapsed_precise}]",
     )?;
@@ -17,7 +19,7 @@ pub fn bars(
                 m.add(
                     metadata
                         .max_tokens
-                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * 4))
+                        .map(|max_tokens| ProgressBar::new((max_tokens as u64) * multiplier))
                         .unwrap_or_else(ProgressBar::no_length)
                         .with_style(style.clone())
                         .with_message(if n == 1 {

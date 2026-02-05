@@ -2,5 +2,5 @@
 #[cfg(feature = "run")]
 pub mod hlo;
 
-#[cfg(feature = "pypi")]
+#[cfg(feature = "tok")]
 pub mod llo;

@@ -15,7 +15,8 @@ env:
 jobs:
   publish_crate:
     name: Publish crate
-    runs-on: ubuntu-latest
+    # Use macOS runner to support publishing with all features including candle-metal
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
       - name: Setup protoc

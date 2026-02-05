@@ -81,7 +81,10 @@ async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
         .await?
         .json()
         .await?;
-    Ok(tags.models.into_iter().any(|m| m.model == model))
+    Ok(tags
+        .models
+        .into_iter()
+        .any(|m| m.model.eq_ignore_ascii_case(model)))
 }
 
 // The Ollama implementation of a single model pull

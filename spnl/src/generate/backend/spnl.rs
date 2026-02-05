@@ -64,7 +64,7 @@ pub async fn generate(
     let client = reqwest::Client::new();
 
     // eprintln!("Sending query {:?}", to_string(&query)?);
-    let pbs = super::progress::bars(spec.n(), &spec.metadata(), &m)?;
+    let pbs = super::progress::bars(spec.n(), &spec.metadata(), &m, None)?;
     let mut response_strings = ::std::iter::repeat_n(String::new(), spec.n()).collect::<Vec<_>>();
 
     let is_map = matches!(spec, Spec::Map(_));
