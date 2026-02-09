@@ -190,6 +190,7 @@ pub async fn generate_chat(
         .n(spec.n)
         .messages(input_messages)
         .temperature(spec.generate.metadata.temperature.unwrap_or_default())
+        .reasoning_effort(async_openai::types::chat::ReasoningEffort::None)
         .max_completion_tokens(mt);
 
     let request_builder = match &provider {
