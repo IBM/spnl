@@ -5,15 +5,12 @@ use arrow_array::{
     FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray,
     /*cast::AsArray,*/ types::Float32Type,
 };
-use arrow_schema::ArrowError;
+use arrow_schema::{ArrowError, DataType, Field, Schema};
 
 use lancedb::query::{ExecutableQuery, QueryBase};
 
 use futures::TryStreamExt;
-use lancedb::{
-    Table,
-    arrow::arrow_schema::{DataType, Field, Schema},
-};
+use lancedb::Table;
 use tracing::warn;
 
 pub struct VecDB {
