@@ -22,7 +22,7 @@ fn get_decode_batch_size() -> usize {
     std::env::var("CANDLE_DECODE_BATCH_SIZE")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(1) // Default to 1 (no batching) for compatibility
+        .unwrap_or(8) // Default to 1 (no batching) for compatibility
 }
 
 /// Check if KV cache reuse is enabled (default: true for better chat performance)
@@ -49,6 +49,36 @@ fn get_tensor_pool_size() -> usize {
         .unwrap_or(16) // Default: pool of 16 tensors
 }
 
+/// Get soft max tokens buffer from environment variable or use default
+/// This allows the model to continue beyond max_tokens to reach EOS naturally
+/// Default: 0 tokens (disabled - strict max_tokens enforcement)
+fn get_soft_max_tokens_buffer() -> usize {
+    std::env::var("CANDLE_SOFT_MAX_TOKENS_BUFFER")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0) // Default: disabled to prevent repetition loops
+}
+
+/// Get EOS bias start ratio from environment variable or use default
+/// This determines when to start biasing towards EOS token (as fraction of max_tokens)
+/// Default: 0.8 (start biasing at 80% of max_tokens)
+fn get_eos_bias_start_ratio() -> f64 {
+    std::env::var("CANDLE_EOS_BIAS_START")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.8)
+}
+
+/// Get EOS bias strength from environment variable or use default
+/// This determines how much to bias towards EOS token
+/// Default: 2.0 (double the EOS logit value at max_tokens)
+fn get_eos_bias_strength() -> f64 {
+    std::env::var("CANDLE_EOS_BIAS_STRENGTH")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2.0)
+}
+
 /// Get repeat penalty window size from environment variable or use default
 /// Smaller windows are faster but may allow more repetition
 /// Larger windows prevent repetition better but are slower for long sequences
@@ -56,7 +86,7 @@ fn get_repeat_penalty_window() -> usize {
     std::env::var("CANDLE_REPEAT_PENALTY_WINDOW")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(256) // Default: consider last 256 tokens
+        .unwrap_or(64) // Default: 64 to match Ollama (0 would mean penalize all generated tokens)
 }
 
 /// Check if GPU-side repeat penalty is enabled (default: false for compatibility)
@@ -66,7 +96,7 @@ fn is_gpu_penalty_enabled() -> bool {
     std::env::var("CANDLE_GPU_PENALTY")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(false) // Default to disabled for compatibility
+        .unwrap_or(true) // Default to disabled for compatibility
 }
 
 /// Get streaming decode batch size from environment variable or use default (1 = no batching)
@@ -77,7 +107,7 @@ fn get_streaming_decode_batch_size() -> usize {
     std::env::var("CANDLE_STREAMING_DECODE_BATCH")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(1) // Default to 1 (no batching) for lowest latency
+        .unwrap_or(8) // Default to 1 (no batching) for lowest latency
 }
 
 /// Optimized repeat penalty cache using HashSet for O(1) lookups
@@ -130,13 +160,21 @@ impl RepeatPenaltyCache {
         let device = logits.device();
         let dtype = logits.dtype();
 
+        // Ensure logits is 1D (vocab_size)
+        let logits_1d = if logits.dims().len() > 1 {
+            // If logits has multiple dimensions, flatten to 1D
+            logits.flatten_all()?
+        } else {
+            logits.clone()
+        };
+
         // Convert penalty indices to tensor (small transfer, done once)
         let penalty_indices: Vec<u32> = self.penalized_tokens.iter().copied().collect();
         let num_penalized = penalty_indices.len();
         let indices_tensor = Tensor::from_vec(penalty_indices, num_penalized, device)?;
 
         // Extract penalized logits using index_select (GPU operation)
-        let penalized_logits = logits.index_select(&indices_tensor, 0)?;
+        let penalized_logits = logits_1d.index_select(&indices_tensor, 0)?;
 
         // Create condition mask: logits >= 0.0 (GPU operation)
         let zeros = Tensor::zeros(num_penalized, dtype, device)?;
@@ -156,9 +194,14 @@ impl RepeatPenaltyCache {
         let penalized_result = is_positive.where_cond(&penalized_positive, &penalized_negative)?;
 
         // Scatter penalized values back into logits (GPU operation)
-        let result = logits.scatter(&indices_tensor, &penalized_result, 0)?;
+        let result = logits_1d.scatter(&indices_tensor, &penalized_result, 0)?;
 
-        Ok(result)
+        // Reshape back to original shape if needed
+        if logits.dims().len() > 1 {
+            Ok(result.reshape(logits.shape())?)
+        } else {
+            Ok(result)
+        }
     }
 
     /// Apply penalty to logits using the cached token set (CPU-based fallback)
@@ -469,6 +512,10 @@ pub fn generate_text<M: ModelForward>(
     let penalty_window = get_repeat_penalty_window();
     let mut penalty_cache = RepeatPenaltyCache::new(penalty_window);
 
+    // Track recent tokens for repetition detection (last 100 tokens)
+    let mut recent_token_sequence: VecDeque<u32> = VecDeque::with_capacity(100);
+    let repetition_check_window = 30; // Check if last 30 tokens repeat
+
     // Initialize pending tokens buffer for batched streaming decode
     // This reduces tokenizer overhead by decoding multiple tokens at once
     let streaming_batch_size = get_streaming_decode_batch_size();
@@ -476,8 +523,15 @@ pub fn generate_text<M: ModelForward>(
 
     // Generation phase - process tokens in batches for better GPU utilization
     // Batching reduces kernel launch overhead and improves throughput
+
+    // Soft max_tokens: allow model to continue beyond max_tokens to reach EOS naturally
+    // This prevents mid-sentence cutoffs while still respecting reasonable limits
+    let soft_buffer = get_soft_max_tokens_buffer();
+    let hard_limit = config.max_tokens + soft_buffer;
+    let mut in_soft_zone = false; // Track if we're in the buffer zone
+
     let mut index_pos = 0;
-    while index_pos < config.max_tokens {
+    while index_pos < hard_limit {
         let start_pos = prompt_len + index_pos;
 
         // Check if we're exceeding max_position_embeddings
@@ -485,8 +539,14 @@ pub fn generate_text<M: ModelForward>(
             break;
         }
 
+        // Check if we've entered the soft zone (beyond max_tokens but before hard limit)
+        if index_pos >= config.max_tokens && !in_soft_zone {
+            in_soft_zone = true;
+            // eprintln!("Entered soft max_tokens zone - will continue until EOS or hard limit");
+        }
+
         // Determine batch size for this iteration (may be smaller at the end)
-        let remaining_tokens = config.max_tokens - index_pos;
+        let remaining_tokens = hard_limit - index_pos;
         let current_batch_size = decode_batch_size.min(remaining_tokens);
 
         // Clear and prepare token buffer for this batch
@@ -519,10 +579,35 @@ pub fn generate_text<M: ModelForward>(
                     penalty_cache.apply_penalty(&last_token_logits, config.repeat_penalty)?;
             }
 
+            // Apply EOS bias as we approach max_tokens to encourage natural completion
+            let eos_bias_start = (config.max_tokens as f64 * get_eos_bias_start_ratio()) as usize;
+            if index_pos >= eos_bias_start {
+                let progress = (index_pos - eos_bias_start) as f64
+                    / (config.max_tokens - eos_bias_start) as f64;
+                let bias_multiplier = 1.0 + (progress * (get_eos_bias_strength() - 1.0));
+
+                // Boost EOS token logit to encourage completion
+                // Convert to F32 first to avoid dtype issues
+                let logits_f32 = last_token_logits.to_dtype(DType::F32)?;
+                let mut logits_vec = logits_f32.to_vec1::<f32>()?;
+                if let Some(eos_logit) = logits_vec.get_mut(eos_token as usize) {
+                    *eos_logit *= bias_multiplier as f32;
+                }
+                let biased_logits =
+                    Tensor::from_vec(logits_vec, last_token_logits.dims()[0], config.device)?;
+                // Convert back to original dtype
+                last_token_logits = biased_logits.to_dtype(last_token_logits.dtype())?;
+            }
+
             // Sample next token
             let next_token = logits_processor.sample(&last_token_logits)?;
 
             if next_token == eos_token {
+                break;
+            }
+
+            // In soft zone, we only continue to find EOS - if we hit hard limit, stop
+            if in_soft_zone && index_pos >= hard_limit - 1 {
                 break;
             }
 
@@ -532,6 +617,52 @@ pub fn generate_text<M: ModelForward>(
             // Add token to penalty cache for future iterations
             penalty_cache.add_token(next_token);
 
+            // Track recent tokens for repetition detection
+            recent_token_sequence.push_back(next_token);
+            if recent_token_sequence.len() > 100 {
+                recent_token_sequence.pop_front();
+            }
+
+            // Check for repetition: if last N tokens match N tokens before them, stop
+            // Also check with smaller windows for earlier detection
+            let mut repetition_detected = false;
+            if recent_token_sequence.len() >= repetition_check_window * 2 {
+                let len = recent_token_sequence.len();
+
+                // Check multiple window sizes to catch different repetition patterns
+                for window_size in [
+                    repetition_check_window,
+                    repetition_check_window / 2,
+                    repetition_check_window / 3,
+                ]
+                .iter()
+                {
+                    if len >= window_size * 2 {
+                        let recent: Vec<u32> = recent_token_sequence
+                            .iter()
+                            .skip(len - window_size)
+                            .copied()
+                            .collect();
+                        let previous: Vec<u32> = recent_token_sequence
+                            .iter()
+                            .skip(len - window_size * 2)
+                            .take(*window_size)
+                            .copied()
+                            .collect();
+
+                        if recent == previous {
+                            // Detected exact repetition - stop generation
+                            repetition_detected = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if repetition_detected {
+                break; // Exit the main generation loop
+            }
+
             // Stream token if callback is provided (with optional batching)
             if let Some(callback) = token_callback.as_mut() {
                 pending_tokens.push(next_token);
@@ -540,7 +671,7 @@ pub fn generate_text<M: ModelForward>(
                 if pending_tokens.len() >= streaming_batch_size || next_token == eos_token {
                     let token_text = config
                         .tokenizer
-                        .decode(&pending_tokens, false)
+                        .decode(&pending_tokens, true)
                         .map_err(|e| anyhow::anyhow!("Token decoding failed: {}", e))?;
                     callback(&token_text)?;
                     pending_tokens.clear();
@@ -592,11 +723,39 @@ pub fn generate_text<M: ModelForward>(
                         penalty_cache.apply_penalty(&last_token_logits, config.repeat_penalty)?;
                 }
 
+                // Apply EOS bias as we approach max_tokens to encourage natural completion
+                let current_pos = index_pos + batch_idx;
+                let eos_bias_start =
+                    (config.max_tokens as f64 * get_eos_bias_start_ratio()) as usize;
+                if current_pos >= eos_bias_start {
+                    let progress = (current_pos - eos_bias_start) as f64
+                        / (config.max_tokens - eos_bias_start) as f64;
+                    let bias_multiplier = 1.0 + (progress * (get_eos_bias_strength() - 1.0));
+
+                    // Boost EOS token logit to encourage completion
+                    // Convert to F32 first to avoid dtype issues
+                    let logits_f32 = last_token_logits.to_dtype(DType::F32)?;
+                    let mut logits_vec = logits_f32.to_vec1::<f32>()?;
+                    if let Some(eos_logit) = logits_vec.get_mut(eos_token as usize) {
+                        *eos_logit *= bias_multiplier as f32;
+                    }
+                    let biased_logits =
+                        Tensor::from_vec(logits_vec, last_token_logits.dims()[0], config.device)?;
+                    // Convert back to original dtype
+                    last_token_logits = biased_logits.to_dtype(last_token_logits.dtype())?;
+                }
+
                 // Sample next token
                 let next_token = logits_processor.sample(&last_token_logits)?;
 
                 if next_token == eos_token {
-                    index_pos = config.max_tokens; // Signal to exit outer loop
+                    index_pos = hard_limit; // Signal to exit outer loop
+                    break;
+                }
+
+                // In soft zone, we only continue to find EOS - if we hit hard limit, stop
+                if in_soft_zone && batch_start_pos >= prompt_len + hard_limit - 1 {
+                    index_pos = hard_limit; // Signal to exit outer loop
                     break;
                 }
 
@@ -606,6 +765,53 @@ pub fn generate_text<M: ModelForward>(
                 // Add token to penalty cache for future iterations
                 penalty_cache.add_token(next_token);
 
+                // Track recent tokens for repetition detection
+                recent_token_sequence.push_back(next_token);
+                if recent_token_sequence.len() > 100 {
+                    recent_token_sequence.pop_front();
+                }
+
+                // Check for repetition: if last N tokens match N tokens before them, stop
+                // Also check with smaller windows for earlier detection
+                let mut repetition_detected = false;
+                if recent_token_sequence.len() >= repetition_check_window * 2 {
+                    let len = recent_token_sequence.len();
+
+                    // Check multiple window sizes to catch different repetition patterns
+                    for window_size in [
+                        repetition_check_window,
+                        repetition_check_window / 2,
+                        repetition_check_window / 3,
+                    ]
+                    .iter()
+                    {
+                        if len >= window_size * 2 {
+                            let recent: Vec<u32> = recent_token_sequence
+                                .iter()
+                                .skip(len - window_size)
+                                .copied()
+                                .collect();
+                            let previous: Vec<u32> = recent_token_sequence
+                                .iter()
+                                .skip(len - window_size * 2)
+                                .take(*window_size)
+                                .copied()
+                                .collect();
+
+                            if recent == previous {
+                                // Detected exact repetition - stop generation
+                                repetition_detected = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if repetition_detected {
+                    index_pos = hard_limit; // Signal to exit outer loop
+                    break; // Exit the batch loop
+                }
+
                 // Stream token if callback is provided (with optional batching)
                 if let Some(callback) = token_callback.as_mut() {
                     pending_tokens.push(next_token);
@@ -614,7 +820,7 @@ pub fn generate_text<M: ModelForward>(
                     if pending_tokens.len() >= streaming_batch_size || next_token == eos_token {
                         let token_text = config
                             .tokenizer
-                            .decode(&pending_tokens, false)
+                            .decode(&pending_tokens, true)
                             .map_err(|e| anyhow::anyhow!("Token decoding failed: {}", e))?;
                         callback(&token_text)?;
                         pending_tokens.clear();
@@ -637,7 +843,7 @@ pub fn generate_text<M: ModelForward>(
     {
         let token_text = config
             .tokenizer
-            .decode(&pending_tokens, false)
+            .decode(&pending_tokens, true)
             .map_err(|e| anyhow::anyhow!("Token decoding failed: {}", e))?;
         callback(&token_text)?;
     }
@@ -669,7 +875,7 @@ pub fn generate_text<M: ModelForward>(
     // Decode all generated tokens at once
     let generated_text = config
         .tokenizer
-        .decode(&generated_tokens, false)
+        .decode(&generated_tokens, true)
         .map_err(|e| anyhow::anyhow!("Decoding failed: {}", e))?;
 
     Ok(generated_text)

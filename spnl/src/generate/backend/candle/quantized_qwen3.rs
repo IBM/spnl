@@ -76,11 +76,12 @@ impl CandleModel for QuantizedQwen3ModelWrapper {
     }
 
     fn eos_token_id(&self, tokenizer: &Tokenizer) -> u32 {
-        // Try to get EOS token from tokenizer
+        // Try to get EOS token from tokenizer - try multiple common EOS tokens
         tokenizer
-            .token_to_id("</s>")
-            .or_else(|| tokenizer.token_to_id("<|endoftext|>"))
-            .or_else(|| tokenizer.token_to_id("<|im_end|>"))
+            .token_to_id("<|im_end|>") // Qwen chat format
+            .or_else(|| tokenizer.token_to_id("<|endoftext|>")) // Standard EOS
+            .or_else(|| tokenizer.token_to_id("</s>")) // Llama-style EOS
+            .or_else(|| tokenizer.token_to_id("<|end|>")) // Alternative
             .unwrap_or(151643) // Qwen3 default EOS token (same as Qwen2)
     }
 }

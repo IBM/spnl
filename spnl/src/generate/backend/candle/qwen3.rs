@@ -124,11 +124,12 @@ impl CandleModel for Qwen3ModelWrapper {
     }
 
     fn eos_token_id(&self, tokenizer: &Tokenizer) -> u32 {
-        // Qwen3 models typically use <|endoftext|> or <|im_end|> as EOS
+        // Qwen3 models typically use <|im_end|> for chat format
         tokenizer
-            .token_to_id("<|endoftext|>")
-            .or_else(|| tokenizer.token_to_id("<|im_end|>"))
-            .or_else(|| tokenizer.token_to_id("</s>"))
+            .token_to_id("<|im_end|>") // Qwen chat format (priority)
+            .or_else(|| tokenizer.token_to_id("<|endoftext|>")) // Standard EOS
+            .or_else(|| tokenizer.token_to_id("</s>")) // Llama-style EOS
+            .or_else(|| tokenizer.token_to_id("<|end|>")) // Alternative
             .unwrap_or(151643) // Default Qwen EOS token ID
     }
 }

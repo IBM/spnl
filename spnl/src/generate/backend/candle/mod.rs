@@ -186,7 +186,7 @@ pub async fn generate_completion(
                         temperature: item.temperature,
                         top_p: None,         // TODO: Add to GenerateOptions if needed
                         _top_k: None,        // TODO: Add to GenerateOptions if needed
-                        repeat_penalty: 1.1, // Default repeat penalty
+                        repeat_penalty: 1.3, // Very strong repeat penalty to prevent repetition
                         seed: 299792458,     // Default seed (speed of light in m/s)
                         tokenizer: &tokenizer,
                         progress_bar: item.progress_bar.as_ref(),
@@ -385,7 +385,7 @@ pub async fn generate_chat(
                         temperature: item.temperature,
                         top_p: None,         // TODO: Add to GenerateOptions if needed
                         _top_k: None,        // TODO: Add to GenerateOptions if needed
-                        repeat_penalty: 1.1, // Default repeat penalty
+                        repeat_penalty: 1.1, // Default repeat penalty (matches Ollama)
                         seed: 299792458,     // Default seed (speed of light in m/s)
                         tokenizer: &tokenizer,
                         progress_bar: item.progress_bar.as_ref(),
