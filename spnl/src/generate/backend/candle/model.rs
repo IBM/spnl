@@ -107,7 +107,7 @@ fn get_streaming_decode_batch_size() -> usize {
     std::env::var("CANDLE_STREAMING_DECODE_BATCH")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(8) // Default to 1 (no batching) for lowest latency
+        .unwrap_or(1) // Default to 1 (no batching) for lowest latency
 }
 
 /// Optimized repeat penalty cache using HashSet for O(1) lookups

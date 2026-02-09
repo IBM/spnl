@@ -38,7 +38,7 @@ fn get_candle_num_parallel() -> usize {
     std::env::var("CANDLE_NUM_PARALLEL")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(4)
+        .unwrap_or(2)
 }
 
 // Work item for the queue

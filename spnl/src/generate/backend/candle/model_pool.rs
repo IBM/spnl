@@ -37,42 +37,48 @@ impl ModelPool {
     /// Get a model from the pool, loading a new instance if all are busy
     /// This allows multiple workers to process requests in parallel
     pub fn get_or_load(&self, model_path: &str) -> anyhow::Result<SharedModel> {
-        let mut models = self.models.lock().unwrap();
-
-        // Check if we have any instances for this model path
-        if let Some(instances) = models.get_mut(model_path) {
-            // Try to find an available (unlocked) instance
-            for instance in instances.iter() {
-                if let Ok(_guard) = instance.try_lock() {
-                    // Found an available instance
-                    return Ok(Arc::clone(instance));
+        // First, try to find an available instance without holding the lock for long
+        {
+            let models = self.models.lock().unwrap();
+            if let Some(instances) = models.get(model_path) {
+                // Try to find an available (unlocked) instance
+                for instance in instances.iter() {
+                    if let Ok(_guard) = instance.try_lock() {
+                        // Found an available instance - clone Arc and return it
+                        // This releases the HashMap lock immediately
+                        return Ok(Arc::clone(instance));
+                    }
                 }
+                // All instances are busy, we'll need to load a new one
+                // Drop the lock here before loading
             }
-
-            // All instances are busy, load a new one for parallel processing
-            let (model, tokenizer, device, dtype) = load_model(model_path)?;
-            let new_instance = Arc::new(Mutex::new(CachedModel {
-                model,
-                tokenizer,
-                device,
-                dtype,
-            }));
-
-            instances.push(Arc::clone(&new_instance));
-            return Ok(new_instance);
+            // No instances exist yet, we'll need to load the first one
+            // Drop the lock here before loading
         }
 
-        // First time loading this model path
+        // Load a new model instance (this is expensive, so we do it outside the lock)
         let (model, tokenizer, device, dtype) = load_model(model_path)?;
-        let instance = Arc::new(Mutex::new(CachedModel {
+        let new_instance = Arc::new(Mutex::new(CachedModel {
             model,
             tokenizer,
             device,
             dtype,
         }));
 
-        models.insert(model_path.to_string(), vec![Arc::clone(&instance)]);
-        Ok(instance)
+        // Now acquire the lock again to add the new instance
+        {
+            let mut models = self.models.lock().unwrap();
+
+            // Check again if instances exist (another thread might have added one)
+            if let Some(instances) = models.get_mut(model_path) {
+                instances.push(Arc::clone(&new_instance));
+            } else {
+                // First instance for this model path
+                models.insert(model_path.to_string(), vec![Arc::clone(&new_instance)]);
+            }
+        }
+
+        Ok(new_instance)
     }
 
     /*
