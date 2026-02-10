@@ -25,14 +25,6 @@ fn get_decode_batch_size() -> usize {
         .unwrap_or(8) // Default to 1 (no batching) for compatibility
 }
 
-/// Check if KV cache reuse is enabled (default: true for better chat performance)
-fn is_cache_reuse_enabled() -> bool {
-    std::env::var("CANDLE_CACHE_REUSE")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(true) // Default to enabled
-}
-
 /// Check if tensor pool is enabled (default: true for reduced allocation overhead)
 fn is_tensor_pool_enabled() -> bool {
     std::env::var("CANDLE_TENSOR_POOL")
@@ -428,57 +420,44 @@ pub fn generate_text<M: ModelForward>(
     // Pre-allocate with estimated capacity
     let mut generated_tokens = Vec::with_capacity(config.max_tokens);
 
-    // Smart KV cache management for better chat performance
-    // Check if we can reuse existing cache by comparing with cached content
+    // Clear KV cache at the start of each generation
+    // The cache persists within a single generation for efficiency (KV cache optimization)
+    // but must be cleared between different generate() calls to prevent pollution
+    // from previous generations affecting new prompts
     let prompt_len = tokens.len();
     let cache_len = model.get_cache_length();
-    let cache_reuse_enabled = is_cache_reuse_enabled();
 
-    // Determine how much of the prompt is already cached
-    let prefill_start = if cache_reuse_enabled && cache_len > 0 && cache_len <= prompt_len {
-        // We have some cache - check if it matches the prompt prefix
-        // For now, we assume cache matches (conservative approach)
-        // Future: Add token comparison for validation
-        cache_len
-    } else {
-        // No cache or cache reuse disabled - start from beginning
-        if cache_len > 0 {
-            model.clear_cache();
-        }
-        0
-    };
+    if cache_len > 0 {
+        model.clear_cache();
+    }
 
     // Prefill phase - process prompt tokens (chunked or all at once)
-    // Skip tokens that are already in cache
     let chunk_size = get_prefill_chunk_size();
 
-    // Only process tokens that aren't already cached
-    if prefill_start < prompt_len {
-        if chunk_size > 0 && (prompt_len - prefill_start) > chunk_size {
-            // Chunked prefill: process tokens in chunks to potentially improve Metal performance
-            // This trades off parallelism for better memory access patterns on Metal
-            // Pre-allocate buffer for chunk processing to avoid repeated allocations
-            let mut chunk_buffer = Vec::with_capacity(chunk_size);
-            let mut pos = prefill_start;
+    if chunk_size > 0 && prompt_len > chunk_size {
+        // Chunked prefill: process tokens in chunks to potentially improve Metal performance
+        // This trades off parallelism for better memory access patterns on Metal
+        // Pre-allocate buffer for chunk processing to avoid repeated allocations
+        let mut chunk_buffer = Vec::with_capacity(chunk_size);
+        let mut pos = 0;
 
-            for chunk_start in (prefill_start..prompt_len).step_by(chunk_size) {
-                let chunk_end = (chunk_start + chunk_size).min(prompt_len);
+        for chunk_start in (0..prompt_len).step_by(chunk_size) {
+            let chunk_end = (chunk_start + chunk_size).min(prompt_len);
 
-                // Reuse buffer: clear and copy chunk data
-                chunk_buffer.clear();
-                chunk_buffer.extend_from_slice(&tokens[chunk_start..chunk_end]);
+            // Reuse buffer: clear and copy chunk data
+            chunk_buffer.clear();
+            chunk_buffer.extend_from_slice(&tokens[chunk_start..chunk_end]);
 
-                // Create tensor from buffer (still allocates GPU memory, but reuses CPU buffer)
-                let input = Tensor::new(&chunk_buffer[..], config.device)?.unsqueeze(0)?;
-                let _logits = model.forward_pass(&input, pos)?;
-                pos += chunk_buffer.len();
-            }
-        } else {
-            // Single-pass prefill: process all uncached prompt tokens at once (default)
-            // Maximizes parallelism, optimal for most cases
-            let input = Tensor::new(&tokens[prefill_start..], config.device)?.unsqueeze(0)?;
-            let _logits = model.forward_pass(&input, prefill_start)?;
+            // Create tensor from buffer (still allocates GPU memory, but reuses CPU buffer)
+            let input = Tensor::new(&chunk_buffer[..], config.device)?.unsqueeze(0)?;
+            let _logits = model.forward_pass(&input, pos)?;
+            pos += chunk_buffer.len();
         }
+    } else {
+        // Single-pass prefill: process all prompt tokens at once (default)
+        // Maximizes parallelism, optimal for most cases
+        let input = Tensor::new(&tokens[..], config.device)?.unsqueeze(0)?;
+        let _logits = model.forward_pass(&input, 0)?;
     }
 
     // Initialize LogitsProcessor for proper sampling

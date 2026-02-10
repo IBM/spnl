@@ -15,7 +15,7 @@ pub fn tokenize_with_chat_template(
 
     // Apply chat template to get the formatted prompt
     // add_ass=true adds the assistant prompt token at the end
-    let formatted_prompt = chat_template::apply(template, &messages, true) + "/no_think";
+    let formatted_prompt = chat_template::apply(template, &messages, true);
 
     // Tokenize the formatted prompt
     let encoding = tokenizer
