@@ -49,7 +49,7 @@ fn download_and_load_gguf(
         // eprintln!("Trying to download: {}", gguf_filename);
         match repo.get(&gguf_filename) {
             Ok(gguf_path) => {
-                eprintln!("Successfully downloaded: {}", gguf_filename);
+                // eprintln!("Successfully downloaded: {}", gguf_filename);
                 return load_gguf_model(&gguf_path, model_id, device);
             }
             Err(e) => {
@@ -75,7 +75,7 @@ pub fn load_model(
 
     // Check if this is a GGUF model by model ID or by finding .gguf files
     // GGUF models are quantized and don't need dtype selection
-    if model_id.contains("-GGUF") || model_id.contains(".gguf") {
+    if model_id.contains("-GGUF") || model_id.contains("-gguf") || model_id.contains(".gguf") {
         // Try to find existing GGUF file, or download it
         match find_gguf_file(model_id) {
             Ok(gguf_path) => {
@@ -299,75 +299,6 @@ fn try_load_model_with_dtype(
 
 // Made with Bob
 
-/// Find a GGUF file for the given model ID
-/// Checks both HuggingFace cache and local paths
-/// Infer base model repository from GGUF filename or model_id
-/// GGUF files don't include tokenizers, so we need to get them from the base model
-fn infer_base_model_from_gguf(gguf_path: &std::path::Path, model_id: &str) -> String {
-    // Get filename from path
-    let filename = gguf_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-    // Check if model_id ends with -GGUF (common pattern for GGUF repos)
-    // e.g., "Qwen/Qwen2.5-1.5B-Instruct-GGUF" -> "Qwen/Qwen2.5-1.5B-Instruct"
-    // or "unsloth/Qwen3-1.7B-GGUF" -> "Qwen/Qwen3-1.7B"
-    if model_id.ends_with("-GGUF") {
-        let base = model_id.trim_end_matches("-GGUF");
-        // If it's from a third-party repo like unsloth, map to official Qwen repo
-        if base.contains('/') && !base.starts_with("Qwen/") {
-            // Extract just the model name part (e.g., "Qwen3-1.7B" from "unsloth/Qwen3-1.7B")
-            let model_name = base.split('/').next_back().unwrap_or(base);
-
-            // Special case: Qwen3 MoE models (A3B variants) map to specific base models
-            if model_name.contains("Qwen3")
-                && (model_name.contains("A3B") || model_name.contains("a3b"))
-            {
-                // All Qwen3 A3B variants use the same base model for tokenizer
-                return "Qwen/Qwen3-30B-A3B-Instruct-2507".to_string();
-            }
-
-            return format!("Qwen/{}", model_name);
-        }
-        return base.to_string();
-    }
-
-    // Try to extract model info from filename or model_id
-    // Common patterns: "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf"
-    let combined = format!("{} {}", filename, model_id);
-
-    if combined.contains("Qwen2.5-0.5B") {
-        return "Qwen/Qwen2.5-0.5B-Instruct".to_string();
-    } else if combined.contains("Qwen2.5-1.5B") {
-        return "Qwen/Qwen2.5-1.5B-Instruct".to_string();
-    } else if combined.contains("Qwen2.5-3B") {
-        return "Qwen/Qwen2.5-3B-Instruct".to_string();
-    } else if combined.contains("Qwen2.5-7B") {
-        return "Qwen/Qwen2.5-7B-Instruct".to_string();
-    } else if combined.contains("Qwen3") {
-        // Check for MoE models first (e.g., 30B-A3B)
-        if combined.contains("30B-A3B") || combined.contains("30b-a3b") {
-            return "Qwen/Qwen3-30B-A3B-Instruct-2507".to_string();
-        } else if combined.contains("A3B") || combined.contains("a3b") {
-            // Default A3B variant
-            return "Qwen/Qwen3-30B-A3B-Instruct-2507".to_string();
-        } else if combined.contains("0.6B") {
-            return "Qwen/Qwen3-0.6B".to_string();
-        } else if combined.contains("1.7B") {
-            return "Qwen/Qwen3-1.7B".to_string();
-        } else if combined.contains("4B") {
-            return "Qwen/Qwen3-4B".to_string();
-        } else if combined.contains("8B") {
-            return "Qwen/Qwen3-8B".to_string();
-        } else if combined.contains("14B") {
-            return "Qwen/Qwen3-14B".to_string();
-        } else if combined.contains("32B") {
-            return "Qwen/Qwen3-32B".to_string();
-        }
-    }
-
-    // Default fallback - try the model_id as-is
-    model_id.to_string()
-}
-
 fn find_gguf_file(model_id: &str) -> anyhow::Result<std::path::PathBuf> {
     use std::path::PathBuf;
 
@@ -411,39 +342,55 @@ fn find_gguf_file(model_id: &str) -> anyhow::Result<std::path::PathBuf> {
 /// Load a GGUF quantized model
 fn load_gguf_model(
     gguf_path: &std::path::Path,
-    model_id: &str,
+    _model_id: &str,
     device: Device,
 ) -> anyhow::Result<(Box<dyn CandleModel>, Tokenizer, Device, DType)> {
-    // Load tokenizer from HuggingFace (GGUF files don't include tokenizer)
-    // Determine base model from GGUF filename or model_id
-    let base_model_id = infer_base_model_from_gguf(gguf_path, model_id);
+    use candle_core::quantized::gguf_file;
 
-    let api = hf_hub::api::sync::Api::new()?;
-    let repo = api.model(base_model_id.to_string());
-    let tokenizer_path = repo.get("tokenizer.json")?;
+    // Open and read GGUF file
+    let mut file = std::fs::File::open(gguf_path)?;
+    let content = gguf_file::Content::read(&mut file)?;
 
-    let tokenizer = Tokenizer::from_file(tokenizer_path)
-        .map_err(|e| anyhow::anyhow!("Failed to load tokenizer: {}", e))?;
+    // Extract tokenizer from GGUF metadata
+    let tokenizer = super::gguf_tokenizer::extract_tokenizer_from_gguf(&content)?;
+    // eprintln!("✓ Extracted tokenizer from GGUF file");
 
-    // Detect architecture from model_id or GGUF metadata
-    // For now, we'll use a simple heuristic based on model name
-    let model: Box<dyn CandleModel> = if model_id.to_lowercase().contains("qwen3") {
-        // Check if this is a MoE model (e.g., A3B)
-        if model_id.to_lowercase().contains("a3b") || model_id.to_lowercase().contains("moe") {
-            Box::new(QuantizedQwen3MoeModelWrapper::load(
-                gguf_path,
-                device.clone(),
-            )?)
-        } else {
-            Box::new(QuantizedQwen3ModelWrapper::load(gguf_path, device.clone())?)
+    // Detect architecture from GGUF metadata
+    let architecture = match content.metadata.get("general.architecture") {
+        Some(gguf_file::Value::String(arch)) => arch.clone(),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Could not determine model architecture from GGUF metadata. Missing or invalid 'general.architecture' field."
+            ));
         }
-    } else if model_id.to_lowercase().contains("qwen") {
-        Box::new(QuantizedQwen2ModelWrapper::load(gguf_path, device.clone())?)
-    } else {
-        return Err(anyhow::anyhow!(
-            "Quantized model loading not yet implemented for architecture: {}. Currently supported: Qwen2/Qwen2.5/Qwen3/Qwen3-MoE",
-            model_id
-        ));
+    };
+
+    // Load the appropriate model based on architecture
+    let model: Box<dyn CandleModel> = match architecture.as_str() {
+        "qwen3" => {
+            // Check if this is a MoE model by looking for expert count in metadata
+            let is_moe = content
+                .metadata
+                .get("qwen3.expert_count")
+                .or_else(|| content.metadata.get("qwen3.expert_used_count"))
+                .is_some();
+
+            if is_moe {
+                Box::new(QuantizedQwen3MoeModelWrapper::load(
+                    gguf_path,
+                    device.clone(),
+                )?)
+            } else {
+                Box::new(QuantizedQwen3ModelWrapper::load(gguf_path, device.clone())?)
+            }
+        }
+        "qwen2" => Box::new(QuantizedQwen2ModelWrapper::load(gguf_path, device.clone())?),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Quantized model loading not yet implemented for architecture: '{}'. Currently supported: qwen2, qwen3, qwen3-moe",
+                architecture
+            ));
+        }
     };
 
     // GGUF models don't have a specific dtype (they're quantized)

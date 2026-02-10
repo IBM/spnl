@@ -1,3 +1,4 @@
+mod gguf_tokenizer;
 mod loader;
 mod model_pool;
 
