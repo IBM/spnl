@@ -7,6 +7,9 @@ pub(crate) mod spnl;
 #[cfg(feature = "candle")]
 pub(crate) mod candle;
 
+#[cfg(feature = "mistralrs")]
+pub(crate) mod mistralrs;
+
 // Shared components used across backends
 #[cfg(feature = "candle")]
 pub(crate) mod shared;

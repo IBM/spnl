@@ -56,6 +56,11 @@ pub async fn map(
             backend::candle::generate_completion(spec.with_model(m)?, mp, options).await
         }
 
+        #[cfg(feature = "mistralrs")]
+        ["mistralrs", m] => {
+            backend::mistralrs::generate_completion(spec.with_model(m)?, mp, options).await
+        }
+
         _ => Err(ModelNotFoundError.into()),
     }
 }
@@ -99,6 +104,11 @@ pub async fn generate(
 
         #[cfg(feature = "candle")]
         ["candle", m] => backend::candle::generate_chat(spec.with_model(m)?, mp, options).await,
+
+        #[cfg(feature = "mistralrs")]
+        ["mistralrs", m] => {
+            backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await
+        }
 
         _ => Err(ModelNotFoundError.into()),
     }

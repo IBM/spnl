@@ -16,6 +16,7 @@ vllm = ["spnl/vllm"]
 k8s = ["spnl/k8s", "vllm"]
 gce = ["spnl/gce", "vllm"]
 candle = ["spnl/candle-metal"]
+mistralrs = ["spnl/mistralrs-metal"]
 
 [dependencies]
 anyhow = "1.0.99"
