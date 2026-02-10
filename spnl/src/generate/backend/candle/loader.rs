@@ -98,8 +98,16 @@ pub fn load_model(
     // Download all necessary files (only once, reused if we need to retry)
     let (tokenizer_path, config_path, filenames) = download_model_files(model_id)?;
 
-    // Try loading with F16 first if requested, fall back to F32 on error
-    let dtype = if try_f16 { DType::F16 } else { DType::F32 };
+    // Gemma3 models have numerical stability issues with F16, force F32
+    let force_f32_for_gemma3 =
+        model_id.to_lowercase().contains("gemma3") || model_id.to_lowercase().contains("gemma-3");
+
+    // Try loading with F16 first if requested (unless it's Gemma3), fall back to F32 on error
+    let dtype = if try_f16 && !force_f32_for_gemma3 {
+        DType::F16
+    } else {
+        DType::F32
+    };
 
     match try_load_model_with_dtype(
         model_id,
@@ -110,8 +118,14 @@ pub fn load_model(
         dtype,
     ) {
         Ok(result) => Ok(result),
-        Err(e) if try_f16 && e.to_string().contains("weight") => {
-            // F16 failed with weight error, retry with F32
+        Err(e)
+            if try_f16
+                && !force_f32_for_gemma3
+                && (e.to_string().contains("weight")
+                    || e.to_string().contains("negative")
+                    || e.to_string().contains("not a valid number")) =>
+        {
+            // F16 failed with numerical error, retry with F32
             eprintln!(
                 "F16 failed ({}), retrying with F32 for better numerical stability",
                 e
