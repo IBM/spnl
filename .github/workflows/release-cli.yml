@@ -36,6 +36,7 @@ jobs:
             platform: linux
             arch: x86_64
             libc: gnu
+            local_feature: local
             name: Linux x86_64 GNU
           
           - runner: ubuntu-24.04-arm
@@ -43,6 +44,8 @@ jobs:
             platform: linux
             arch: aarch64
             libc: gnu
+            local_feature: local
+            rustflags: "-Ctarget-feature=+fp16,+fhm" # https://github.com/sarah-quinones/gemm/issues/31 avoid "error: instruction requires: fullfp16"
             name: Linux ARM64 GNU
           
           # macOS builds
@@ -58,6 +61,7 @@ jobs:
             platform: macos
             arch: aarch64
             libc: ""
+            local_feature: metal
             name: macOS ARM64
           
           # Windows builds
@@ -66,6 +70,7 @@ jobs:
             platform: windows
             arch: x86_64
             libc: ""
+            local_feature: local
             name: Windows x86_64
           
           - runner: windows-latest
@@ -73,6 +78,9 @@ jobs:
             platform: windows
             arch: aarch64
             libc: ""
+            # local: very slow to build on aarch64 windows (60+ minutes); disabled for now. maybe we can restore if we figure out rustc caching
+            #local_feature: local
+            #rustflags: "-Ctarget-feature=+fp16,+fhm" # https://github.com/sarah-quinones/gemm/issues/31 avoid "error: instruction requires: fullfp16"
             name: Windows ARM64
 
     env:
@@ -80,6 +88,8 @@ jobs:
       PLATFORM: ${{ matrix.platform.platform }}
       ARCH: ${{ matrix.platform.arch }}
       LIBC: ${{ matrix.platform.libc }}
+      LOCAL_FEATURE: ${{ matrix.platform.local_feature || '' }}
+      RUSTFLAGS: ${{ matrix.platform.rustflags || '' }}
 
     steps:
       - name: Checkout repository
@@ -151,7 +161,7 @@ jobs:
         run: |
           # Only use openssl-vendored for musl builds (static linking)
           # Other platforms use system OpenSSL
-          cargo build --features rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --features $LOCAL_FEATURE,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Check for Apple signing secrets
         if: runner.os == 'macOS'
@@ -304,7 +314,7 @@ jobs:
       - name: Build CLI
         shell: sh
         run: |
-          cargo build --features rag,k8s,gce,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --features $LOCAL_FEATURE,rag,k8s,gce,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
 
       - name: Prepare binary
         shell: sh
