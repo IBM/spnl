@@ -51,8 +51,8 @@ pub async fn map(
             // FYI this is what we would do to invoke via the openai bulk api directly: backend::openai::generate_completion(OpenAI, spec.with_model(m)?, mp, options).await
         }
 
-        #[cfg(feature = "mistralrs")]
-        ["mistralrs", m] => {
+        #[cfg(feature = "local")]
+        ["local", m] => {
             backend::mistralrs::generate_completion(spec.with_model(m)?, mp, options).await
         }
 
@@ -97,10 +97,8 @@ pub async fn generate(
             .await
         }
 
-        #[cfg(feature = "mistralrs")]
-        ["mistralrs", m] => {
-            backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await
-        }
+        #[cfg(feature = "local")]
+        ["local", m] => backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await,
 
         _ => Err(ModelNotFoundError.into()),
     }

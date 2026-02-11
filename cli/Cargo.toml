@@ -15,7 +15,7 @@ openssl-vendored = ["spnl/openssl-vendored"]
 vllm = ["spnl/vllm"]
 k8s = ["spnl/k8s", "vllm"]
 gce = ["spnl/gce", "vllm"]
-mistralrs = ["spnl/mistralrs-metal"]
+local = ["spnl/local-metal"]
 
 [dependencies]
 anyhow = "1.0.99"
