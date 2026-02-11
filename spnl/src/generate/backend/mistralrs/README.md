@@ -42,11 +42,12 @@ Configure the backend with these environment variables:
 
 ### Performance & Optimization
 - `MISTRALRS_ISQ`: In-situ quantization type for non-GGUF models (`Q4K`, `Q5K`, `Q8_0`, etc.) - default: none (full precision)
-- `MISTRALRS_PAGED_ATTN`: Enable PagedAttention (`true`/`false`) - default: `true` if supported
+- `MISTRALRS_PAGED_ATTN`: Enable PagedAttention (`true`/`false`) - default: `false` (disabled for faster startup)
 - `MISTRALRS_PAGED_ATTN_BLOCK_SIZE`: PagedAttention block size - default: `32`
 - `MISTRALRS_PREFIX_CACHE_N`: Number of sequences to cache (set to `0` or `false` to disable) - default: `16`
 
 ### General Configuration
+- `MISTRALRS_VERBOSE`: Enable mistral.rs INFO logging (`true`/`1` to enable) - default: disabled for cleaner output
 - `MISTRALRS_NO_STREAM`: Disable streaming output (`1` to disable) - default: streaming enabled
 - `MISTRALRS_DEVICE`: Device to use (`auto`, `cpu`, `cuda`, `metal`) - default: `auto`
 - `HF_HOME`: HuggingFace cache directory - default: `~/.cache/huggingface`
@@ -147,7 +148,10 @@ MISTRALRS_NO_STREAM=1 spnl -c '(generate (model "mistralrs/...") (input "..."))'
 - **Enable quantization for non-GGUF models**: `MISTRALRS_ISQ=Q4K` (2-4x faster decode)
 - Use GPU if available (Metal on macOS, CUDA on Linux/Windows)
 - Use GGUF models which are pre-quantized and optimized
-- Disable PagedAttention for single requests: `MISTRALRS_PAGED_ATTN=false`
+- PagedAttention is already disabled by default for faster startup
+
+### Verbose output
+- Enable mistral.rs logging for debugging: `MISTRALRS_VERBOSE=true`
 
 **Performance tip**: For models like Phi-3.5, use quantization to match Ollama's speed:
 ```bash

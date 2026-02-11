@@ -18,11 +18,11 @@ The current implementation now includes high-priority optimizations based on the
 
 **What it is**: PagedAttention is a memory-efficient attention mechanism that reduces memory fragmentation and enables better batching.
 
-**Current State**: ✅ **ENABLED** (as of 2026-02-10)
+**Current State**: ✅ **AVAILABLE** (disabled by default for faster startup)
 
 **Implementation**:
 ```rust
-// In loader.rs - automatically enabled if supported
+// In loader.rs - opt-in via environment variable
 if let Some(paged_config) = get_paged_attn_config() {
     builder = builder.with_paged_attn(paged_config)?;
 }
@@ -30,7 +30,7 @@ if let Some(paged_config) = get_paged_attn_config() {
 
 **Configuration**:
 ```bash
-# Enable/disable PagedAttention (default: true if platform supports it)
+# Enable PagedAttention (default: false for faster startup)
 MISTRALRS_PAGED_ATTN=true
 
 # Configure block size (default: 32)
@@ -43,7 +43,9 @@ MISTRALRS_PAGED_ATTN_BLOCK_SIZE=32
 - Improves throughput for concurrent requests
 - Particularly beneficial for long sequences
 
-**Status**: ✅ Implemented with automatic platform detection and environment variable configuration
+**Status**: ✅ Implemented as opt-in feature (disabled by default to reduce startup time)
+
+**Note**: PagedAttention adds initialization overhead. Enable it for high-throughput scenarios with concurrent requests or long sequences.
 
 ---
 
@@ -262,13 +264,16 @@ MISTRALRS_ISQ=Q4K                      # In-situ quantization type (default: non
                                        # Options: Q2K, Q3K, Q4K, Q4_0, Q4_1, Q5K, Q5_0, Q5_1, Q6K, Q8_0, Q8_1
                                        # Recommended: Q4K for 2-4x faster decode
 
-# PagedAttention configuration
-MISTRALRS_PAGED_ATTN=true              # Enable/disable (default: true if supported)
+# PagedAttention configuration (opt-in for high-throughput scenarios)
+MISTRALRS_PAGED_ATTN=true              # Enable/disable (default: false for faster startup)
 MISTRALRS_PAGED_ATTN_BLOCK_SIZE=32     # Block size (default: 32)
 
 # Prefix caching
 MISTRALRS_PREFIX_CACHE_N=16            # Number of sequences to cache (default: 16)
                                        # Set to "false" or "0" to disable
+
+# Logging (opt-in for debugging)
+MISTRALRS_VERBOSE=true                 # Enable mistral.rs INFO logging (default: false for cleaner output)
 ```
 
 ### Implementation Details
