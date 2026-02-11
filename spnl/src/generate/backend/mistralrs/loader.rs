@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Get the HuggingFace cache directory
-/// This matches the cache used by hf_hub crate (used by candle backend)
+/// This matches the cache used by hf_hub crate
 /// Returns the path to the hub directory where models are stored
 fn get_hf_cache_dir() -> PathBuf {
     // Check HF_HOME first (official HuggingFace env var)
