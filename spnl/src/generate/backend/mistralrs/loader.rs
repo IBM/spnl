@@ -1,5 +1,6 @@
 //! Model loading and caching for mistral.rs backend
 
+use indicatif::{ProgressBar, ProgressStyle};
 use mistralrs::{
     Device, GgufModelBuilder, IsqType, Model, PagedAttentionMetaBuilder, TextModelBuilder,
     paged_attn_supported,
@@ -7,6 +8,7 @@ use mistralrs::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Get the HuggingFace cache directory
@@ -34,19 +36,20 @@ fn get_hf_cache_dir() -> PathBuf {
 /// Returns None if PagedAttention is disabled or not supported
 fn get_paged_attn_config()
 -> Option<impl FnOnce() -> anyhow::Result<mistralrs::PagedAttentionConfig>> {
-    // Check if PagedAttention is supported on this platform
-    if !paged_attn_supported() {
-        eprintln!("PagedAttention not supported on this platform");
-        return None;
-    }
-
-    // Check if explicitly disabled via environment variable
+    // Check if explicitly enabled via environment variable (disabled by default for faster startup)
     let enabled = std::env::var("MISTRALRS_PAGED_ATTN")
-        .unwrap_or_else(|_| "true".to_string())
+        .unwrap_or_else(|_| "false".to_string())
         .to_lowercase();
 
     if enabled == "false" || enabled == "0" {
-        eprintln!("PagedAttention disabled via MISTRALRS_PAGED_ATTN");
+        return None;
+    }
+
+    // Check if PagedAttention is supported on this platform
+    if !paged_attn_supported() {
+        if should_enable_logging() {
+            eprintln!("PagedAttention not supported on this platform");
+        }
         return None;
     }
 
@@ -56,7 +59,9 @@ fn get_paged_attn_config()
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(32);
 
-    eprintln!("Enabling PagedAttention with block_size={}", block_size);
+    if should_enable_logging() {
+        eprintln!("Enabling PagedAttention with block_size={}", block_size);
+    }
 
     Some(move || {
         PagedAttentionMetaBuilder::default()
@@ -71,16 +76,22 @@ fn get_prefix_cache_n() -> Option<usize> {
     match std::env::var("MISTRALRS_PREFIX_CACHE_N") {
         Ok(val) => {
             if val.to_lowercase() == "false" || val == "0" {
-                eprintln!("Prefix caching disabled via MISTRALRS_PREFIX_CACHE_N");
+                if should_enable_logging() {
+                    eprintln!("Prefix caching disabled via MISTRALRS_PREFIX_CACHE_N");
+                }
                 None
             } else {
                 match val.parse::<usize>() {
                     Ok(n) => {
-                        eprintln!("Prefix caching enabled with n={}", n);
+                        if should_enable_logging() {
+                            eprintln!("Prefix caching enabled with n={}", n);
+                        }
                         Some(n)
                     }
                     Err(_) => {
-                        eprintln!("Invalid MISTRALRS_PREFIX_CACHE_N value, using default (16)");
+                        if should_enable_logging() {
+                            eprintln!("Invalid MISTRALRS_PREFIX_CACHE_N value, using default (16)");
+                        }
                         Some(16)
                     }
                 }
@@ -91,6 +102,14 @@ fn get_prefix_cache_n() -> Option<usize> {
             Some(16)
         }
     }
+}
+
+/// Check if logging should be enabled
+/// Returns true if MISTRALRS_VERBOSE env var is set to "true" or "1"
+fn should_enable_logging() -> bool {
+    std::env::var("MISTRALRS_VERBOSE")
+        .map(|v| v.to_lowercase() == "true" || v == "1")
+        .unwrap_or(false)
 }
 
 /// Parse ISQ (In-Situ Quantization) type from string
@@ -133,11 +152,15 @@ fn get_isq_type() -> Option<IsqType> {
             } else {
                 match parse_isq_type(&val) {
                     Ok(isq_type) => {
-                        eprintln!("Enabling in-situ quantization: {:?}", isq_type);
+                        if should_enable_logging() {
+                            eprintln!("Enabling in-situ quantization: {:?}", isq_type);
+                        }
                         Some(isq_type)
                     }
                     Err(e) => {
-                        eprintln!("Warning: {}", e);
+                        if should_enable_logging() {
+                            eprintln!("Warning: {}", e);
+                        }
                         None
                     }
                 }
@@ -240,12 +263,16 @@ impl ModelPool {
                             .collect();
 
                         if !cached_files.is_empty() {
-                            eprintln!("Found cached GGUF files: {:?}", cached_files);
+                            if should_enable_logging() {
+                                eprintln!("Found cached GGUF files: {:?}", cached_files);
+                            }
 
                             // Return the first priority format that's cached
                             for filename in &priority_formats {
                                 if cached_files.contains(filename) {
-                                    eprintln!("Using cached GGUF file: {}", filename);
+                                    if should_enable_logging() {
+                                        eprintln!("Using cached GGUF file: {}", filename);
+                                    }
                                     return Ok(vec![filename.clone()]);
                                 }
                             }
@@ -256,7 +283,9 @@ impl ModelPool {
         }
 
         // If not in cache, query HF API to find which file to download
-        eprintln!("Model not in cache, querying HuggingFace API...");
+        if should_enable_logging() {
+            eprintln!("Model not in cache, querying HuggingFace API...");
+        }
         let url = format!("https://huggingface.co/api/models/{}/tree/main", model_name);
         let response = reqwest::get(&url).await?;
 
@@ -278,12 +307,16 @@ impl ModelPool {
             })
             .collect();
 
-        eprintln!("Available GGUF files in repo: {:?}", available_files);
+        if should_enable_logging() {
+            eprintln!("Available GGUF files in repo: {:?}", available_files);
+        }
 
         // Return the first priority format that exists
         for filename in &priority_formats {
             if available_files.contains(filename) {
-                eprintln!("Will download GGUF file: {}", filename);
+                if should_enable_logging() {
+                    eprintln!("Will download GGUF file: {}", filename);
+                }
                 return Ok(vec![filename.clone()]);
             }
         }
@@ -299,7 +332,21 @@ impl ModelPool {
 
     /// Load a model from HuggingFace using appropriate builder
     async fn load_model(&self, model_name: &str) -> anyhow::Result<Arc<Model>> {
-        eprintln!("Loading model: {}", model_name);
+        // Create progress spinner (only if not in verbose mode)
+        let spinner = if !should_enable_logging() {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.cyan} {msg}")
+                    .unwrap(),
+            );
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb.set_message(format!("Loading {}", model_name));
+            Some(pb)
+        } else {
+            eprintln!("Loading model: {}", model_name);
+            None
+        };
 
         // Check if this is a GGUF model (contains "GGUF" in the name)
         let is_gguf = model_name.to_uppercase().contains("GGUF");
@@ -308,11 +355,19 @@ impl ModelPool {
         let device = if cfg!(target_os = "macos") {
             match Device::new_metal(0) {
                 Ok(metal_device) => {
-                    eprintln!("Using Metal GPU acceleration");
+                    if let Some(ref pb) = spinner {
+                        pb.set_message(format!("Loading {} (Metal GPU)", model_name));
+                    } else {
+                        eprintln!("Using Metal GPU acceleration");
+                    }
                     metal_device
                 }
                 Err(e) => {
-                    eprintln!("Metal not available ({}), falling back to CPU", e);
+                    if let Some(ref pb) = spinner {
+                        pb.set_message(format!("Loading {} (CPU)", model_name));
+                    } else {
+                        eprintln!("Metal not available ({}), falling back to CPU", e);
+                    }
                     Device::Cpu
                 }
             }
@@ -322,19 +377,30 @@ impl ModelPool {
 
         // Build the model using the appropriate builder
         let model = if is_gguf {
-            eprintln!("Detected GGUF model, using GgufModelBuilder");
+            if let Some(ref pb) = spinner {
+                pb.set_message(format!("Loading {} (GGUF)", model_name));
+            } else {
+                eprintln!("Detected GGUF model, using GgufModelBuilder");
+            }
 
             // Get priority list of GGUF files to try
             let gguf_files = self.select_gguf_files(model_name).await?;
 
             if let Some(first_file) = gguf_files.first() {
-                eprintln!("Using GGUF file: {}", first_file);
+                if let Some(ref pb) = spinner {
+                    pb.set_message(format!("Loading {} ({})", model_name, first_file));
+                } else {
+                    eprintln!("Using GGUF file: {}", first_file);
+                }
             }
 
             // Use GgufModelBuilder for GGUF models
-            let mut builder = GgufModelBuilder::new(model_name, gguf_files)
-                .with_logging()
-                .with_device(device);
+            let mut builder = GgufModelBuilder::new(model_name, gguf_files).with_device(device);
+
+            // Optionally enable logging
+            if should_enable_logging() {
+                builder = builder.with_logging();
+            }
 
             // Apply PagedAttention if available and enabled
             if let Some(paged_config) = get_paged_attn_config() {
@@ -344,15 +410,27 @@ impl ModelPool {
             // Apply prefix caching configuration
             builder = builder.with_prefix_cache_n(get_prefix_cache_n());
 
+            if let Some(ref pb) = spinner {
+                pb.set_message(format!("Initializing {}", model_name));
+            }
+
             builder.build().await?
         } else {
-            eprintln!("Using TextModelBuilder for standard model");
+            if let Some(ref pb) = spinner {
+                pb.set_message(format!("Loading {} (standard)", model_name));
+            } else {
+                eprintln!("Using TextModelBuilder for standard model");
+            }
 
             // Use TextModelBuilder for normal models
             let mut builder = TextModelBuilder::new(model_name)
-                .with_logging()
                 // .with_dtype(mistralrs::ModelDType::F32) // for future reference: might be needed for ISQ on metal
                 .with_device(device);
+
+            // Optionally enable logging
+            if should_enable_logging() {
+                builder = builder.with_logging();
+            }
 
             // Apply in-situ quantization if configured
             if let Some(isq_type) = get_isq_type() {
@@ -367,10 +445,20 @@ impl ModelPool {
             // Apply prefix caching configuration
             builder = builder.with_prefix_cache_n(get_prefix_cache_n());
 
+            if let Some(ref pb) = spinner {
+                pb.set_message(format!("Initializing {}", model_name));
+            }
+
             builder.build().await?
         };
 
-        eprintln!("Model loaded successfully: {}", model_name);
+        // Finish spinner
+        if let Some(pb) = spinner {
+            pb.finish_and_clear();
+        } else {
+            eprintln!("Model loaded successfully: {}", model_name);
+        }
+
         Ok(Arc::new(model))
     }
 }
