@@ -10096,17 +10096,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spnl-wasm"
-version = "0.15.0"
-dependencies = [
- "serde_json",
- "spnl",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
 name = "sqlparser"
 version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

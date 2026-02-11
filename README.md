@@ -5,7 +5,6 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/spnl)](https://pypi.org/project/spnl)
 [![CI - Core](https://github.com/IBM/spnl/actions/workflows/core.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/core.yml)
 [![CI - Python](https://github.com/IBM/spnl/actions/workflows/python.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/python.yml)
-[![CI - Playground](https://github.com/IBM/spnl/actions/workflows/playground.yml/badge.svg)](https://github.com/IBM/spnl/actions/workflows/playground.yml)
 ![GitHub License](https://img.shields.io/github/license/IBM/spnl)
 
 <img align="right" src="/docs/images/nested-gen.svg" width="150">
@@ -25,8 +24,8 @@ generalize the interface to inference servers via the **Span
 Query**.
 
 In a span query, chat is a special case of a more general
-form. To the right is a visualization of a [span query for a
-"judge/generator"](https://ibm.github.io/spnl/?demo=email2&qv=true) (a.k.a. "LLM-as-a-judge").
+form. To the right is a visualization of a span query for a
+"judge/generator" (a.k.a. "LLM-as-a-judge").
 
 Learn more about [span query syntax and semantics](./docs/about.md)
 
@@ -39,7 +38,7 @@ SPNL is a library for creating, optimizing, and tokenizing span
 queries. The library is surfaced for consumption as:
 
 [**vLLM image**](https://github.com/IBM/spnl/pkgs/container/spnl-llm-d-cuda) **|** [**vLLM patch**](docker/vllm/llm-d/patches/0.4.0) **|** [**CLI image**](https://github.com/IBM/spnl/pkgs/container/spnl) **|** [**CLI image
-  with  Ollama**](https://github.com/IBM/spnl/pkgs/container/spnl-ollama) **|** [**Rust crate**](https://crates.io/crates/spnl) **|** [**Python pip**](https://pypi.org/project/spnl) **|** [**Playground**](https://ibm.github.io/spnl/?qv=false)
+  with  Ollama**](https://github.com/IBM/spnl/pkgs/container/spnl-ollama) **|** [**Rust crate**](https://crates.io/crates/spnl) **|** [**Python pip**](https://pypi.org/project/spnl)
 
 ## Using the `spnl` CLI
 

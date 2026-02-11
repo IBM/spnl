@@ -7,7 +7,6 @@ COPY Cargo.* .
 COPY spnl spnl
 COPY cli cli
 COPY benchmarks/haystack benchmarks/haystack
-COPY web/wasm web/wasm
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \

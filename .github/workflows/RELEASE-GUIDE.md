@@ -6,7 +6,7 @@
 
 1. Update version (run this once to get the `set-version` command): `cargo install cargo-edit`):
    ```bash
-   cargo set-version 0.14.0 --verbose  && (cd web/playground/ && npm version 0.14.0 && npm i && npm i)
+   cargo set-version 0.14.0 --verbose
    ```
    Note: you may need to repeat this, as there is some bug in cargo set-version.
 

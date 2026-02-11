@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = [ "cli", "spnl", "benchmarks/haystack", "web/wasm"]
-exclude = [ "cli", "benchmarks/haystack", "web/wasm"]
+members = [ "cli", "spnl", "benchmarks/haystack"]
+exclude = [ "cli", "benchmarks/haystack"]
 
 [workspace.dependencies]
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
