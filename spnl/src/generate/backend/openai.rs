@@ -5,7 +5,7 @@ use async_openai::{
         ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
         ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
-        ChatCompletionRequestUserMessageContent, CreateChatCompletionRequestArgs,
+        ChatCompletionRequestUserMessageContent, CreateChatCompletionRequestArgs, ReasoningEffort,
     },
     types::completions::CreateCompletionRequestArgs,
 };
@@ -29,17 +29,24 @@ pub enum Provider {
     Ollama,
 }
 
-fn api_base(provider: Provider) -> String {
+fn api_base(provider: &Provider) -> (String, ReasoningEffort) {
     match provider {
         // Note: NO TRAILING SLASHES!
-        Provider::OpenAI => {
-            ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".to_string())
-        }
-        Provider::Gemini => ::std::env::var("GEMINI_API_BASE")
-            .unwrap_or("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
-        Provider::Ollama => ::std::env::var("OLLAMA_API_BASE")
-            .map(|b| format!("{b}/v1"))
-            .unwrap_or("http://localhost:11434/v1".to_string()),
+        Provider::OpenAI => (
+            ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".to_string()),
+            ReasoningEffort::Low,
+        ),
+        Provider::Gemini => (
+            ::std::env::var("GEMINI_API_BASE")
+                .unwrap_or("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+            ReasoningEffort::Low,
+        ),
+        Provider::Ollama => (
+            ::std::env::var("OLLAMA_API_BASE")
+                .map(|b| format!("{b}/v1"))
+                .unwrap_or("http://localhost:11434/v1".to_string()),
+            ReasoningEffort::None,
+        ),
     }
 }
 
@@ -92,7 +99,7 @@ pub async fn generate_completion(
 
     // TODO: handle with chat_choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
     let mut stream = client.completions().create_stream(request).await?;
     loop {
         match stream.next().await {
@@ -184,13 +191,15 @@ pub async fn generate_chat(
 
     let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m, None)?;
 
+    let (apibase, reasoning_effort) = api_base(&provider);
+
     let mut request_builder_0 = CreateChatCompletionRequestArgs::default();
     let request_builder_1 = request_builder_0
         .model(spec.generate.metadata.model)
         .n(spec.n)
         .messages(input_messages)
         .temperature(spec.generate.metadata.temperature.unwrap_or_default())
-        .reasoning_effort(async_openai::types::chat::ReasoningEffort::None)
+        .reasoning_effort(reasoning_effort)
         .max_completion_tokens(mt);
 
     let request_builder = match &provider {
@@ -213,7 +222,7 @@ pub async fn generate_chat(
 
     // TODO: handle with choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(apibase));
     let mut stream = client.chat().create_stream(request).await?;
     loop {
         match stream.next().await {
@@ -325,7 +334,7 @@ pub async fn embed(
 ) -> anyhow::Result<impl Iterator<Item = Vec<f32>> + use<>> {
     use async_openai::types::embeddings::CreateEmbeddingRequestArgs;
 
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(provider)));
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
 
     let docs = match data {
         EmbedData::String(s) => &vec![s.clone()],
