@@ -73,13 +73,7 @@ pub async fn generate_completion(
         })
         .unwrap_or(2048);
 
-    let start_time = match (mt, &options.time) {
-        (1, Some(crate::WhatToTime::Gen1))
-        | (_, Some(crate::WhatToTime::Gen))
-        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
-        _ => None,
-    };
-    let quiet = m.is_some() || start_time.is_some();
+    let quiet = m.is_some() || options.time;
 
     let pbs = super::progress::bars(n_prompts, &spec.metadata, &m, None)?;
 
@@ -97,6 +91,15 @@ pub async fn generate_completion(
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
+    // Timing tracking
+    let start_time = if options.time {
+        Some(::std::time::Instant::now())
+    } else {
+        None
+    };
+    let mut ttft: Option<::std::time::Duration> = None;
+    let mut token_count = 0u64;
+
     // TODO: handle with chat_choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
@@ -106,6 +109,18 @@ pub async fn generate_completion(
             Some(Ok(res)) => {
                 for choice in res.choices.iter() {
                     let idx: usize = choice.index.try_into()?;
+
+                    // Track TTFT (time to first token)
+                    if ttft.is_none()
+                        && !choice.text.is_empty()
+                        && let Some(start) = start_time
+                    {
+                        ttft = Some(start.elapsed());
+                    }
+
+                    // Count tokens (approximate by characters for now)
+                    token_count += choice.text.len() as u64;
+
                     if !quiet {
                         stdout.write_all(b"\x1b[32m").await?; // green
                         stdout.write_all(choice.text.as_bytes()).await?;
@@ -134,8 +149,15 @@ pub async fn generate_completion(
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
 
-    if let Some(start_time) = start_time {
-        println!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+    // Report timing metrics
+    if let Some(start) = start_time {
+        let total_time = start.elapsed();
+        let task = super::timing::TaskTiming {
+            ttft,
+            total_duration: total_time,
+            token_count,
+        };
+        super::timing::print_timing_metrics(&[task]);
     }
 
     if response.len() == 1 {
@@ -181,13 +203,7 @@ pub async fn generate_chat(
         })
         .unwrap_or(2048);
 
-    let start_time = match (mt, &options.time) {
-        (1, Some(crate::WhatToTime::Gen1))
-        | (_, Some(crate::WhatToTime::Gen))
-        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
-        _ => None,
-    };
-    let quiet = m.is_some() || start_time.is_some();
+    let quiet = m.is_some() || options.time;
 
     let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m, None)?;
 
@@ -220,6 +236,15 @@ pub async fn generate_chat(
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
+    // Timing tracking
+    let start_time = if options.time {
+        Some(::std::time::Instant::now())
+    } else {
+        None
+    };
+    let mut ttft: Option<::std::time::Duration> = None;
+    let mut token_count = 0u64;
+
     // TODO: handle with choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
     let client = Client::with_config(OpenAIConfig::new().with_api_base(apibase));
@@ -230,6 +255,18 @@ pub async fn generate_chat(
                 for choice in res.choices.iter() {
                     if let Some(ref content) = choice.delta.content {
                         let idx: usize = choice.index.try_into()?;
+
+                        // Track TTFT (time to first token)
+                        if ttft.is_none()
+                            && !content.is_empty()
+                            && let Some(start) = start_time
+                        {
+                            ttft = Some(start.elapsed());
+                        }
+
+                        // Count tokens (approximate by characters for now)
+                        token_count += content.len() as u64;
+
                         if !quiet {
                             stdout.write_all(b"\x1b[32m").await?; // green
                             stdout.write_all(content.as_bytes()).await?;
@@ -259,8 +296,15 @@ pub async fn generate_chat(
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
 
-    if let Some(start_time) = start_time {
-        println!("GenerateTime {} ns", start_time.elapsed().as_nanos())
+    // Report timing metrics
+    if let Some(start) = start_time {
+        let total_time = start.elapsed();
+        let task = super::timing::TaskTiming {
+            ttft,
+            total_duration: total_time,
+            token_count,
+        };
+        super::timing::print_timing_metrics(&[task]);
     }
 
     if response.len() == 1 {

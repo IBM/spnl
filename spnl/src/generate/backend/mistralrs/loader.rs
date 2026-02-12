@@ -223,11 +223,6 @@ impl ModelPool {
         // 1. "model-name-Q4_K_M.gguf" (hyphen separator)
         // 2. "model-name.Q4_K_M.gguf" (dot separator - QuantFactory style)
         let priority_formats = vec![
-            // Q8_0 (higher quality)
-            format!("{}.Q8_0.gguf", base_name),
-            format!("{}-Q8_0.gguf", base_name),
-            format!("{}-q8_0.gguf", base_name),
-            format!("{}.q8_0.gguf", base_name),
             // Q4_K_M (most common, good balance)
             format!("{}.Q4_K_M.gguf", base_name),
             format!("{}-Q4_K_M.gguf", base_name),
@@ -238,6 +233,11 @@ impl ModelPool {
             format!("{}-Q5_K_M.gguf", base_name),
             format!("{}-q5_k_m.gguf", base_name),
             format!("{}.q5_k_m.gguf", base_name),
+            // Q8_0 (higher quality)
+            format!("{}.Q8_0.gguf", base_name),
+            format!("{}-Q8_0.gguf", base_name),
+            format!("{}-q8_0.gguf", base_name),
+            format!("{}.q8_0.gguf", base_name),
             // Q4_K_S (smaller, faster)
             format!("{}.Q4_K_S.gguf", base_name),
             format!("{}-Q4_K_S.gguf", base_name),

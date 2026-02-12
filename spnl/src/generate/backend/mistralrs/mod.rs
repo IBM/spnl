@@ -26,6 +26,28 @@ fn get_model_pool() -> &'static ModelPool {
     MODEL_POOL.get_or_init(ModelPool::new)
 }
 
+/// Convert collected timing data into TaskTiming structs
+fn prepare_timing_metrics(
+    all_ttft: &[::std::time::Duration],
+    all_task_durations: &[::std::time::Duration],
+    all_token_counts: &[u64],
+) -> Vec<super::timing::TaskTiming> {
+    all_ttft
+        .iter()
+        .enumerate()
+        .map(|(i, &ttft_duration)| {
+            let task_duration = all_task_durations.get(i).copied().unwrap_or(ttft_duration);
+            let task_tokens = all_token_counts.get(i).copied().unwrap_or(0);
+
+            super::timing::TaskTiming {
+                ttft: Some(ttft_duration),
+                total_duration: task_duration,
+                token_count: task_tokens,
+            }
+        })
+        .collect()
+}
+
 /// Generate completions for multiple inputs (Map operation)
 pub async fn generate_completion(
     spec: Map,
@@ -42,14 +64,7 @@ pub async fn generate_completion(
 
     let n_prompts = spec.inputs.len();
 
-    // Determine if we're in quiet mode (same logic as Candle backend)
-    let start_time = match (n_prompts, options.time.as_ref()) {
-        (1, Some(crate::WhatToTime::Gen1))
-        | (_, Some(crate::WhatToTime::Gen))
-        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
-        _ => None,
-    };
-    let quiet = mp.is_some() || start_time.is_some();
+    let quiet = mp.is_some() || options.time;
 
     // Create progress bars if in quiet mode
     let pbs = super::progress::bars(n_prompts, &spec.metadata, &mp, Some(1))?;
@@ -69,12 +84,20 @@ pub async fn generate_completion(
     let pool = get_model_pool();
     let model = pool.get_or_load(&model_name).await?;
 
+    // Timing tracking
+    let start_time = if options.time {
+        Some(::std::time::Instant::now())
+    } else {
+        None
+    };
+
     // Process each input in parallel
     let mut tasks = Vec::new();
     for (idx, input) in spec.inputs.iter().enumerate() {
         let progress_bar = pbs.as_ref().and_then(|v| v.get(idx).cloned());
         let input = input.clone();
         let model = model.clone();
+        let track_timing = options.time;
 
         let task = tokio::spawn(async move {
             // Create a simple completion request using the higher-level API
@@ -88,6 +111,15 @@ pub async fn generate_completion(
             let mut full_text = String::new();
             let mut stdout = tokio::io::stdout();
 
+            // Timing tracking per task
+            let mut ttft: Option<::std::time::Duration> = None;
+            let mut token_count = 0u64;
+            let task_start = if track_timing {
+                Some(::std::time::Instant::now())
+            } else {
+                None
+            };
+
             while let Some(response) = stream.next().await {
                 match response {
                     Response::Chunk(chunk) => {
@@ -95,6 +127,17 @@ pub async fn generate_completion(
                         if let Some(text) =
                             chunk.choices.first().and_then(|c| c.delta.content.as_ref())
                         {
+                            // Track TTFT (time to first token)
+                            if ttft.is_none()
+                                && !text.is_empty()
+                                && let Some(start) = task_start
+                            {
+                                ttft = Some(start.elapsed());
+                            }
+
+                            // Count tokens (approximate by characters for now)
+                            token_count += text.len() as u64;
+
                             full_text.push_str(text);
 
                             // Update progress bar by the number of characters in this chunk
@@ -125,6 +168,8 @@ pub async fn generate_completion(
                             if let Some(pb) = &progress_bar {
                                 pb.inc(content.len() as u64);
                             }
+
+                            token_count += content.len() as u64;
                         }
                         break;
                     }
@@ -153,7 +198,15 @@ pub async fn generate_completion(
                 pb.finish_and_clear();
             }
 
-            Ok::<_, anyhow::Error>(Query::Message(Assistant(full_text)))
+            // Calculate task duration
+            let task_duration = task_start.map(|start| start.elapsed());
+
+            Ok::<_, anyhow::Error>((
+                Query::Message(Assistant(full_text)),
+                ttft,
+                task_duration,
+                token_count,
+            ))
         });
 
         tasks.push(task);
@@ -162,14 +215,32 @@ pub async fn generate_completion(
     // Wait for all tasks to complete
     let results = futures::future::join_all(tasks).await;
     let mut final_results = Vec::new();
+    let mut all_ttft = Vec::new();
+    let mut all_task_durations = Vec::new();
+    let mut all_token_counts = Vec::new();
+
     for result in results {
-        final_results.push(result??);
+        let (query, ttft, task_duration, token_count) = result??;
+        final_results.push(query);
+        if let Some(ttft_val) = ttft {
+            all_ttft.push(ttft_val);
+        }
+        if let Some(duration) = task_duration {
+            all_task_durations.push(duration);
+        }
+        all_token_counts.push(token_count);
     }
 
     // Print final newline if not in quiet mode
     if !quiet {
         let mut stdout = tokio::io::stdout();
         stdout.write_all(b"\n").await?;
+    }
+
+    // Report timing metrics
+    if start_time.is_some() {
+        let tasks = prepare_timing_metrics(&all_ttft, &all_task_durations, &all_token_counts);
+        super::timing::print_timing_metrics(&tasks);
     }
 
     Ok(Query::Par(final_results))
@@ -191,14 +262,7 @@ pub async fn generate_chat(
 
     let n_usize = spec.n as usize;
 
-    // Determine if we're in quiet mode (same logic as Candle backend)
-    let start_time = match (n_usize, options.time.as_ref()) {
-        (1, Some(crate::WhatToTime::Gen1))
-        | (_, Some(crate::WhatToTime::Gen))
-        | (_, Some(crate::WhatToTime::All)) => Some(::std::time::Instant::now()),
-        _ => None,
-    };
-    let quiet = mp.is_some() || start_time.is_some();
+    let quiet = mp.is_some() || options.time;
 
     // Create progress bars if in quiet mode
     let pbs = super::progress::bars(n_usize, &spec.generate.metadata, &mp, Some(1))?;
@@ -221,12 +285,20 @@ pub async fn generate_chat(
     let pool = get_model_pool();
     let model = pool.get_or_load(&model_name).await?;
 
+    // Timing tracking
+    let start_time = if options.time {
+        Some(::std::time::Instant::now())
+    } else {
+        None
+    };
+
     // Generate n completions in parallel
     let mut tasks = Vec::new();
     for idx in 0..n_usize {
         let progress_bar = pbs.as_ref().and_then(|v| v.get(idx).cloned());
         let input_query = input_query.clone();
         let model = model.clone();
+        let track_timing = options.time;
 
         let task = tokio::spawn(async move {
             // Build request with messages from the query
@@ -242,6 +314,15 @@ pub async fn generate_chat(
             let mut full_text = String::new();
             let mut stdout = tokio::io::stdout();
 
+            // Timing tracking per task
+            let mut ttft: Option<::std::time::Duration> = None;
+            let mut token_count = 0u64;
+            let task_start = if track_timing {
+                Some(::std::time::Instant::now())
+            } else {
+                None
+            };
+
             while let Some(response) = stream.next().await {
                 match response {
                     Response::Chunk(chunk) => {
@@ -249,6 +330,17 @@ pub async fn generate_chat(
                         if let Some(text) =
                             chunk.choices.first().and_then(|c| c.delta.content.as_ref())
                         {
+                            // Track TTFT (time to first token)
+                            if ttft.is_none()
+                                && !text.is_empty()
+                                && let Some(start) = task_start
+                            {
+                                ttft = Some(start.elapsed());
+                            }
+
+                            // Count tokens (approximate by characters for now)
+                            token_count += text.len() as u64;
+
                             full_text.push_str(text);
 
                             // Update progress bar by the number of characters in this chunk
@@ -279,6 +371,8 @@ pub async fn generate_chat(
                             if let Some(pb) = &progress_bar {
                                 pb.inc(content.len() as u64);
                             }
+
+                            token_count += content.len() as u64;
                         }
                         break;
                     }
@@ -307,7 +401,15 @@ pub async fn generate_chat(
                 pb.finish_and_clear();
             }
 
-            Ok::<_, anyhow::Error>(Query::Message(Assistant(full_text)))
+            // Calculate task duration
+            let task_duration = task_start.map(|start| start.elapsed());
+
+            Ok::<_, anyhow::Error>((
+                Query::Message(Assistant(full_text)),
+                ttft,
+                task_duration,
+                token_count,
+            ))
         });
 
         tasks.push(task);
@@ -316,14 +418,32 @@ pub async fn generate_chat(
     // Wait for all tasks to complete
     let results = futures::future::join_all(tasks).await;
     let mut final_results = Vec::new();
+    let mut all_ttft = Vec::new();
+    let mut all_task_durations = Vec::new();
+    let mut all_token_counts = Vec::new();
+
     for result in results {
-        final_results.push(result??);
+        let (query, ttft, task_duration, token_count) = result??;
+        final_results.push(query);
+        if let Some(ttft_val) = ttft {
+            all_ttft.push(ttft_val);
+        }
+        if let Some(duration) = task_duration {
+            all_task_durations.push(duration);
+        }
+        all_token_counts.push(token_count);
     }
 
     // Print final newline if not in quiet mode
     if !quiet {
         let mut stdout = tokio::io::stdout();
         stdout.write_all(b"\n").await?;
+    }
+
+    // Report timing metrics
+    if start_time.is_some() {
+        let tasks = prepare_timing_metrics(&all_ttft, &all_task_durations, &all_token_counts);
+        super::timing::print_timing_metrics(&tasks);
     }
 
     Ok(Query::Par(final_results))

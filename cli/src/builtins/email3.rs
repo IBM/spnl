@@ -13,8 +13,6 @@ pub fn query(args: Args) -> Query {
         ..
     } = args;
 
-    let outer_max_tokens = if args.time.is_some() { Some(1) } else { None };
-
     let mut rl = rustyline::DefaultEditor::new().unwrap();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
@@ -44,6 +42,6 @@ pub fn query(args: Args) -> Query {
                    candidate_emails
                    (print "Generate candidate emails in parallel"))
 
-          temperature outer_max_tokens
+          temperature max_tokens
     )
 }

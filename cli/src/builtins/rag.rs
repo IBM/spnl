@@ -9,14 +9,6 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
         chunk_size,
         ..
     } = args;
-
-    // TODO use args.max_tokens to govern the length of the documents
-    let outer_max_tokens = if args.time.is_some() {
-        Some(1)
-    } else {
-        Some(max_tokens)
-    };
-
     // The question to augment. We use a default value that pertains
     // to the Prompt Declaration Language (PDL)
     // documentation. https://github.com/IBM/prompt-declaration-language
@@ -86,6 +78,6 @@ Citations: @base-baz-2, @raptor-glam-8
             (cross
              (system system_prompt)
              (with embedding_model (user prompt) docs))
-            temperature outer_max_tokens
+            temperature max_tokens
     ))
 }

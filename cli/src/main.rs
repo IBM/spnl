@@ -2,9 +2,7 @@ use clap::Parser;
 
 use crate::args::{Args, Commands, FullArgs};
 use crate::builtins::*;
-use spnl::{
-    ExecuteOptions, SpnlError, WhatToTime, execute, ir::from_str, ir::pretty_print, optimizer::hlo,
-};
+use spnl::{ExecuteOptions, SpnlError, execute, ir::from_str, ir::pretty_print, optimizer::hlo};
 
 #[cfg(feature = "gce")]
 use crate::args::ImageCommands;
@@ -143,7 +141,7 @@ async fn run(args: Args) -> Result<(), SpnlError> {
     let show_only = args.show_query;
     let dry_run = args.dry_run;
     let rp = ExecuteOptions {
-        time: args.time.clone(),
+        time: args.time,
         prepare: Some(args.prepare),
     };
 
@@ -164,12 +162,7 @@ async fn run(args: Args) -> Result<(), SpnlError> {
             .build()?,
     };
 
-    let is_timing = args.time.is_some();
-    let start_time = if let Some(WhatToTime::All) = args.time {
-        Some(::std::time::Instant::now())
-    } else {
-        None
-    };
+    let is_timing = args.time;
 
     let query = hlo::optimize(
         &match args.builtin {
@@ -210,16 +203,10 @@ async fn run(args: Args) -> Result<(), SpnlError> {
         return Ok(());
     }
 
-    let res = execute(&query, &rp).await.map(|res| {
+    execute(&query, &rp).await.map(|res| {
         if !is_timing && !res.to_string().is_empty() {
             println!("{res}");
         }
         Ok(())
-    })?;
-
-    if let Some(start_time) = start_time {
-        println!("AllTime {} ns", start_time.elapsed().as_nanos());
-    }
-
-    res
+    })?
 }

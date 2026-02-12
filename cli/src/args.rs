@@ -113,9 +113,9 @@ pub struct Args {
     #[arg(short, long, default_value_t = false)]
     pub show_query: bool,
 
-    /// Report query execution time to stderr
-    #[arg(value_enum, long)]
-    pub time: Option<spnl::WhatToTime>,
+    /// Report timing metrics (TTFT and ITL) to stderr
+    #[arg(long)]
+    pub time: bool,
 
     /// Verbose output
     #[arg(short, long, default_value_t = false)]

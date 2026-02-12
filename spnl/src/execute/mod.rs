@@ -129,7 +129,7 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
 
         #[cfg(feature = "print")]
         Query::Print(m) => {
-            if rp.time.is_none() {
+            if !rp.time {
                 println!("{m}");
             }
             Ok(Query::Message(User("".into())))
