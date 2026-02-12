@@ -4455,7 +4455,7 @@ dependencies = [
 
 [[package]]
 name = "haystack"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -10022,7 +10022,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -10079,7 +10079,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-cli"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "anyhow",
  "clap",

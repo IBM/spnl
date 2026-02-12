@@ -1,7 +1,7 @@
 //! Shared timing metrics printing for all backends
 
 use std::time::Duration;
-use tabled::{Table, Tabled};
+use tabled::{Table, Tabled, settings::Style};
 
 /// Timing data for a single task
 #[derive(Debug, Clone)]
@@ -63,7 +63,7 @@ pub fn print_timing_metrics(tasks: &[TaskTiming]) {
             });
         }
 
-        let table = Table::new(rows).to_string();
+        let table = Table::new(rows).with(Style::sharp()).to_string();
         eprintln!("{}", table);
     } else {
         // Plain ASCII output for non-TTY or single task
