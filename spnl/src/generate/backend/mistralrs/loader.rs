@@ -3,7 +3,7 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use mistralrs::{
     Device, GgufModelBuilder, IsqType, Model, PagedAttentionMetaBuilder, TextModelBuilder,
-    paged_attn_supported,
+    best_device, paged_attn_supported,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -338,25 +338,17 @@ impl ModelPool {
         // Check if model files are already cached (to determine if we need to download)
         let is_cached = self.is_model_cached(model_name, is_gguf).await;
 
-        // Determine device - prefer Metal on macOS, fallback to CPU
-        let device = if cfg!(target_os = "macos") {
-            match Device::new_metal(0) {
-                Ok(metal_device) => {
-                    if should_enable_logging() {
-                        eprintln!("Using Metal GPU acceleration");
-                    }
-                    metal_device
-                }
-                Err(e) => {
-                    if should_enable_logging() {
-                        eprintln!("Metal not available ({}), falling back to CPU", e);
-                    }
-                    Device::Cpu
-                }
+        // Detect the best available device (CUDA, Metal, or CPU)
+        let device = best_device(false).expect("Failed to detect device");
+
+        // Log the selected device if logging is enabled
+        if should_enable_logging() {
+            match &device {
+                Device::Cuda(_) => eprintln!("Using CUDA GPU acceleration"),
+                Device::Metal(_) => eprintln!("Using Metal GPU acceleration"),
+                Device::Cpu => eprintln!("Using CPU for inference"),
             }
-        } else {
-            Device::Cpu
-        };
+        }
 
         // Build the model using the appropriate builder
         let model = if is_gguf {
