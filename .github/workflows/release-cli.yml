@@ -343,10 +343,175 @@ jobs:
             ${{ env.ARCHIVE_PATH }}.sha256
           if-no-files-found: error
 
+  build-cuda:
+    # CUDA builds for Linux x86_64 with GPU acceleration support
+    #
+    # IMPORTANT: Minimum GPU Requirement - Compute Capability 80 (Ampere Architecture)
+    #
+    # All CUDA builds require NVIDIA GPUs with compute capability 80 or higher because:
+    # - The candle-kernels dependency uses WMMA (Warp Matrix Multiply Accumulate) operations
+    # - WMMA with bfloat16 data type requires compute capability 80+ (Ampere and newer)
+    # - Attempting to build for older GPUs (e.g., compute capability 75/Turing/RTX 20* series)
+    #   will fail with compilation errors about incomplete WMMA fragment types
+    #
+    # Supported GPU Architectures:
+    # - Compute Capability 80: NVIDIA A100, A30, A10
+    # - Compute Capability 86: RTX 30* series (3060, 3070, 3080, 3090, etc.)
+    # - Compute Capability 89: RTX 40* series (4060, 4070, 4080, 4090), L40, L40S
+    # - Compute Capability 90: H100, H800, RTX 50* series (Hopper architecture)
+    #
+    # Build Variants:
+    # 1. cuda: Base CUDA support (compute capability 80+)
+    # 2. cuda-flash-attn: Adds Flash Attention optimization (compute capability 80+)
+    # 3. cuda-flash-attn-v3: Flash Attention v3 for Hopper GPUs only (compute capability 90)
+    #
+    # Disk Space: CUDA builds are very large (~20GB+). The free-up-disk-space-fast.sh script
+    # runs before building to remove unnecessary software and free up space on GitHub runners.
+    #
+    # CUDA Version: Uses CUDA 12.8.1 (latest stable 12.8.x release) for compatibility.
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ubuntu-latest
+    container:
+      image: nvidia/cuda:12.8.1-devel-ubuntu22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x86_64
+            libc: gnu
+            features: cuda
+            name: Linux x86_64 CUDA
+            # Plain CUDA: support Ampere and newer GPUs (RTX 30* series and newer)
+            # Compute capabilities: 80 (A100), 86 (RTX 30*), 89 (RTX 40*, L40s), 90 (H100, H800, RTX 50*)
+            # Note: Compute capability 75 (RTX 20* series) is not supported because candle-kernels
+            # uses WMMA operations with bfloat16 which require compute capability 80+
+            cuda_compute_cap: "80"
+            #cuda_nvcc_flags: "-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_89,code=sm_89 -gencode arch=compute_90,code=sm_90"
+          
+          - target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x86_64
+            libc: gnu
+            features: cuda-flash-attn
+            variant: cuda-flash-attn
+            name: Linux x86_64 CUDA Flash-Attn (RTX30*/40*, A100, L40s)
+            # Flash-Attn: requires compute capability 80+ (Ampere and newer)
+            # Compute capabilities: 80 (A100), 86 (RTX 30*), 89 (RTX 40*, L40s)
+            cuda_compute_cap: "80"
+            # cuda_nvcc_flags: "-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_89,code=sm_89"
+          
+          - target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x86_64
+            libc: gnu
+            features: cuda-flash-attn-v3
+            variant: cuda-flash-attn-v3
+            name: Linux x86_64 CUDA Flash-Attn-v3 (H100, H800, RTX50*)
+            # Flash-Attn-v3: requires compute capability 90 (Hopper architecture)
+            cuda_compute_cap: "90"
+            # cuda_nvcc_flags: "-gencode arch=compute_90,code=sm_90"
+
+    env:
+      TARGET: ${{ matrix.platform.target }}
+      PLATFORM: ${{ matrix.platform.platform }}
+      ARCH: ${{ matrix.platform.arch }}
+      LIBC: ${{ matrix.platform.libc }}
+      FEATURES: ${{ matrix.platform.features }}
+      VARIANT: ${{ matrix.platform.variant }}
+      # CUDA_COMPUTE_CAP: Set to single value to prevent bindgen_cuda from running nvidia-smi
+      # bindgen_cuda 0.1.6 has a bug parsing multiple values (comma or space separated)
+      # We set it to the minimum capability for each variant just to bypass the nvidia-smi check
+      CUDA_COMPUTE_CAP: ${{ matrix.platform.cuda_compute_cap }}
+      # CUDA_NVCC_FLAGS: Commented out - causes GCC errors when mistralrs build script passes it incorrectly
+      # CUDA_NVCC_FLAGS: ${{ matrix.platform.cuda_nvcc_flags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y curl build-essential pkg-config libssl-dev protobuf-compiler git
+          
+          echo "GCC version:"
+          gcc --version
+          echo "Git version:"
+          git --version
+
+      - name: Free up disk space
+        shell: bash
+        run: |
+          # Disk space cleanup for CUDA builds
+          # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
+          ./.github/scripts/free-up-disk-space-fast.sh &
+          wait
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          source "$HOME/.cargo/env"
+          rustup target add ${{ matrix.platform.target }}
+
+      - name: Get version from release
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build CLI with CUDA
+        shell: bash
+        run: |
+          source "$HOME/.cargo/env"
+          echo "Building with features: $FEATURES,rag,k8s,gce,spnl-api"
+          echo "CUDA_COMPUTE_CAP: $CUDA_COMPUTE_CAP"
+          echo "CUDA_NVCC_FLAGS: $CUDA_NVCC_FLAGS"
+          cargo build --features $FEATURES,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG \
+            --package spnl-cli --target $TARGET
+
+      - name: Prepare binary
+        shell: bash
+        run: |
+          cd target/$TARGET/$BUILD_DIR
+          BINARY_NAME="spnl"
+          
+          if [ -n "$VARIANT" ]; then
+            ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC-$VARIANT.tar.gz"
+          else
+            ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC-cuda.tar.gz"
+          fi
+          
+          tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Generate checksum
+        shell: bash
+        run: |
+          sha256sum "$ARCHIVE_PATH" | awk '{print $1}' > "$ARCHIVE_PATH.sha256"
+          echo "Checksum for $ARCHIVE_NAME:"
+          cat "$ARCHIVE_PATH.sha256"
+
+      - name: Upload artifact
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: |
+            ${{ env.ARCHIVE_PATH }}
+            ${{ env.ARCHIVE_PATH }}.sha256
+          if-no-files-found: error
+
   upload-to-release:
     name: Upload assets to release
     if: github.event_name == 'release'
-    needs: [build-and-upload, build-musl]
+    needs: [build-and-upload, build-musl, build-cuda]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

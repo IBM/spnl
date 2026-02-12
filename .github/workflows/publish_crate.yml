@@ -37,7 +37,9 @@ jobs:
           fi
           unzip protoc.zip -d $HOME/.local
       - name: Publish
-        run: cargo publish --manifest-path spnl/Cargo.toml --all-features $DRY_RUN
+        # Don't use --all-features to avoid CUDA compilation on macOS
+        # Users can enable CUDA features explicitly when needed
+        run: cargo publish --manifest-path spnl/Cargo.toml $DRY_RUN
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           DRY_RUN: ${{ github.event_name == 'pull_request' && '--dry-run' || ' ' }}

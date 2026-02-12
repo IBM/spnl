@@ -22,7 +22,10 @@ ollama = ["openai"]
 openai = ["dep:async-openai","dep:tokio"]
 gemini = ["openai"]
 local = ["run","dep:mistralrs","dep:tokio","dep:uuid","dep:indexmap","dep:either"]
-local-metal = ["local","mistralrs/metal"]
+metal = ["local","mistralrs/metal"]
+cuda = ["local","mistralrs/cuda"]
+cuda-flash-attn = ["cuda","mistralrs/flash-attn"]
+cuda-flash-attn-v3 = ["cuda","dep:mistralrs-core","mistralrs-core/flash-attn-v3"]
 openssl-vendored = ["dep:openssl"]
 pull = ["dep:reqwest","dep:tokio-util"]
 ffi = []
@@ -84,6 +87,7 @@ sha2 = { version = "0.10.9", optional = true }
 pyo3 = { version = "0.28.0", features = ["macros"], optional = true }
 tokenizers = { version = "0.22.0", default-features = false, features = ["onig", "esaxx_fast", "hf-hub", "http"], optional = true }
 mistralrs = { version = "0.7.0", git = "https://github.com/EricLBuehler/mistral.rs", rev = "dd8d0c6f9dc2fe3129ff4228de667e2a0efcf5b4", optional = true }
+mistralrs-core = { version = "0.7.0", git = "https://github.com/EricLBuehler/mistral.rs", rev = "dd8d0c6f9dc2fe3129ff4228de667e2a0efcf5b4", optional = true, default-features = false }
 hf-hub = { version = "0.4.3", features = ["tokio"], optional = true }
 derive_builder = "0.20.2"
 moka = { version = "0.12.10", features = ["sync"], optional = true }

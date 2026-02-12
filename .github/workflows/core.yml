@@ -56,6 +56,9 @@ jobs:
       - name: report rustc version
         run: rustc --version
 
+      - name: verify feature consistency
+        run: .github/scripts/verify-feature-consistency.sh
+
       - name: install ollama
         run: |
           # Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
@@ -74,21 +77,32 @@ jobs:
       - name: cargo test
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            # Test all features on macOS, including candle-metal
-            cargo test --all-features -p spnl -p spnl-cli -- --nocapture
+            # IMPORTANT: Cannot use --all-features because mistralrs (used by local/metal/cuda features)
+            # unconditionally depends on candle-core, which depends on cudarc (CUDA).
+            #
+            # When adding new features to spnl/Cargo.toml, update this list!
+            # Current features tested (from spnl/Cargo.toml):
+            # - Included: cli_support, print, lisp, run, ollama, openai, gemini, pull, yaml, metal, rag, rag-deep-debug, spnl-api, vllm, k8s, gce, ffi, pypi, run_py, tok, openssl-vendored
+            # - Excluded: local (CPU inference - pulls in CUDA deps via mistralrs)
+            # - Excluded: cuda, cuda-flash-attn, cuda-flash-attn-v3 (CUDA features)
+            cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored -- --nocapture
+            cargo test -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
           else
-            # Test default features on Linux (candle works on Linux, but --all-features
-            # includes candle-metal which is macOS-only)
+            # Test default features on Linux (no GPU features)
             cargo test -p spnl -p spnl-cli -- --nocapture
           fi
 
       - name: cargo clippy
-        # Only run clippy on macOS to validate all features including candle-metal.
+        # Only run clippy on macOS to validate all features except local and cuda*.
         # Clippy is linting/static analysis (OS-independent), so running once is sufficient.
-        # The candle-metal feature is macOS-only and causes `cargo publish --all-features`
-        # to fail on Linux runners with "objc2 only works on Apple platforms" error.
+        #
+        # IMPORTANT: Cannot use --all-features because mistralrs (used by local/metal/cuda features)
+        # unconditionally depends on candle-core, which depends on cudarc (CUDA).
+        # When adding new features, update the feature list above in cargo test!
         if: runner.os == 'macOS'
-        run: cargo clippy --workspace --all-features --tests --no-deps -- -D warnings
+        run: |
+          cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored --tests --no-deps -- -D warnings
+          cargo clippy -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
 
       - name: rustfmt
         run: cargo fmt --all -- --check
