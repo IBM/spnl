@@ -91,6 +91,11 @@ pub async fn generate_completion(
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
+    // TODO: handle with chat_choice.delta.role, rather than hard-wire
+    // Asistant (at the end of this function)
+    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
+    let mut stream = client.completions().create_stream(request).await?;
+
     // Timing tracking
     let start_time = if options.time {
         Some(::std::time::Instant::now())
@@ -100,10 +105,6 @@ pub async fn generate_completion(
     let mut ttft: Option<::std::time::Duration> = None;
     let mut token_count = 0u64;
 
-    // TODO: handle with chat_choice.delta.role, rather than hard-wire
-    // Asistant (at the end of this function)
-    let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
-    let mut stream = client.completions().create_stream(request).await?;
     loop {
         match stream.next().await {
             Some(Ok(res)) => {

@@ -8,7 +8,8 @@
 
 use indicatif::MultiProgress;
 use mistralrs::{RequestBuilder, Response, TextMessageRole};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Semaphore;
 
 use crate::{
     SpnlResult,
@@ -24,6 +25,15 @@ static MODEL_POOL: OnceLock<ModelPool> = OnceLock::new();
 
 fn get_model_pool() -> &'static ModelPool {
     MODEL_POOL.get_or_init(ModelPool::new)
+}
+
+/// Get the maximum number of parallel tasks from environment variable
+/// Defaults to 2 if not set or invalid
+fn get_max_parallel() -> usize {
+    std::env::var("SPNL_NUM_PARALLEL")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2)
 }
 
 /// Convert collected timing data into TaskTiming structs
@@ -91,15 +101,23 @@ pub async fn generate_completion(
         None
     };
 
-    // Process each input in parallel
+    // Create semaphore for concurrency control
+    let max_parallel = get_max_parallel();
+    let semaphore = Arc::new(Semaphore::new(max_parallel));
+
+    // Process each input in parallel with bounded concurrency
     let mut tasks = Vec::new();
     for (idx, input) in spec.inputs.iter().enumerate() {
         let progress_bar = pbs.as_ref().and_then(|v| v.get(idx).cloned());
         let input = input.clone();
         let model = model.clone();
         let track_timing = options.time;
+        let sem = semaphore.clone();
 
         let task = tokio::spawn(async move {
+            // Acquire permit before processing
+            let _permit = sem.acquire().await.unwrap();
+
             // Create a simple completion request using the higher-level API
             let request = RequestBuilder::new()
                 .add_message(TextMessageRole::User, input)
@@ -188,6 +206,9 @@ pub async fn generate_completion(
                 }
             }
 
+            // Calculate task duration
+            let task_duration = task_start.map(|start| start.elapsed());
+
             // Print newline after streaming output (only if not quiet)
             if !quiet && !full_text.is_empty() {
                 stdout.write_all(b"\n").await?;
@@ -197,9 +218,6 @@ pub async fn generate_completion(
             if let Some(pb) = &progress_bar {
                 pb.finish_and_clear();
             }
-
-            // Calculate task duration
-            let task_duration = task_start.map(|start| start.elapsed());
 
             Ok::<_, anyhow::Error>((
                 Query::Message(Assistant(full_text)),
@@ -285,6 +303,10 @@ pub async fn generate_chat(
     let pool = get_model_pool();
     let model = pool.get_or_load(&model_name).await?;
 
+    // Create semaphore for concurrency control
+    let max_parallel = get_max_parallel();
+    let semaphore = Arc::new(Semaphore::new(max_parallel));
+
     // Timing tracking
     let start_time = if options.time {
         Some(::std::time::Instant::now())
@@ -292,15 +314,19 @@ pub async fn generate_chat(
         None
     };
 
-    // Generate n completions in parallel
+    // Generate n completions in parallel with bounded concurrency
     let mut tasks = Vec::new();
     for idx in 0..n_usize {
         let progress_bar = pbs.as_ref().and_then(|v| v.get(idx).cloned());
         let input_query = input_query.clone();
         let model = model.clone();
         let track_timing = options.time;
+        let sem = semaphore.clone();
 
         let task = tokio::spawn(async move {
+            // Acquire permit before processing
+            let _permit = sem.acquire().await.unwrap();
+
             // Build request with messages from the query
             let mut request_builder = RequestBuilder::new()
                 .set_sampler_temperature(temperature as f64)
@@ -391,6 +417,9 @@ pub async fn generate_chat(
                 }
             }
 
+            // Calculate task duration
+            let task_duration = task_start.map(|start| start.elapsed());
+
             // Print newline after streaming output (only if not quiet)
             if !quiet && !full_text.is_empty() {
                 stdout.write_all(b"\n").await?;
@@ -400,9 +429,6 @@ pub async fn generate_chat(
             if let Some(pb) = &progress_bar {
                 pb.finish_and_clear();
             }
-
-            // Calculate task duration
-            let task_duration = task_start.map(|start| start.elapsed());
 
             Ok::<_, anyhow::Error>((
                 Query::Message(Assistant(full_text)),
