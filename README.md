@@ -86,6 +86,9 @@ Quick reference:
 # Run a query
 spnl run [OPTIONS]
 
+# Run with timing metrics (reports TTFT and ITL to stderr)
+spnl run --time [OPTIONS]
+
 # Manage vLLM deployments
 spnl vllm <up|down> [OPTIONS]
 

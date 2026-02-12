@@ -35,6 +35,7 @@ spnl run [OPTIONS]
 
 - `-f, --file <FILE>` - File to process
 - `-b, --builtin <BUILTIN>` - Builtin query to run (env: `SPNL_BUILTIN`)
+  - Required unless `--file` is present
   - Possible values: `bulkmap`, `email`, `email2`, `email3`, `sweagent`, `gsm8k`, `rag`, `spans`
 
 #### Model Configuration
@@ -56,8 +57,9 @@ spnl run [OPTIONS]
 - `-d, --document <DOCUMENT>` - Document(s) that will augment the question
 - `-x, --max-aug <MAX_AUG>` - Maximum augmentations to add to the query (env: `SPNL_RAG_MAX_MATCHES`)
 - `-i, --indexer <INDEXER>` - The RAG indexing scheme
-  - `simple-embed-retrieve` - Only perform the initial embedding without any further knowledge graph formation
-  - `raptor` - Use the RAPTOR algorithm (https://github.com/parthsarthi03/raptor)
+  - Possible values:
+    - `simple-embed-retrieve` - Only perform the initial embedding without any further knowledge graph formation
+    - `raptor` - Use the RAPTOR algorithm (https://github.com/parthsarthi03/raptor)
 - `-k, --chunk-size <CHUNK_SIZE>` - Chunk size for document processing
 - `--vecdb-uri <VECDB_URI>` - Vector database URL
   - Default: `data/spnl`
@@ -72,8 +74,7 @@ spnl run [OPTIONS]
 #### Output Options
 
 - `-s, --show-query` - Re-emit the compiled query
-- `--time <TIME>` - Report query execution time to stderr
-  - Possible values: `all`, `gen`, `gen1`
+- `--time` - Report timing metrics (TTFT and ITL) to stderr
 - `-v, --verbose` - Verbose output
 
 ### Examples
@@ -119,7 +120,7 @@ spnl vllm up [OPTIONS] --hf-token <HF_TOKEN> <NAME>
 
 ### Arguments
 
-- `<NAME>` - Name of the deployment resource (required)
+- `<NAME>` - Name of the deployment/instance (required)
 
 ### Options
 
@@ -136,7 +137,6 @@ spnl vllm up [OPTIONS] --hf-token <HF_TOKEN> <NAME>
 #### Model Configuration
 
 - `-m, --model <MODEL>` - Model to serve from HuggingFace (env: `SPNL_MODEL`)
-  - Default: `ibm-granite/granite-3.3-8b-instruct`
 - `-t, --hf-token <HF_TOKEN>` - HuggingFace token for pulling model weights (env: `HF_TOKEN`) (required)
 
 #### Resource Configuration
@@ -225,7 +225,7 @@ spnl vllm down [OPTIONS] <NAME>
 
 ### Arguments
 
-- `<NAME>` - Name of the deployment resource to tear down (required)
+- `<NAME>` - Name of the deployment/instance to tear down (required)
 
 ### Options
 
