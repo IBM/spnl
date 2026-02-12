@@ -63,7 +63,11 @@ pub async fn generate(
     let client = reqwest::Client::new();
 
     // eprintln!("Sending query {:?}", to_string(&query)?);
-    let pbs = super::progress::bars(spec.n(), &spec.metadata(), &m, None)?;
+    let pbs = if options.silent {
+        None
+    } else {
+        super::progress::bars(spec.n(), &spec.metadata(), &m, None)?
+    };
     let mut response_strings = ::std::iter::repeat_n(String::new(), spec.n()).collect::<Vec<_>>();
 
     let is_map = matches!(spec, Spec::Map(_));
@@ -77,7 +81,7 @@ pub async fn generate(
         .await?;
 
     let mut stdout = stdout();
-    let quiet = m.is_some() || options.time;
+    let quiet = m.is_some() || options.time || options.silent;
     if !quiet {
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
@@ -222,8 +226,10 @@ pub async fn generate(
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
 
-    // Report timing metrics
-    if let Some(start) = start_time {
+    // Report timing metrics (unless in silent mode)
+    if let Some(start) = start_time
+        && !options.silent
+    {
         let total_time = start.elapsed();
         let task = super::timing::TaskTiming {
             ttft,

@@ -146,6 +146,7 @@ async fn run(args: Args) -> Result<(), SpnlError> {
     let rp = ExecuteOptions {
         time: args.time,
         prepare: Some(args.prepare),
+        silent: false,
     };
 
     let hlo_options = hlo::Options {

@@ -6,7 +6,6 @@ RUN apt update && apt upgrade -y && apt install -y pkg-config protobuf-compiler 
 COPY Cargo.* .
 COPY spnl spnl
 COPY cli cli
-COPY benchmarks/haystack benchmarks/haystack
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \

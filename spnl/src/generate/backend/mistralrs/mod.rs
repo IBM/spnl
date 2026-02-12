@@ -74,10 +74,14 @@ pub async fn generate_completion(
 
     let n_prompts = spec.inputs.len();
 
-    let quiet = mp.is_some() || options.time;
+    let quiet = mp.is_some() || options.time || options.silent;
 
-    // Create progress bars if in quiet mode
-    let pbs = super::progress::bars(n_prompts, &spec.metadata, &mp, None)?;
+    // Create progress bars if in quiet mode (but not if silent)
+    let pbs = if options.silent {
+        None
+    } else {
+        super::progress::bars(n_prompts, &spec.metadata, &mp, None)?
+    };
 
     // Print "Assistant: " prefix if not in quiet mode
     if !quiet {
@@ -255,8 +259,8 @@ pub async fn generate_completion(
         stdout.write_all(b"\n").await?;
     }
 
-    // Report timing metrics
-    if start_time.is_some() {
+    // Report timing metrics (unless in silent mode)
+    if start_time.is_some() && !options.silent {
         let tasks = prepare_timing_metrics(&all_ttft, &all_task_durations, &all_token_counts);
         super::timing::print_timing_metrics(&tasks);
     }
@@ -280,10 +284,14 @@ pub async fn generate_chat(
 
     let n_usize = spec.n as usize;
 
-    let quiet = mp.is_some() || options.time;
+    let quiet = mp.is_some() || options.time || options.silent;
 
-    // Create progress bars if in quiet mode
-    let pbs = super::progress::bars(n_usize, &spec.generate.metadata, &mp, None)?;
+    // Create progress bars if in quiet mode (but not if silent)
+    let pbs = if options.silent {
+        None
+    } else {
+        super::progress::bars(n_usize, &spec.generate.metadata, &mp, None)?
+    };
 
     // Print "Assistant: " prefix if not in quiet mode
     if !quiet {
@@ -466,8 +474,8 @@ pub async fn generate_chat(
         stdout.write_all(b"\n").await?;
     }
 
-    // Report timing metrics
-    if start_time.is_some() {
+    // Report timing metrics (unless in silent mode)
+    if start_time.is_some() && !options.silent {
         let tasks = prepare_timing_metrics(&all_ttft, &all_task_durations, &all_token_counts);
         super::timing::print_timing_metrics(&tasks);
     }

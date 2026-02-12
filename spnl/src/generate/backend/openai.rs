@@ -73,9 +73,13 @@ pub async fn generate_completion(
         })
         .unwrap_or(2048);
 
-    let quiet = m.is_some() || options.time;
+    let quiet = m.is_some() || options.time || options.silent;
 
-    let pbs = super::progress::bars(n_prompts, &spec.metadata, &m, None)?;
+    let pbs = if options.silent {
+        None
+    } else {
+        super::progress::bars(n_prompts, &spec.metadata, &m, None)?
+    };
 
     let request = CreateCompletionRequestArgs::default()
         .model(spec.metadata.model)
@@ -150,8 +154,10 @@ pub async fn generate_completion(
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
 
-    // Report timing metrics
-    if let Some(start) = start_time {
+    // Report timing metrics (unless in silent mode)
+    if let Some(start) = start_time
+        && !options.silent
+    {
         let total_time = start.elapsed();
         let task = super::timing::TaskTiming {
             ttft,
@@ -204,9 +210,13 @@ pub async fn generate_chat(
         })
         .unwrap_or(2048);
 
-    let quiet = m.is_some() || options.time;
+    let quiet = m.is_some() || options.time || options.silent;
 
-    let pbs = super::progress::bars(spec.n.into(), &spec.generate.metadata, &m, None)?;
+    let pbs = if options.silent {
+        None
+    } else {
+        super::progress::bars(spec.n.into(), &spec.generate.metadata, &m, None)?
+    };
 
     let (apibase, reasoning_effort) = api_base(&provider);
 
@@ -297,8 +307,10 @@ pub async fn generate_chat(
         .map(|s| Query::Message(Assistant(s)))
         .collect::<Vec<_>>();
 
-    // Report timing metrics
-    if let Some(start) = start_time {
+    // Report timing metrics (unless in silent mode)
+    if let Some(start) = start_time
+        && !options.silent
+    {
         let total_time = start.elapsed();
         let task = super::timing::TaskTiming {
             ttft,
