@@ -33,6 +33,9 @@ async fn main() -> Result<(), SpnlError> {
     match args.command {
         Commands::Run(run_args) => run(run_args).await,
 
+        #[cfg(feature = "local")]
+        Commands::List => list_local_models(),
+
         #[cfg(any(feature = "k8s", feature = "gce"))]
         Commands::Vllm {
             command:
@@ -209,4 +212,45 @@ async fn run(args: Args) -> Result<(), SpnlError> {
         }
         Ok(())
     })?
+}
+
+#[cfg(feature = "local")]
+fn list_local_models() -> Result<(), SpnlError> {
+    use tabled::{Table, Tabled, settings::Style};
+
+    #[derive(Tabled)]
+    struct ModelRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "CACHED")]
+        cached: String,
+        #[tabled(rename = "ID")]
+        id: String,
+    }
+
+    let models = spnl::generate::backend::prettynames::list_all_models();
+
+    let rows: Vec<ModelRow> = models
+        .iter()
+        .map(|(pretty_name, hf_name, is_cached)| ModelRow {
+            name: pretty_name.to_string(),
+            cached: if *is_cached { "✓" } else { "-" }.to_string(),
+            id: hf_name.to_string(),
+        })
+        .collect();
+
+    if rows.is_empty() {
+        println!("No local models available");
+        return Ok(());
+    }
+
+    let table = Table::new(rows).with(Style::blank()).to_string();
+
+    // Apply colors: green checkmarks for cached, dim gray dash for not cached
+    let colored_table = table
+        .replace("✓", "\x1b[32m✓\x1b[0m")
+        .replace("-", "\x1b[2m-\x1b[0m");
+
+    println!("{}", colored_table);
+    Ok(())
 }

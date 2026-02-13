@@ -10091,6 +10091,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spnl",
+ "tabled",
  "tinytemplate",
  "tokio",
 ]

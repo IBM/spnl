@@ -13,6 +13,10 @@ pub enum Commands {
     /// Run a query
     Run(Args),
 
+    /// List available local models with pretty names (requires 'local' feature)
+    #[cfg(feature = "local")]
+    List,
+
     /// Bring up vLLM in a Kubernetes cluster
     #[cfg(feature = "vllm")]
     Vllm {

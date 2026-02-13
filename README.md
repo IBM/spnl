@@ -89,6 +89,12 @@ spnl run [OPTIONS]
 # Run with timing metrics (reports TTFT and ITL to stderr)
 spnl run --time [OPTIONS]
 
+# List available local models (requires 'local' feature)
+spnl list
+
+# Run with a local model using pretty names
+spnl run --builtin email2 --model llama3.2:1b
+
 # Manage vLLM deployments
 spnl vllm <up|down> [OPTIONS]
 

@@ -56,6 +56,13 @@ pub async fn map(
             backend::mistralrs::generate_completion(spec.with_model(m)?, mp, options).await
         }
 
+        #[cfg(feature = "local")]
+        _ => {
+            // Try to look up as a pretty name and delegate to mistralrs
+            backend::prettynames::generate_completion(spec, mp, options).await
+        }
+
+        #[cfg(not(feature = "local"))]
         _ => Err(ModelNotFoundError.into()),
     }
 }
@@ -100,6 +107,13 @@ pub async fn generate(
         #[cfg(feature = "local")]
         ["local", m] => backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await,
 
+        #[cfg(feature = "local")]
+        _ => {
+            // Try to look up as a pretty name and delegate to mistralrs
+            backend::prettynames::generate_chat(&spec, mp, options).await
+        }
+
+        #[cfg(not(feature = "local"))]
         _ => Err(ModelNotFoundError.into()),
     }
 }

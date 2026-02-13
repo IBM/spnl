@@ -11,6 +11,7 @@ spnl <COMMAND>
 ### Commands
 
 - `run` - Run a query
+- `list` - List available local models with pretty names (requires 'local' feature)
 - `vllm` - Bring up vLLM in a Kubernetes cluster or Google Compute Engine
 - `help` - Print help message or help for a specific subcommand
 
@@ -88,6 +89,42 @@ spnl run --file query.json --model ollama/granite3.3:2b
 
 # RAG query with custom settings
 spnl run --prompt "What is the main topic?" --document paper.pdf --max-aug 5 --indexer raptor
+```
+
+---
+
+## `spnl list` - List Available Local Models
+
+List all available local models with their pretty names and cache status. This command requires the 'local' feature to be enabled.
+
+```bash
+spnl list
+```
+
+This command displays a table with the following columns:
+- **NAME** - Human-readable pretty name for the model
+- **CACHED** - Whether the model is cached locally (✓ for cached, - for not cached)
+- **ID** - The HuggingFace model identifier
+
+### Example Output
+
+```
+NAME          CACHED  ID
+gemma2:2b       ✓     unsloth/gemma-2-2b-it-GGUF
+llama3.2:1b     -     unsloth/Llama-3.2-1B-Instruct-GGUF
+qwen2.5:0.5b    ✓     unsloth/Qwen2.5-0.5B-Instruct-GGUF
+```
+
+### Usage with Pretty Names
+
+Once you've identified a model from the list, you can use its pretty name with the `--model` flag:
+
+```bash
+# Use a pretty name instead of the full HuggingFace ID
+spnl run --builtin email2 --model llama3.2:1b
+
+# The pretty name is more concise than the full ID
+spnl run --builtin email2 --model unsloth/Llama-3.2-1B-Instruct-GGUF
 ```
 
 ---
