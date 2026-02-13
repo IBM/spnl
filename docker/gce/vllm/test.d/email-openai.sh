@@ -1,4 +1,4 @@
 #!/bin/sh
 
 # Test that we can invoke the OpenAI API without error
-spnl run -b email -m openai/$MODEL -n 1 -l 1 --time gen1
+spnl run -b email -m openai/$MODEL -n 1 -l 1 --time

@@ -15,7 +15,7 @@ pub struct TaskTiming {
 pub fn print_timing_metrics(tasks: &[TaskTiming]) {
     use std::io::IsTerminal;
 
-    let is_tty = std::io::stderr().is_terminal();
+    let is_tty = std::io::stdout().is_terminal();
 
     if is_tty {
         // Use tabled for nice formatting when output is a TTY and we have multiple tasks
@@ -64,7 +64,7 @@ pub fn print_timing_metrics(tasks: &[TaskTiming]) {
         }
 
         let table = Table::new(rows).with(Style::sharp()).to_string();
-        eprintln!("{}", table);
+        println!("{}", table);
     } else {
         // Plain ASCII output for non-TTY or single task
         print_plain(tasks);
@@ -74,28 +74,28 @@ pub fn print_timing_metrics(tasks: &[TaskTiming]) {
 fn print_plain(tasks: &[TaskTiming]) {
     for (i, task) in tasks.iter().enumerate() {
         if tasks.len() > 1 {
-            eprintln!("Task {}:", i + 1);
+            println!("Task {}:", i + 1);
         }
 
         if let Some(ttft_duration) = task.ttft {
-            eprintln!("TTFT: {:.2}ms", ttft_duration.as_secs_f64() * 1000.0);
+            println!("TTFT: {:.2}ms", ttft_duration.as_secs_f64() * 1000.0);
 
             // Calculate ITL (Inter-Token Latency) - time after first token divided by remaining tokens
             if task.token_count > 1 {
                 let time_after_first = task.total_duration - ttft_duration;
                 let itl = time_after_first.as_secs_f64() / (task.token_count - 1) as f64;
-                eprintln!("ITL: {:.2}ms/token", itl * 1000.0);
+                println!("ITL: {:.2}ms/token", itl * 1000.0);
             }
         }
 
-        eprintln!(
+        println!(
             "Total time: {:.2}ms",
             task.total_duration.as_secs_f64() * 1000.0
         );
-        eprintln!("Tokens: {}", task.token_count);
+        println!("Tokens: {}", task.token_count);
 
         if tasks.len() > 1 && i < tasks.len() - 1 {
-            eprintln!();
+            println!();
         }
     }
 }

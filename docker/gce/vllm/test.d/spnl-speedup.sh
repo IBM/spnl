@@ -22,8 +22,8 @@ do
             declare -a A
             for i in $(seq 1 5)
             do
-                T1=$(spnl run -b $b -m openai/$MODEL -n $n -l $l -k $l --time gen1 --shuffle | tail -1 | awk '{print $2}')
-                T2=$(spnl run -b $b -m spnl/$MODEL -n $n -l $l -k $l --time gen1 --shuffle | tail -1 | awk '{print $2}')
+                T1=$(spnl run -b $b -m openai/$MODEL -n $n -l $l -k $l --time --shuffle | grep TTFT | tail -1 | awk '{print $2}')
+                T2=$(spnl run -b $b -m spnl/$MODEL -n $n -l $l -k $l --time --shuffle | grep TTFT | tail -1 | awk '{print $2}')
 
                 speedup=$(calc $T1/$T2)
                 A+=($speedup)

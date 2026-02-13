@@ -113,7 +113,7 @@ pub struct Args {
     #[arg(short, long, default_value_t = false)]
     pub show_query: bool,
 
-    /// Report timing metrics (TTFT and ITL) to stderr
+    /// Report timing metrics (TTFT and ITL) to stdout
     #[arg(long)]
     pub time: bool,
 

@@ -74,7 +74,7 @@ spnl run [OPTIONS]
 #### Output Options
 
 - `-s, --show-query` - Re-emit the compiled query
-- `--time` - Report timing metrics (TTFT and ITL) to stderr
+- `--time` - Report timing metrics (TTFT and ITL) to stdout
 - `-v, --verbose` - Verbose output
 
 ### Examples
