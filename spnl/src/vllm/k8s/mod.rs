@@ -22,6 +22,10 @@ pub struct UpArgs {
     #[builder(default)]
     model: Option<String>,
 
+    /// Tokenizer to use (optional)
+    #[builder(default)]
+    tokenizer: Option<String>,
+
     /// HuggingFace api token
     #[builder(setter(into))]
     hf_token: String,
@@ -79,6 +83,17 @@ fn load_deployment_manifest(args: UpArgs) -> anyhow::Result<(Deployment, uuid::U
                     None => {
                         return Err(anyhow::anyhow!(
                             "Missing MODEL env var in deployment.yml template"
+                        ));
+                    }
+                };
+            }
+
+            if let Some(tokenizer) = args.tokenizer {
+                match env.iter_mut().find(|kv| kv.name == "TOKENIZER") {
+                    Some(kv) => kv.value = Some(tokenizer),
+                    None => {
+                        return Err(anyhow::anyhow!(
+                            "Missing TOKENIZER env var in deployment.yml template"
                         ));
                     }
                 };
@@ -498,6 +513,7 @@ mod tests {
         assert_eq!(args.name, "vllm");
         assert_eq!(args.namespace, None);
         assert_eq!(args.model, None);
+        assert_eq!(args.tokenizer, None);
         assert_eq!(args.gpus, 1);
         assert_eq!(args.local_port, Some(8000));
         assert_eq!(args.remote_port, 8000);
@@ -511,6 +527,7 @@ mod tests {
             .name("my-vllm")
             .namespace(Some("my-namespace".to_string()))
             .model(Some("my-model".to_string()))
+            .tokenizer(Some("my-tokenizer".to_string()))
             .hf_token("my-token")
             .gpus(2)
             .local_port(Some(9000))
@@ -520,10 +537,38 @@ mod tests {
         assert_eq!(args.name, "my-vllm");
         assert_eq!(args.namespace, Some("my-namespace".to_string()));
         assert_eq!(args.model, Some("my-model".to_string()));
+        assert_eq!(args.tokenizer, Some("my-tokenizer".to_string()));
         assert_eq!(args.hf_token, "my-token");
         assert_eq!(args.gpus, 2);
         assert_eq!(args.local_port, Some(9000));
         assert_eq!(args.remote_port, 8080);
+
+        Ok(())
+    }
+
+    #[test]
+    fn load_deployment_manifest_with_tokenizer() -> anyhow::Result<()> {
+        let args = UpArgsBuilder::default()
+            .hf_token("test-token")
+            .tokenizer(Some("custom-tokenizer".to_string()))
+            .build()?;
+
+        let (deployment, _id) = super::load_deployment_manifest(args)?;
+
+        if let Some(spec) = &deployment.spec
+            && let Some(template_spec) = &spec.template.spec
+            && !template_spec.containers.is_empty()
+            && let Some(env) = &template_spec.containers[0].env
+        {
+            let tokenizer_env = env.iter().find(|e| e.name == "TOKENIZER");
+            assert!(tokenizer_env.is_some());
+            assert_eq!(
+                tokenizer_env.unwrap().value,
+                Some("custom-tokenizer".to_string())
+            );
+        } else {
+            panic!("Deployment spec not properly configured");
+        }
 
         Ok(())
     }

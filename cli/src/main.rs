@@ -37,105 +37,97 @@ async fn main() -> Result<(), SpnlError> {
         Commands::List => list_local_models(),
 
         #[cfg(any(feature = "k8s", feature = "gce"))]
-        Commands::Vllm {
-            command:
-                VllmCommands::Up {
-                    target,
-                    name,
-                    model,
-                    hf_token,
-                    gpus: _gpus,
-                    local_port: _local_port,
-                    remote_port: _remote_port,
-                    #[cfg(feature = "gce")]
-                    gce_config,
-                },
-        } => match target {
-            #[cfg(feature = "k8s")]
-            VllmTarget::K8s => {
-                k8s_vllm::up(
-                    k8s_vllm::UpArgsBuilder::default()
-                        .name(name.name)
-                        .namespace(name.namespace)
-                        .model(model)
-                        .hf_token(hf_token)
-                        .gpus(_gpus)
-                        .local_port(_local_port)
-                        .remote_port(_remote_port)
-                        .build()?,
-                )
-                .await
-            }
+        Commands::Vllm { command } => match command.as_ref() {
+            VllmCommands::Up {
+                target,
+                name,
+                model,
+                tokenizer,
+                hf_token,
+                gpus: _gpus,
+                local_port: _local_port,
+                remote_port: _remote_port,
+                #[cfg(feature = "gce")]
+                gce_config,
+            } => match target {
+                #[cfg(feature = "k8s")]
+                VllmTarget::K8s => {
+                    k8s_vllm::up(
+                        k8s_vllm::UpArgsBuilder::default()
+                            .name(name.name.clone())
+                            .namespace(name.namespace.clone())
+                            .model(model.clone())
+                            .tokenizer(tokenizer.clone())
+                            .hf_token(hf_token.clone())
+                            .gpus(*_gpus)
+                            .local_port(*_local_port)
+                            .remote_port(*_remote_port)
+                            .build()?,
+                    )
+                    .await
+                }
+                #[cfg(feature = "gce")]
+                VllmTarget::Gce => {
+                    gce_vllm::up(
+                        gce_vllm::UpArgsBuilder::default()
+                            .name(name.name.clone())
+                            .model(model.clone())
+                            .hf_token(hf_token.clone())
+                            .local_port(*_local_port)
+                            .config(gce_config.clone())
+                            .build()?,
+                    )
+                    .await
+                }
+            },
+            VllmCommands::Down {
+                target,
+                name,
+                #[cfg(feature = "gce")]
+                gce_config,
+            } => match target {
+                #[cfg(feature = "k8s")]
+                VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace.clone()).await,
+                #[cfg(feature = "gce")]
+                VllmTarget::Gce => {
+                    gce_vllm::down(&name.name, name.namespace.clone(), gce_config.clone()).await
+                }
+            },
             #[cfg(feature = "gce")]
-            VllmTarget::Gce => {
-                gce_vllm::up(
-                    gce_vllm::UpArgsBuilder::default()
-                        .name(name.name)
-                        .model(model)
-                        .hf_token(hf_token)
-                        .local_port(_local_port)
-                        .config(gce_config)
-                        .build()?,
-                )
-                .await
-            }
-        },
-        #[cfg(any(feature = "k8s", feature = "gce"))]
-        Commands::Vllm {
-            command:
-                VllmCommands::Down {
+            VllmCommands::Image { command } => match command.as_ref() {
+                ImageCommands::Create {
                     target,
-                    name,
-                    #[cfg(feature = "gce")]
+                    force,
+                    image_name,
+                    image_family,
+                    llmd_version,
                     gce_config,
+                } => match target {
+                    VllmTarget::Gce => {
+                        let image_name = gce_vllm::create_image(
+                            gce_vllm::ImageCreateArgsBuilder::default()
+                                .force_overwrite(*force)
+                                .image_name(image_name.clone())
+                                .image_family(image_family.clone())
+                                .llmd_version(llmd_version.clone())
+                                .vllm_org(gce_config.vllm_org.clone())
+                                .vllm_repo(gce_config.vllm_repo.clone())
+                                .vllm_branch(gce_config.vllm_branch.clone())
+                                .config(gce_config.clone())
+                                .build()?,
+                        )
+                        .await?;
+                        println!("Image created successfully: {}", image_name);
+                        Ok(())
+                    }
+                    #[cfg(feature = "k8s")]
+                    VllmTarget::K8s => Err(anyhow::anyhow!(
+                        "Image creation is only supported for GCE target"
+                    )),
                 },
-        } => match target {
-            #[cfg(feature = "k8s")]
-            VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace).await,
-            #[cfg(feature = "gce")]
-            VllmTarget::Gce => gce_vllm::down(&name.name, name.namespace, gce_config).await,
+            },
+            VllmCommands::Patchfile => vllm::patchfile().await,
         },
-        #[cfg(feature = "gce")]
-        Commands::Vllm {
-            command:
-                VllmCommands::Image {
-                    command:
-                        ImageCommands::Create {
-                            target,
-                            force,
-                            image_name,
-                            image_family,
-                            llmd_version,
-                            gce_config,
-                        },
-                },
-        } => match target {
-            VllmTarget::Gce => {
-                let image_name = gce_vllm::create_image(
-                    gce_vllm::ImageCreateArgsBuilder::default()
-                        .force_overwrite(force)
-                        .image_name(image_name)
-                        .image_family(image_family)
-                        .llmd_version(llmd_version)
-                        .vllm_org(gce_config.vllm_org.clone())
-                        .vllm_repo(gce_config.vllm_repo.clone())
-                        .vllm_branch(gce_config.vllm_branch.clone())
-                        .config(gce_config)
-                        .build()?,
-                )
-                .await?;
-                println!("Image created successfully: {}", image_name);
-                Ok(())
-            }
-            #[cfg(feature = "k8s")]
-            VllmTarget::K8s => Err(anyhow::anyhow!(
-                "Image creation is only supported for GCE target"
-            )),
-        },
-        #[cfg(feature = "vllm")]
-        Commands::Vllm {
-            command: VllmCommands::Patchfile,
-        } => vllm::patchfile().await,
     }
 }
 
