@@ -21,7 +21,7 @@ spec:
           command:
             - /bin/sh
             - "-c"
-            - "vllm serve $MODEL --enforce-eager"
+            - "vllm serve $MODEL ${TOKENIZER:+--tokenizer $TOKENIZER} --enforce-eager"
             # TODO make enforce-eager optional
           ports:
             - containerPort: 8000  # or 8200 for decode pods
@@ -29,6 +29,8 @@ spec:
           env:
             - name: MODEL
               value: ibm-granite/granite-3.3-8b-instruct
+            - name: TOKENIZER
+              value: ""
             - name: HF_TOKEN
               value: will_be_replaced
             - name: VLLM_USE_V1

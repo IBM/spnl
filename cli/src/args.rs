@@ -21,7 +21,7 @@ pub enum Commands {
     #[cfg(feature = "vllm")]
     Vllm {
         #[command(subcommand)]
-        command: VllmCommands,
+        command: Box<VllmCommands>,
     },
 }
 
@@ -155,6 +155,10 @@ pub enum VllmCommands {
         #[arg(short = 'm', long, env = "SPNL_MODEL")]
         model: Option<String>,
 
+        /// Tokenizer to use (optional, defaults to model's tokenizer)
+        #[arg(long)]
+        tokenizer: Option<String>,
+
         /// HuggingFace token, used to pull model weights
         #[arg(short = 't', long, env = "HF_TOKEN", required = true)]
         hf_token: String,
@@ -194,7 +198,7 @@ pub enum VllmCommands {
     #[cfg(feature = "gce")]
     Image {
         #[command(subcommand)]
-        command: ImageCommands,
+        command: Box<ImageCommands>,
     },
     /// Emit vLLM patchfile to stdout
     Patchfile,
