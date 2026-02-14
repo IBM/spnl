@@ -100,14 +100,14 @@ pub async fn generate_completion(
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
     let mut stream = client.completions().create_stream(request).await?;
 
-    // Timing tracking
+    // Timing tracking - track per task
     let start_time = if options.time {
         Some(::std::time::Instant::now())
     } else {
         None
     };
-    let mut ttft: Option<::std::time::Duration> = None;
-    let mut token_count = 0u64;
+    let mut ttfts: Vec<Option<::std::time::Duration>> = vec![None; n_prompts];
+    let mut token_counts: Vec<u64> = vec![0; n_prompts];
 
     loop {
         match stream.next().await {
@@ -115,16 +115,19 @@ pub async fn generate_completion(
                 for choice in res.choices.iter() {
                     let idx: usize = choice.index.try_into()?;
 
-                    // Track TTFT (time to first token)
-                    if ttft.is_none()
+                    // Track TTFT (time to first token) per task
+                    if idx < ttfts.len()
+                        && ttfts[idx].is_none()
                         && !choice.text.is_empty()
                         && let Some(start) = start_time
                     {
-                        ttft = Some(start.elapsed());
+                        ttfts[idx] = Some(start.elapsed());
                     }
 
-                    // Count tokens (approximate by characters for now)
-                    token_count += choice.text.len() as u64;
+                    // Count tokens per task (approximate by characters for now)
+                    if idx < token_counts.len() {
+                        token_counts[idx] += choice.text.len() as u64;
+                    }
 
                     if !quiet {
                         stdout.write_all(b"\x1b[32m").await?; // green
@@ -145,6 +148,14 @@ pub async fn generate_completion(
             None => break,
         }
     }
+
+    // Finish progress bars before printing timing metrics
+    if let Some(ref pbs) = pbs {
+        for pb in pbs {
+            pb.finish_and_clear();
+        }
+    }
+
     if !quiet {
         stdout.write_all(b"\n").await?;
     }
@@ -159,12 +170,16 @@ pub async fn generate_completion(
         && !options.silent
     {
         let total_time = start.elapsed();
-        let task = super::timing::TaskTiming {
-            ttft,
-            total_duration: total_time,
-            token_count,
-        };
-        super::timing::print_timing_metrics(&[task]);
+        let tasks: Vec<super::timing::TaskTiming> = ttfts
+            .into_iter()
+            .zip(token_counts.into_iter())
+            .map(|(ttft, token_count)| super::timing::TaskTiming {
+                ttft,
+                total_duration: total_time,
+                token_count,
+            })
+            .collect();
+        super::timing::print_timing_metrics(&tasks);
     }
 
     if response.len() == 1 {
@@ -247,14 +262,14 @@ pub async fn generate_chat(
         stdout.write_all(b"\x1b[1mAssistant: \x1b[0m").await?;
     }
 
-    // Timing tracking
+    // Timing tracking - track per task
     let start_time = if options.time {
         Some(::std::time::Instant::now())
     } else {
         None
     };
-    let mut ttft: Option<::std::time::Duration> = None;
-    let mut token_count = 0u64;
+    let mut ttfts: Vec<Option<::std::time::Duration>> = vec![None; spec.n.into()];
+    let mut token_counts: Vec<u64> = vec![0; spec.n.into()];
 
     // TODO: handle with choice.delta.role, rather than hard-wire
     // Asistant (at the end of this function)
@@ -267,16 +282,19 @@ pub async fn generate_chat(
                     if let Some(ref content) = choice.delta.content {
                         let idx: usize = choice.index.try_into()?;
 
-                        // Track TTFT (time to first token)
-                        if ttft.is_none()
+                        // Track TTFT (time to first token) per task
+                        if idx < ttfts.len()
+                            && ttfts[idx].is_none()
                             && !content.is_empty()
                             && let Some(start) = start_time
                         {
-                            ttft = Some(start.elapsed());
+                            ttfts[idx] = Some(start.elapsed());
                         }
 
-                        // Count tokens (approximate by characters for now)
-                        token_count += content.len() as u64;
+                        // Count tokens per task (approximate by characters for now)
+                        if idx < token_counts.len() {
+                            token_counts[idx] += content.len() as u64;
+                        }
 
                         if !quiet {
                             stdout.write_all(b"\x1b[32m").await?; // green
@@ -298,6 +316,14 @@ pub async fn generate_chat(
             None => break,
         }
     }
+
+    // Finish progress bars before printing timing metrics
+    if let Some(ref pbs) = pbs {
+        for pb in pbs {
+            pb.finish_and_clear();
+        }
+    }
+
     if !quiet {
         stdout.write_all(b"\n").await?;
     }
@@ -312,12 +338,16 @@ pub async fn generate_chat(
         && !options.silent
     {
         let total_time = start.elapsed();
-        let task = super::timing::TaskTiming {
-            ttft,
-            total_duration: total_time,
-            token_count,
-        };
-        super::timing::print_timing_metrics(&[task]);
+        let tasks: Vec<super::timing::TaskTiming> = ttfts
+            .into_iter()
+            .zip(token_counts.into_iter())
+            .map(|(ttft, token_count)| super::timing::TaskTiming {
+                ttft,
+                total_duration: total_time,
+                token_count,
+            })
+            .collect();
+        super::timing::print_timing_metrics(&tasks);
     }
 
     if response.len() == 1 {
