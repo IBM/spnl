@@ -13,7 +13,7 @@ concurrency:
 
 permissions:
   contents: read
-  
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
@@ -47,7 +47,7 @@ jobs:
           source venv/bin/activate
           echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
-          
+
       - name: install maturin
         run: pip install maturin
       - name: maturin develop

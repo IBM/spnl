@@ -38,7 +38,7 @@ jobs:
             libc: gnu
             local_feature: local
             name: Linux x86_64 GNU
-          
+
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             platform: linux
@@ -47,7 +47,7 @@ jobs:
             local_feature: local
             rustflags: "-Ctarget-feature=+fp16,+fhm" # https://github.com/sarah-quinones/gemm/issues/31 avoid "error: instruction requires: fullfp16"
             name: Linux ARM64 GNU
-          
+
           # macOS builds
           # - runner: macos-latest
           #   target: x86_64-apple-darwin
@@ -55,7 +55,7 @@ jobs:
           #   arch: x86_64
           #   libc: ""
           #   name: macOS x86_64
-          
+
           - runner: macos-latest
             target: aarch64-apple-darwin
             platform: macos
@@ -63,7 +63,7 @@ jobs:
             libc: ""
             local_feature: metal
             name: macOS ARM64
-          
+
           # Windows builds
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
@@ -72,7 +72,7 @@ jobs:
             libc: ""
             local_feature: local
             name: Windows x86_64
-          
+
           - runner: windows-latest
             target: aarch64-pc-windows-msvc
             platform: windows
@@ -145,14 +145,14 @@ jobs:
         run: |
           # Create a local directory for protoc
           mkdir -p "$RUNNER_TEMP/protoc"
-          
+
           # Download and extract protoc
           curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v31.1/protoc-31.1-win64.zip
           unzip protoc.zip -d "$RUNNER_TEMP/protoc"
-          
+
           # Add to PATH using Windows-style path
           echo "$RUNNER_TEMP/protoc/bin" >> $GITHUB_PATH
-          
+
           # Verify protoc is available (will be available in next step)
           ls -la "$RUNNER_TEMP/protoc/bin"
 
@@ -187,15 +187,15 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
+
           # Import certificate
           echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
           security import certificate.p12 -k $KEYCHAIN_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
+
           # Add keychain to search list
           security list-keychain -d user -s $KEYCHAIN_PATH
-          
+
           # Clean up certificate file
           rm certificate.p12
 
@@ -273,7 +273,7 @@ jobs:
             libc: musl
             name: Linux x86_64 musl (static)
             container: rust:alpine
-          
+
           # - runner: ubuntu-24.04-arm
           #   target: aarch64-unknown-linux-musl
           #   platform: linux
@@ -389,7 +389,7 @@ jobs:
             # uses WMMA operations with bfloat16 which require compute capability 80+
             cuda_compute_cap: "80"
             #cuda_nvcc_flags: "-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_89,code=sm_89 -gencode arch=compute_90,code=sm_90"
-          
+
           - target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x86_64
@@ -401,7 +401,7 @@ jobs:
             # Compute capabilities: 80 (A100), 86 (RTX 30*), 89 (RTX 40*, L40s)
             cuda_compute_cap: "80"
             # cuda_nvcc_flags: "-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_89,code=sm_89"
-          
+
           - target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x86_64
@@ -431,12 +431,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: linux-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            linux-cargo-registry-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: target/
+          key: linux-${{ matrix.platform.arch }}-cargo-build-cuda-${{ matrix.platform.features }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            linux-${{ matrix.platform.arch }}-cargo-build-cuda-${{ matrix.platform.features }}-
+            linux-${{ matrix.platform.arch }}-cargo-build-cuda-
+
       - name: Install build dependencies
         shell: bash
         run: |
           apt-get update
           apt-get install -y curl build-essential pkg-config libssl-dev protobuf-compiler git
-          
+
           echo "GCC version:"
           gcc --version
           echo "Git version:"
@@ -480,13 +500,13 @@ jobs:
         run: |
           cd target/$TARGET/$BUILD_DIR
           BINARY_NAME="spnl"
-          
+
           if [ -n "$VARIANT" ]; then
             ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC-$VARIANT.tar.gz"
           else
             ARCHIVE_NAME="spnl-${{ steps.version.outputs.version }}-$PLATFORM-$ARCH-$LIBC-cuda.tar.gz"
           fi
-          
+
           tar czf "$ARCHIVE_NAME" "$BINARY_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
           echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
@@ -534,7 +554,7 @@ jobs:
         run: |
           mkdir -p release-assets
           find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
-          
+
           # Create combined checksums file
           cd release-assets
           cat *.sha256 > checksums.txt
@@ -549,24 +569,24 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           cd release-assets
-          
+
           # Function to generate pretty name from filename
           get_pretty_name() {
             local file="$1"
-            
+
             # Handle checksums.txt specially
             if [ "$file" = "checksums.txt" ]; then
               echo "SHA256 Checksums"
               return
             fi
-            
+
             # Parse the filename: spnl-VERSION-PLATFORM-ARCH[-LIBC].EXT
             local basename="${file%.tar.gz}"
             basename="${basename%.zip}"
-            
+
             # Extract components after version
             local parts="${basename#spnl-$VERSION-}"
-            
+
             # Parse platform, arch, and libc
             if [[ "$parts" =~ ^([^-]+)-([^-]+)-([^-]+)$ ]]; then
               # Has libc: platform-arch-libc
@@ -579,14 +599,14 @@ jobs:
               local arch="${BASH_REMATCH[2]}"
               local libc=""
             fi
-            
+
             # Convert to pretty names
             case "$platform" in
               linux) platform="Linux" ;;
               macos) platform="macOS" ;;
               windows) platform="Windows" ;;
             esac
-            
+
             case "$arch" in
               x86_64) arch="x86_64" ;;
               aarch64)
@@ -597,16 +617,16 @@ jobs:
                 fi
                 ;;
             esac
-            
+
             case "$libc" in
               gnu) libc=" (GNU)" ;;
               musl) libc=" (musl static)" ;;
               *) libc="" ;;
             esac
-            
+
             echo "$platform $arch$libc"
           }
-          
+
           # Upload all archives and checksums with pretty names
           for file in *.tar.gz *.zip checksums.txt; do
             if [ -f "$file" ]; then
@@ -615,7 +635,7 @@ jobs:
               gh release upload "$VERSION" "$file#$pretty_name" --clobber
             fi
           done
-          
+
           echo "✅ All assets uploaded successfully!"
           gh release view "$VERSION"
 
@@ -655,16 +675,16 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           TAG="${{ steps.version.outputs.tag }}"
-          
+
           # Find and read the checksum files
           MACOS_ARM64_SHA256=$(cat artifacts/spnl-${TAG}-macos-aarch64.tar.gz/spnl-${TAG}-macos-aarch64.tar.gz.sha256)
           LINUX_ARM64_SHA256=$(cat artifacts/spnl-${TAG}-linux-aarch64-gnu.tar.gz/spnl-${TAG}-linux-aarch64-gnu.tar.gz.sha256)
           LINUX_X86_64_SHA256=$(cat artifacts/spnl-${TAG}-linux-x86_64-gnu.tar.gz/spnl-${TAG}-linux-x86_64-gnu.tar.gz.sha256)
-          
+
           echo "macos_arm64_sha256=$MACOS_ARM64_SHA256" >> $GITHUB_OUTPUT
           echo "linux_arm64_sha256=$LINUX_ARM64_SHA256" >> $GITHUB_OUTPUT
           echo "linux_x86_64_sha256=$LINUX_X86_64_SHA256" >> $GITHUB_OUTPUT
-          
+
           echo "Checksums extracted:"
           echo "  macOS ARM64: $MACOS_ARM64_SHA256"
           echo "  Linux ARM64: $LINUX_ARM64_SHA256"
@@ -677,13 +697,13 @@ jobs:
           MACOS_ARM64_SHA256="${{ steps.checksums.outputs.macos_arm64_sha256 }}"
           LINUX_ARM64_SHA256="${{ steps.checksums.outputs.linux_arm64_sha256 }}"
           LINUX_X86_64_SHA256="${{ steps.checksums.outputs.linux_x86_64_sha256 }}"
-          
+
           # Update the formula file using sed
           sed -i "s/version \".*\"/version \"$VERSION\"/" Formula/spnl.rb
           sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-macos-aarch64.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-macos-aarch64.tar.gz\"|" Formula/spnl.rb
           sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-linux-aarch64-gnu.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-linux-aarch64-gnu.tar.gz\"|" Formula/spnl.rb
           sed -i "s|url \"https://github.com/IBM/spnl/releases/download/v[^/]*/spnl-v[^-]*-linux-x86_64-gnu.tar.gz\"|url \"https://github.com/IBM/spnl/releases/download/v$VERSION/spnl-v$VERSION-linux-x86_64-gnu.tar.gz\"|" Formula/spnl.rb
-          
+
           # Update SHA256 checksums - find the line after each URL and replace it
           # macOS ARM64
           awk -v sha="$MACOS_ARM64_SHA256" '/macos-aarch64\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
@@ -691,7 +711,7 @@ jobs:
           awk -v sha="$LINUX_ARM64_SHA256" '/linux-aarch64-gnu\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
           # Linux x86_64
           awk -v sha="$LINUX_X86_64_SHA256" '/linux-x86_64-gnu\.tar\.gz/ {print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next} 1' Formula/spnl.rb > Formula/spnl.rb.tmp && mv Formula/spnl.rb.tmp Formula/spnl.rb
-          
+
           echo "Formula updated:"
           cat Formula/spnl.rb
 
@@ -705,56 +725,56 @@ jobs:
           MACOS_SHA="${{ steps.checksums.outputs.macos_arm64_sha256 }}"
           LINUX_ARM_SHA="${{ steps.checksums.outputs.linux_arm64_sha256 }}"
           LINUX_X86_SHA="${{ steps.checksums.outputs.linux_x86_64_sha256 }}"
-          
+
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Create and checkout new branch
           git checkout -b "$BRANCH_NAME"
-          
+
           # Add and commit changes
           git add Formula/spnl.rb
-          
+
           if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          
+
           git commit -m "chore: update Homebrew formula to v${VERSION}"
-          
+
           # Push branch
           git push origin "$BRANCH_NAME"
-          
+
           # Create PR body file
           cat > /tmp/pr-body.md << EOF
           This PR updates the Homebrew formula to version v${VERSION}.
-          
+
           ## Changes
           - Updated version to ${VERSION}
           - Updated SHA256 checksums for all platforms:
             - macOS ARM64: ${MACOS_SHA}
             - Linux ARM64: ${LINUX_ARM_SHA}
             - Linux x86_64: ${LINUX_X86_SHA}
-          
+
           ## Testing
           The formula can be tested with:
           \`\`\`bash
           brew install --build-from-source Formula/spnl.rb
           spnl --version
           \`\`\`
-          
+
           ---
           *This PR was automatically generated by the release workflow.*
           EOF
-          
+
           # Create PR
           gh pr create \
             --title "chore: update Homebrew formula to v${VERSION}" \
             --body-file /tmp/pr-body.md \
             --base main \
             --head "$BRANCH_NAME"
-          
+
           echo "✅ Pull request created for Homebrew formula update to v${VERSION}"
 
 # Made with Bob
