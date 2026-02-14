@@ -6,8 +6,8 @@ class Spnl < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/IBM/spnl/releases/download/v0.16.0/spnl-v0.16.0-macos-aarch64.tar.gz"
-      sha256 "b0169f9ca052f4f4482ec8c443dbe8b1b6840104312456886b444d7a9a0979a0"
+      url "https://github.com/IBM/spnl/archive/refs/tags/v0.17.0.tar.gz"
+      sha256 "f143ca53a9b1d858329bb0870120d1925d412015d997251654e306782fb54ba4"
     end
   end
 
