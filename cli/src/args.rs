@@ -43,19 +43,14 @@ pub struct Args {
     pub builtin: Option<Builtin>,
 
     /// Generative Model
-    #[arg(
-        short,
-        long,
-        default_value = "ollama/granite3.3:2b",
-        env = "SPNL_MODEL"
-    )]
+    #[arg(short, long, default_value = "llama3.2:1b", env = "SPNL_MODEL")]
     pub model: String,
 
     /// Embedding Model
     #[arg(
         short,
         long,
-        default_value = "ollama/mxbai-embed-large:335m",
+        default_value = "local/google/embeddinggemma-300m",
         env = "SPNL_EMBEDDING_MODEL"
     )]
     pub embedding_model: String,

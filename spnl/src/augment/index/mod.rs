@@ -33,7 +33,7 @@ pub async fn index(query: &Query, options: &AugmentOptions) -> anyhow::Result<()
     let augments = extract_augments(query, &None);
 
     match options.indexer {
-        Indexer::Raptor => raptor::index(query, &augments, options, &m).await,
+        Indexer::Raptor => raptor::index(&augments, options, &m).await,
         Indexer::SimpleEmbedRetrieve => {
             simple_embed_retrieve::index(query, &augments, options, &m).await
         }

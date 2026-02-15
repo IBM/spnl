@@ -73,15 +73,15 @@ jobs:
             local_feature: local
             name: Windows x86_64
 
-          - runner: windows-latest
-            target: aarch64-pc-windows-msvc
-            platform: windows
-            arch: aarch64
-            libc: ""
-            # local: very slow to build on aarch64 windows (60+ minutes); disabled for now. maybe we can restore if we figure out rustc caching
-            #local_feature: local
-            #rustflags: "-Ctarget-feature=+fp16,+fhm" # https://github.com/sarah-quinones/gemm/issues/31 avoid "error: instruction requires: fullfp16"
-            name: Windows ARM64
+          # TODO. the local feature is very slow to build on aarch64 windows (60+ minutes); disabled for now. maybe we can restore if we figure out rustc caching
+          # - runner: windows-latest
+          #   target: aarch64-pc-windows-msvc
+          #   platform: windows
+          #   arch: aarch64
+          #   libc: ""
+          #   local_feature: local
+          #   rustflags: "-Ctarget-feature=+fp16,+fhm" # https://github.com/sarah-quinones/gemm/issues/31 avoid "error: instruction requires: fullfp16"
+          #   name: Windows ARM64
 
     env:
       TARGET: ${{ matrix.platform.target }}

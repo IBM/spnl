@@ -14,20 +14,19 @@ include = [
 ]
 
 [features]
-default = ["cli_support","lisp","run","ollama","openai","gemini","pull","yaml"]
+default = ["cli_support","lisp","run","ollama","openai","gemini","yaml","local"]
 cli_support = ["print","dep:ptree"]
 print = []
 lisp = ["dep:serde-lexpr"]
 ollama = ["openai"]
 openai = ["dep:async-openai","dep:tokio"]
 gemini = ["openai"]
-local = ["run","dep:mistralrs","dep:tokio","dep:uuid","dep:indexmap","dep:either"]
+local = ["run","dep:mistralrs","dep:tokio","dep:uuid","dep:indexmap","dep:either","dep:reqwest"]
 metal = ["local","mistralrs/metal"]
 cuda = ["local","mistralrs/cuda"]
 cuda-flash-attn = ["cuda","mistralrs/flash-attn"]
 cuda-flash-attn-v3 = ["cuda","dep:mistralrs-core","mistralrs-core/flash-attn-v3"]
 openssl-vendored = ["dep:openssl"]
-pull = ["dep:reqwest","dep:tokio-util"]
 ffi = []
 pypi = ["ffi","tok","dep:pyo3","pyo3/extension-module","dep:thiserror"]
 rag = ["run","dep:sha2", "dep:lancedb","dep:tracing","dep:arrow-schema","dep:arrow-array","dep:itertools","dep:pdf-extract","dep:async-recursion","dep:regex","dep:rand"]
@@ -71,7 +70,6 @@ futures = { version = "0.3.31", optional = true }
 indicatif = { version = "0.18.0", optional = true }
 tokio = { version = "1.44.1", features = ["io-std", "io-util", "signal"], optional = true }
 tokio-stream = { version = "0.1.18", features = ["net"], optional = true }
-tokio-util = { version = "0.7.16", optional = true }
 anyhow = { version = "1.0.98" }
 lancedb = { version = "0.26.0", default-features = false, optional = true }
 tracing = { version = "0.1.41", optional = true }

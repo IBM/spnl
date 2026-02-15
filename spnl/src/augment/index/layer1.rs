@@ -54,9 +54,6 @@ async fn process_document(
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<Option<Fragments>> {
-    #[cfg(feature = "pull")]
-    crate::pull::pull_model_if_needed(a.embedding_model.as_str()).await?;
-
     let (filename, content) = &a.doc;
     let window_size = match content {
         Document::Text(_) => 1,

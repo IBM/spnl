@@ -59,22 +59,12 @@ jobs:
       - name: verify feature consistency
         run: .github/scripts/verify-feature-consistency.sh
 
-      - name: install ollama
-        run: |
-          # Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
-          ./.github/scripts/free-up-disk-space-fast.sh &
-
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            curl -fsSL https://ollama.com/install.sh | bash
-            # note: install.sh will start ollama as an systemd service, no need to start it ourselves (actively harmful -- port conflict)
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            brew update
-            brew install ollama
-            brew services start ollama
-          fi
-          wait # for disk space cleanup
+      - name: free up disk space
+        run: ./.github/scripts/free-up-disk-space-fast.sh
 
       - name: cargo test
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             # IMPORTANT: Cannot use --all-features because mistralrs (used by local/metal/cuda features)
@@ -82,10 +72,10 @@ jobs:
             #
             # When adding new features to spnl/Cargo.toml, update this list!
             # Current features tested (from spnl/Cargo.toml):
-            # - Included: cli_support, print, lisp, run, ollama, openai, gemini, pull, yaml, metal, rag, rag-deep-debug, spnl-api, vllm, k8s, gce, ffi, pypi, run_py, tok, openssl-vendored
+            # - Included: cli_support, print, lisp, run, ollama, openai, gemini, yaml, metal, rag, rag-deep-debug, spnl-api, vllm, k8s, gce, ffi, pypi, run_py, tok, openssl-vendored
             # - Excluded: local (CPU inference - pulls in CUDA deps via mistralrs)
             # - Excluded: cuda, cuda-flash-attn, cuda-flash-attn-v3 (CUDA features)
-            cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored -- --nocapture
+            cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored -- --nocapture
             cargo test -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
           else
             # Test default features on Linux (no GPU features)
@@ -101,7 +91,7 @@ jobs:
         # When adding new features, update the feature list above in cargo test!
         if: runner.os == 'macOS'
         run: |
-          cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored --tests --no-deps -- -D warnings
+          cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored --tests --no-deps -- -D warnings
           cargo clippy -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
 
       - name: rustfmt

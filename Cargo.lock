@@ -10370,7 +10370,6 @@ dependencies = [
  "tokenizers 0.22.2",
  "tokio",
  "tokio-stream",
- "tokio-util",
  "tower-test",
  "tracing",
  "uuid 1.21.0",

@@ -143,7 +143,7 @@ if [[ -f /etc/environment ]]; then
 fi
 
 echo "=== Disabling unnecessary services ==="
-# Disable services not needed for vLLM/ollama
+# Disable services not needed for vLLM
 sudo systemctl disable snapd.service || true
 sudo systemctl disable snapd.socket || true
 sudo systemctl disable unattended-upgrades.service || true
@@ -175,9 +175,6 @@ echo "=== Installing vLLM with dependencies ==="
 uv venv --seed
 source .venv/bin/activate
 VLLM_USE_PRECOMPILED=1 uv pip install --editable .
-
-echo "=== Installing ollama ==="
-curl -fsSL https://ollama.com/install.sh | sh
 
 echo "=== Creating systemd service for vLLM ==="
 # Create directory for vLLM configuration
@@ -218,10 +215,6 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 VLLM_SERVICE_EOF
-
-echo "=== Creating systemd service for Ollama ==="
-# Create Ollama systemd service (ollama install.sh already creates one, but we ensure it's enabled)
-sudo systemctl enable ollama.service
 
 echo "=== Enabling services to start at boot ==="
 sudo systemctl enable vllm.service

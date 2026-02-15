@@ -113,8 +113,8 @@ async fn run_rag_benchmark(
 fn mt_rag_benchmark(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let model = "ollama/granite3.3:2b";
-    let embedding_model = "ollama/mxbai-embed-large:335m";
+    let model = "llama3.2:3b";
+    let embedding_model = "local/google/embeddinggemma-300m";
     let temperature = 0.0;
     let max_tokens = 100; // Use small token limit for faster benchmarking
 
