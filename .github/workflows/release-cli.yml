@@ -372,7 +372,7 @@ jobs:
     name: Build ${{ matrix.platform.name }}
     runs-on: ubuntu-latest
     container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      image: nvidia/cuda:13.1.1-devel-ubuntu22.04
     strategy:
       fail-fast: false
       matrix:
