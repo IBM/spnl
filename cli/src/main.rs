@@ -36,8 +36,9 @@ async fn main() -> Result<(), SpnlError> {
         #[cfg(feature = "local")]
         Commands::List => list_local_models(),
 
-        #[cfg(any(feature = "k8s", feature = "gce"))]
+        #[cfg(feature = "vllm")]
         Commands::Vllm { command } => match command.as_ref() {
+            #[cfg(any(feature = "k8s", feature = "gce"))]
             VllmCommands::Up {
                 target,
                 name,
@@ -80,6 +81,7 @@ async fn main() -> Result<(), SpnlError> {
                     .await
                 }
             },
+            #[cfg(any(feature = "k8s", feature = "gce"))]
             VllmCommands::Down {
                 target,
                 name,
