@@ -2,9 +2,6 @@ use crate::ir::{Bulk, Generate, GenerateBuilder, Message::*, Query, Repeat};
 use crate::optimizer::hlo::simplify;
 use indicatif::MultiProgress;
 
-#[cfg(feature = "pull")]
-pub mod pull;
-
 pub type ExecuteOptions = crate::generate::GenerateOptions;
 
 pub type SpnlError = anyhow::Error;
@@ -76,9 +73,6 @@ async fn run_subtree(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgres
 }
 
 async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgress>) -> SpnlResult {
-    #[cfg(feature = "pull")]
-    crate::execute::pull::pull_if_needed(query).await?;
-
     match query {
         Query::Message(_) => Ok(query.clone()),
 

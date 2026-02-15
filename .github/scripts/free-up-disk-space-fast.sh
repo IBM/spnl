@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
+
 # Remove Java (JDKs)
 sudo rm -rf /usr/lib/jvm
 

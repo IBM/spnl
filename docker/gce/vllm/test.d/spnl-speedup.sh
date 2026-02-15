@@ -8,8 +8,6 @@ SCRIPTDIR=$(cd $(dirname "$0") && pwd)
 
 #set -x # debug
 
-export SPNL_EMBEDDING_MODEL=ollama/qwen3-embedding:0.6b
-
 # TODO: make at least the inner-most loop bound a parameter rather than hard-coded
 for b in email2 rag
 do

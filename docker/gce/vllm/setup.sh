@@ -172,17 +172,9 @@ VLLM_ATTENTION_BACKEND=TRITON_ATTN \
     VLLM_SERVER_DEV_MODE=1 \
     nohup vllm serve $MODEL --enforce-eager &
 
-# Install ollama (for embedding)
-(curl -fsSL https://ollama.com/install.sh | sh && ollama serve) &
-
 # Wait till vllm is ready
 timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:8000/health; do sleep 3; done'
 echo "vllm is ready"
-
-# Wait till ollama is ready
-#timeout 5m bash -c 'until curl --output /dev/null --silent --fail http://localhost:11434; do sleep 3; done'
-timeout 5m bash -c 'until ollama ps; do sleep 3; done'
-echo "ollama is ready"
 
 # Run tests only if not using a release (releases are for production, not testing)
 if [[ -z "$SPNL_RELEASE" ]]

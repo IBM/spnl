@@ -18,16 +18,10 @@ const CONCURRENCY_LIMIT: usize = 32;
 
 /// Index using the RAPTOR algorithm https://github.com/parthsarthi03/raptor
 pub async fn index(
-    query: &Query,
     a: &[(String, Augment)], // (enclosing_model, Augment)
     options: &AugmentOptions,
     m: &MultiProgress,
 ) -> anyhow::Result<()> {
-    // TODO if we really want the pulls to be done in parallel with
-    // the process_corpora, we'll need something fancier...
-    #[cfg(feature = "pull")]
-    crate::pull::pull_if_needed(query).await?;
-
     // This will generate one Fragments struct per corpus, and then iterate over each Fragments struct to "cross index" it
     let cross_index_futures = process_corpora(a, options, m)
         .await?
