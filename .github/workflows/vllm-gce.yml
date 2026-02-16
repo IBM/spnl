@@ -20,9 +20,9 @@ jobs:
     name: Test in GCE VM
     env:
       # Adjust these as needed
-      VLLM_ORG: neuralmagic
+      VLLM_ORG: vllm-project
       VLLM_REPO: vllm
-      VLLM_BRANCH: llm-d-release-0.4
+      VLLM_SHA: d7de043d55d1dd629554467e23874097e1c48993
       MODEL: ibm-granite/granite-3.3-2b-instruct
 
       # You probably won't need to change this
