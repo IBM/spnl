@@ -69,8 +69,10 @@ fi
 # Install vLLM
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
-git clone https://github.com/$VLLM_ORG/$VLLM_REPO.git vllm -b $VLLM_BRANCH
+git clone https://github.com/$VLLM_ORG/$VLLM_REPO.git vllm
 cd vllm
+git fetch origin $VLLM_SHA
+git checkout $VLLM_SHA
 uv venv --seed
 source .venv/bin/activate
 VLLM_USE_PRECOMPILED=1 uv pip install --editable .

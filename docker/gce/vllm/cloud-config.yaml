@@ -23,7 +23,7 @@ write_files:
       SPNL_RELEASE=${spnl_release}
       VLLM_ORG=${vllm_org}
       VLLM_REPO=${vllm_repo}
-      VLLM_BRANCH=${vllm_branch}
+      VLLM_SHA=${vllm_sha}
       MODEL=${model}
       VLLM_PATCHFILE=/tmp/vllm.patch
 ${vllm_config_section}

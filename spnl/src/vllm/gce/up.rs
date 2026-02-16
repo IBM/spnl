@@ -71,7 +71,7 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
     };
     let vllm_org = &args.config.vllm_org;
     let vllm_repo = &args.config.vllm_repo;
-    let vllm_branch = &args.config.vllm_branch;
+    let vllm_sha = &args.config.vllm_sha;
     let model = args
         .model
         .clone()
@@ -187,7 +187,7 @@ cloud_final_modules: []"#
     substitutions.insert("spnl_release", spnl_release.as_str());
     substitutions.insert("vllm_org", vllm_org.as_str());
     substitutions.insert("vllm_repo", vllm_repo.as_str());
-    substitutions.insert("vllm_branch", vllm_branch.as_str());
+    substitutions.insert("vllm_sha", vllm_sha.as_str());
     substitutions.insert("model", model.as_str());
     substitutions.insert("packages_section", &packages_section);
     substitutions.insert("setup_dev_script", &setup_dev_script);
@@ -248,11 +248,19 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     // Determine which image to use
     let source_image = if is_dev_mode {
         // Dev mode: use standard Ubuntu accelerator image
-        "projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-580-v20251210".to_string()
+        "projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-580-v20260203".to_string()
     } else {
         // Production mode: use custom image based on vLLM configuration
-        // Use the image family to get the latest image
-        format!("projects/{}/global/images/family/vllm-spnl", project)
+        // Generate the exact image name using the same logic as image creation
+        let patch_content =
+            include_bytes!("../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz");
+        let image_name = super::image::generate_image_name(
+            patch_content,
+            &args.config.vllm_org,
+            &args.config.vllm_repo,
+            &args.config.vllm_sha,
+        );
+        format!("projects/{}/global/images/{}", project, image_name)
     };
 
     #[derive(Tabled)]
@@ -314,6 +322,15 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
         "v2-x86-template-1-4-0".to_string(),
     );
 
+    // Configure disk based on mode
+    // Dev mode needs more space for compilation (300GB pd-balanced)
+    // Production mode uses smaller, faster disk (100GB pd-ssd)
+    let (disk_size_gb, disk_type) = if is_dev_mode {
+        (300, format!("zones/{}/diskTypes/pd-balanced", zone))
+    } else {
+        (100, format!("zones/{}/diskTypes/pd-ssd", zone))
+    };
+
     // Create the instance configuration matching the terraform file
     let instance = Instance::new()
         .set_name(&instance_name)
@@ -325,8 +342,8 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
             .set_initialize_params(
                 AttachedDiskInitializeParams::new()
                     .set_source_image(&source_image)
-                    .set_disk_size_gb(100)
-                    .set_disk_type(format!("zones/{}/diskTypes/pd-ssd", zone)),
+                    .set_disk_size_gb(disk_size_gb)
+                    .set_disk_type(disk_type),
             )
             .set_mode("READ_WRITE")])
         .set_network_interfaces([NetworkInterface::new()

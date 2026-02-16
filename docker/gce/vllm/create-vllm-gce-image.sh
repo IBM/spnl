@@ -2,7 +2,7 @@
 
 #
 # Create a custom GCE image with vLLM pre-installed
-# This script creates a reusable image based on the setup.sh logic
+# This script creates a reusable image
 #
 
 set -euo pipefail

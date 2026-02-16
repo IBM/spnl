@@ -31,9 +31,10 @@ jobs:
           git config --global user.email "foo@bar.com"
           git config --global user.name "Spnl Dev"
 
-      - name: Generate patch
-        working-directory: docker/vllm/llm-d
-        run: ./genpatch.sh
+      # llmd 0.5.0 required AI help to rebase... We can re-enable this if we ever rebase our vllm span query branch to avoid the conflicts that come up when running genpatch
+      #- name: Generate patch
+      #  working-directory: docker/vllm/llm-d
+      #  run: ./genpatch.sh
         
       - name: Apply patch
         working-directory: docker/vllm/llm-d

@@ -114,7 +114,7 @@ async fn main() -> Result<(), SpnlError> {
                                 .llmd_version(llmd_version.clone())
                                 .vllm_org(gce_config.vllm_org.clone())
                                 .vllm_repo(gce_config.vllm_repo.clone())
-                                .vllm_branch(gce_config.vllm_branch.clone())
+                                .vllm_sha(gce_config.vllm_sha.clone())
                                 .config(gce_config.clone())
                                 .build()?,
                         )

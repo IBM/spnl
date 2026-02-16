@@ -52,9 +52,9 @@ pub struct GceConfig {
     #[arg(long, env = "VLLM_REPO", default_value = "vllm")]
     pub vllm_repo: String,
 
-    /// vLLM branch to use
-    #[arg(long, env = "VLLM_BRANCH", default_value = "llm-d-release-0.4")]
-    pub vllm_branch: String,
+    /// vLLM commit SHA to use
+    #[arg(long, env = "VLLM_SHA", default_value = "a1b2c3d4e5f6")]
+    pub vllm_sha: String,
 }
 
 impl GceConfig {
@@ -72,7 +72,7 @@ impl GceConfig {
             github_ref: None,
             vllm_org: "neuralmagic".to_string(),
             vllm_repo: "vllm".to_string(),
-            vllm_branch: "llm-d-release-0.4".to_string(),
+            vllm_sha: "a1b2c3d4e5f6".to_string(),
         }
     }
 
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(config.spnl_github, None);
         assert_eq!(config.vllm_org, "neuralmagic");
         assert_eq!(config.vllm_repo, "vllm");
-        assert_eq!(config.vllm_branch, "llm-d-release-0.4");
+        assert_eq!(config.vllm_sha, "a1b2c3d4e5f6");
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
 const PATCH_DATA: &[u8] =
-    include_bytes!("../../docker/vllm/llm-d/patches/0.4.0/01-spans-llmd-vllm.patch.gz");
+    include_bytes!("../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz");
 
 /// Emit the vLLM patchfile to stdout
 ///

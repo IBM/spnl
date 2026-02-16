@@ -1,11 +1,11 @@
 use super::args::GceConfig;
 
 /// Generate image name from patch content hash and vLLM source identifier
-fn generate_image_name(
+pub fn generate_image_name(
     patch_content: &[u8],
     vllm_org: &str,
     vllm_repo: &str,
-    vllm_branch: &str,
+    vllm_sha: &str,
 ) -> String {
     use sha2::{Digest, Sha256};
 
@@ -13,7 +13,7 @@ fn generate_image_name(
     let patch_hash = format!("{:x}", Sha256::digest(patch_content));
 
     // Create vLLM source identifier
-    let vllm_source_id = format!("{}/{}@{}", vllm_org, vllm_repo, vllm_branch);
+    let vllm_source_id = format!("{}/{}@{}", vllm_org, vllm_repo, vllm_sha);
 
     // Combine and hash (GCE image names have 63 char limit, format is "vllm-spnl-{hash}")
     let combined = format!("{}{}", patch_hash, vllm_source_id);
@@ -41,12 +41,12 @@ pub struct ImageCreateArgs {
     #[builder(setter(into), default = "vllm".to_string())]
     pub(crate) vllm_repo: String,
 
-    /// vLLM branch to use
-    #[builder(setter(into), default = "llm-d-release-0.4".to_string())]
-    pub(crate) vllm_branch: String,
+    /// vLLM commit SHA to use
+    #[builder(setter(into), default = "a1b2c3d4e5f6".to_string())]
+    pub(crate) vllm_sha: String,
 
     /// LLM-D version for patch file
-    #[builder(setter(into), default = "0.4.0".to_string())]
+    #[builder(setter(into), default = "0.5.0".to_string())]
     pub(crate) llmd_version: String,
 
     /// Custom image name (defaults to auto-generated from hash)
@@ -66,7 +66,7 @@ pub struct ImageCreateArgs {
 fn generate_startup_script(
     vllm_org: &str,
     vllm_repo: &str,
-    vllm_branch: &str,
+    vllm_sha: &str,
     patch_content_b64: &str,
 ) -> String {
     format!(
@@ -97,8 +97,10 @@ sudo resize2fs /dev/sda1 2>/dev/null || true
 echo "=== Installing vLLM ==="
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
-git clone https://github.com/{}/{}.git vllm -b {}
+git clone https://github.com/{}/{}.git vllm
 cd vllm
+git fetch origin {}
+git checkout {}
 
 echo "=== Applying vLLM patch ==="
 # Decode the embedded patch file
@@ -179,7 +181,7 @@ sudo rm -rf /var/lib/apt/lists/*
 
 echo "=== Image preparation complete ==="
 "#,
-        vllm_org, vllm_repo, vllm_branch, patch_content_b64
+        vllm_org, vllm_repo, vllm_sha, vllm_sha, patch_content_b64
     )
 }
 
@@ -423,7 +425,7 @@ struct ImageCreationParams<'a> {
     project: &'a str,
     vllm_org: &'a str,
     vllm_repo: &'a str,
-    vllm_branch: &'a str,
+    vllm_sha: &'a str,
     llmd_version: &'a str,
 }
 
@@ -435,8 +437,8 @@ async fn create_image_from_disk(params: ImageCreationParams<'_>) -> anyhow::Resu
     let client = Images::builder().build().await?;
 
     let description = format!(
-        "vLLM custom image with VLLM_ORG={}, VLLM_REPO={}, VLLM_BRANCH={}, LLMD_VERSION={}",
-        params.vllm_org, params.vllm_repo, params.vllm_branch, params.llmd_version
+        "vLLM custom image with VLLM_ORG={}, VLLM_REPO={}, VLLM_SHA={}, LLMD_VERSION={}",
+        params.vllm_org, params.vllm_repo, params.vllm_sha, params.llmd_version
     );
 
     eprintln!("Creating custom image: {}", params.image_name);
@@ -560,7 +562,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
     eprintln!("Configuration:");
     eprintln!("  VLLM_ORG: {}", args.vllm_org);
     eprintln!("  VLLM_REPO: {}", args.vllm_repo);
-    eprintln!("  VLLM_BRANCH: {}", args.vllm_branch);
+    eprintln!("  VLLM_SHA: {}", args.vllm_sha);
     eprintln!("  LLMD_VERSION: {}", args.llmd_version);
     eprintln!("  IMAGE_FAMILY: {}", args.image_family);
     eprintln!("  IMAGE_PROJECT: {}", project);
@@ -568,12 +570,12 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
 
     // Embed patch file at compile time based on LLMD version
     let patch_content = match args.llmd_version.as_str() {
-        "0.4.0" => {
-            include_bytes!("../../../docker/vllm/llm-d/patches/0.4.0/01-spans-llmd-vllm.patch.gz")
+        "0.5.0" => {
+            include_bytes!("../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz")
         }
         _ => {
             return Err(anyhow::anyhow!(
-                "Unsupported LLMD version: {}. Only 0.4.0 is currently supported.",
+                "Unsupported LLMD version: {}. Only 0.5 is currently supported.",
                 args.llmd_version
             ));
         }
@@ -592,7 +594,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
             patch_content,
             &args.vllm_org,
             &args.vllm_repo,
-            &args.vllm_branch,
+            &args.vllm_sha,
         )
     };
 
@@ -626,7 +628,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
     let startup_script = generate_startup_script(
         &args.vllm_org,
         &args.vllm_repo,
-        &args.vllm_branch,
+        &args.vllm_sha,
         &patch_content_b64,
     );
 
@@ -654,7 +656,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
         project: &project,
         vllm_org: &args.vllm_org,
         vllm_repo: &args.vllm_repo,
-        vllm_branch: &args.vllm_branch,
+        vllm_sha: &args.vllm_sha,
         llmd_version: &args.llmd_version,
     })
     .await?;
@@ -701,8 +703,8 @@ mod tests {
             .force_overwrite(true)
             .vllm_org("test-org")
             .vllm_repo("test-repo")
-            .vllm_branch("test-branch")
-            .llmd_version("0.4.0")
+            .vllm_sha("abc123def456")
+            .llmd_version("0.5.0")
             .image_family("test-family")
             .build()
             .unwrap();
@@ -710,8 +712,8 @@ mod tests {
         assert!(args.force_overwrite);
         assert_eq!(args.vllm_org, "test-org");
         assert_eq!(args.vllm_repo, "test-repo");
-        assert_eq!(args.vllm_branch, "test-branch");
-        assert_eq!(args.llmd_version, "0.4.0");
+        assert_eq!(args.vllm_sha, "abc123def456");
+        assert_eq!(args.llmd_version, "0.5.0");
         assert_eq!(args.image_family, "test-family");
     }
 }

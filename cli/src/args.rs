@@ -226,7 +226,7 @@ pub enum ImageCommands {
         image_family: String,
 
         /// LLM-D version for patch file
-        #[arg(long, default_value = "0.4.0")]
+        #[arg(long, default_value = "0.5.0")]
         llmd_version: String,
 
         /// GCE configuration
