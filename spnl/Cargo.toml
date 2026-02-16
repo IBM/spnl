@@ -132,3 +132,8 @@ harness = false
 name = "niah"
 harness = false
 required-features = ["tok"]
+
+[[bench]]
+name = "ruler"
+harness = false
+required-features = ["tok"]
