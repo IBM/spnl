@@ -10316,7 +10316,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -10377,7 +10377,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-cli"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "clap",
