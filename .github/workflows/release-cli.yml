@@ -370,6 +370,8 @@ jobs:
     #
     # CUDA Version: Uses CUDA 12.8.1 (latest stable 12.8.x release) for compatibility.
     name: Build ${{ matrix.platform.name }}
+    # Skip flash-attn variants on PRs (only run on release)
+    if: github.event_name == 'release' || matrix.platform.features == 'cuda'
     runs-on: ubuntu-latest
     container:
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
