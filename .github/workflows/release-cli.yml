@@ -21,6 +21,9 @@ env:
   BUILD_DIR: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || 'debug' }}
   CARGO_INCREMENTAL: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#environment-flags-to-disable-incremental-compilation
   CARGO_PROFILE_TEST_DEBUG: 0 # https://corrode.dev/blog/tips-for-faster-ci-builds/#disable-debug-info
+  # Enable parallel compilation with 8 threads for faster builds
+  # -Z threads=8 is a nightly-only flag that enables parallel front-end compilation
+  RUSTFLAGS: "-Z threads=8"
 
 jobs:
   build-and-upload:
@@ -89,7 +92,7 @@ jobs:
       ARCH: ${{ matrix.platform.arch }}
       LIBC: ${{ matrix.platform.libc }}
       LOCAL_FEATURE: ${{ matrix.platform.local_feature || '' }}
-      RUSTFLAGS: ${{ matrix.platform.rustflags || '' }}
+      RUSTFLAGS: ${{ matrix.platform.rustflags || '-Z threads=8' }}
 
     steps:
       - name: Checkout repository
@@ -113,6 +116,9 @@ jobs:
               source "$HOME/.cargo/env"
             fi
           fi
+          # Install nightly toolchain for RUSTFLAGS="-Z threads=8" support
+          rustup toolchain install nightly
+          rustup default nightly
           rustup target add ${{ matrix.platform.target }}
 
       - name: Setup protoc (Linux)
@@ -309,6 +315,9 @@ jobs:
       - name: Setup Rust toolchain
         shell: sh
         run: |
+          # Install nightly toolchain for RUSTFLAGS="-Z threads=8" support
+          rustup toolchain install nightly
+          rustup default nightly
           rustup target add ${{ matrix.platform.target }}
 
       - name: Build CLI
@@ -476,6 +485,9 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           source "$HOME/.cargo/env"
+          # Install nightly toolchain for RUSTFLAGS="-Z threads=8" support
+          rustup toolchain install nightly
+          rustup default nightly
           rustup target add ${{ matrix.platform.target }}
 
       - name: Get version from release

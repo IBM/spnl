@@ -15,6 +15,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Enable parallel compilation with 8 threads for faster builds
+  # -Z threads=8 is a nightly-only flag that enables parallel front-end compilation
+  RUSTFLAGS: "-Z threads=8"
+
 jobs:
   vllm_gce:
     name: Test in GCE VM
@@ -61,6 +66,13 @@ jobs:
       - name: Use gcloud CLI
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: gcloud info
+
+      - name: Install Rust nightly
+        # Required for RUSTFLAGS="-Z threads=8" which is a nightly-only feature
+        if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
+        run: |
+          rustup toolchain install nightly
+          rustup default nightly
 
       - name: Install spnl CLI
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"

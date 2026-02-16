@@ -11,6 +11,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Enable parallel compilation with 8 threads for faster builds
+  # -Z threads=8 is a nightly-only flag that enables parallel front-end compilation
+  RUSTFLAGS: "-Z threads=8"
 
 jobs:
   publish_crate:
@@ -19,6 +22,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Install Rust nightly
+        # Required for RUSTFLAGS="-Z threads=8" which is a nightly-only feature
+        run: |
+          rustup toolchain install nightly
+          rustup default nightly
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]
