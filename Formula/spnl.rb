@@ -11,17 +11,6 @@ class Spnl < Formula
     end
   end
 
-  on_linux do
-    on_arm do
-      url "https://github.com/IBM/spnl/releases/download/v0.17.0/spnl-v0.17.0-linux-aarch64-gnu.tar.gz"
-      sha256 "f5183c27959103365131b1b29a5488489f3e34a0537a4268665f4db77f10f027"
-    end
-    on_intel do
-      url "https://github.com/IBM/spnl/releases/download/v0.17.0/spnl-v0.17.0-linux-x86_64-gnu.tar.gz"
-      sha256 "9c23b1739059bed0aa7010e2024db3ac4d18900f5150186469beadc586c04be5"
-    end
-  end
-
   livecheck do
     url :stable
     strategy :github_latest
