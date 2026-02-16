@@ -35,6 +35,23 @@ cargo bench --bench niah --features tok
 - Example configurations
 - Debug mode and troubleshooting
 
+### [RULER Benchmark](README-RULER.md)
+
+Evaluates long-context language models across multiple task categories to determine their effective context length. Faithful port of the [RULER](https://github.com/NVIDIA/RULER) benchmark methodology.
+
+**Quick Start:**
+```bash
+cargo bench --bench ruler --features tok
+```
+
+**Documentation:** See [README-RULER.md](README-RULER.md) for:
+- Task categories (NIAH, Variable Tracking, and more)
+- Environment variable configuration
+- Model and tokenizer configuration
+- Task-specific complexity settings
+- Comprehensive output statistics
+- Future work roadmap
+
 ## General Criterion Features
 
 All benchmarks support Criterion's built-in features:
