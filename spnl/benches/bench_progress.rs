@@ -35,6 +35,7 @@ pub fn create_benchmark_progress(_total: u64, message: impl Into<String>) -> Arc
 /// * `high_precision_count` - Count of runs with precision >= 0.75
 /// * `high_recall_count` - Count of runs with recall >= 0.75
 /// * `total_count` - Total number of samples collected so far
+#[allow(dead_code)]
 pub fn update_progress_with_stats(
     pb: &ProgressBar,
     base_msg: &str,
