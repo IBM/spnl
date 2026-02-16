@@ -370,8 +370,6 @@ jobs:
     #
     # CUDA Version: Uses CUDA 12.8.1 (latest stable 12.8.x release) for compatibility.
     name: Build ${{ matrix.platform.name }}
-    # Skip flash-attn variants on PRs (only run on release)
-    if: github.event_name == 'release' || matrix.platform.features == 'cuda'
     runs-on: ubuntu-latest
     container:
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
@@ -432,8 +430,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
 
       - name: Cache Cargo registry
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         uses: actions/cache@v5
         with:
           path: |
@@ -445,6 +447,8 @@ jobs:
             linux-cargo-registry-
 
       - name: Cache Cargo build
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         uses: actions/cache@v5
         with:
           path: target/
@@ -454,6 +458,8 @@ jobs:
             linux-${{ matrix.platform.arch }}-cargo-build-cuda-
 
       - name: Install build dependencies
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           apt-get update
@@ -465,6 +471,8 @@ jobs:
           git --version
 
       - name: Free up disk space
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           # Disk space cleanup for CUDA builds
@@ -473,6 +481,8 @@ jobs:
           wait
 
       - name: Install Rust
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -481,6 +491,8 @@ jobs:
           rustup target add ${{ matrix.platform.target }}
 
       - name: Get version from release
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         id: version
         shell: bash
         run: |
@@ -488,6 +500,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build CLI with CUDA
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           source "$HOME/.cargo/env"
@@ -498,6 +512,8 @@ jobs:
             --package spnl-cli --target $TARGET
 
       - name: Prepare binary
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           cd target/$TARGET/$BUILD_DIR
@@ -514,6 +530,8 @@ jobs:
           echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Generate checksum
+        # Skip flash-attn variants on PRs (only run on release)
+        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
         shell: bash
         run: |
           sha256sum "$ARCHIVE_PATH" | awk '{print $1}' > "$ARCHIVE_PATH.sha256"
