@@ -2,170 +2,106 @@
 
 This directory contains Criterion-based benchmarks for SPNL.
 
-## Haystack Benchmark
+## Available Benchmarks
 
-The haystack benchmark tests SPNL's ability to extract information from multiple documents.
+### [Haystack Benchmark](README-HAYSTACK.md)
 
-### Running the Benchmark
+Tests SPNL's ability to extract information from multiple documents using basic and map-reduce approaches.
 
-Run all benchmarks:
+**Quick Start:**
 ```bash
 cargo bench --bench haystack
 ```
 
+**Documentation:** See [README-HAYSTACK.md](README-HAYSTACK.md) for:
+- Command-line filtering options
+- Environment variable configuration
+- Example configurations
+- Progress bars and output
+
+### [Needle In A Haystack (NIAH) Benchmark](README-NIAH.md)
+
+Evaluates an LLM's ability to retrieve specific information from within large contexts at various depths. Faithful port of the [LLMTest_NeedleInAHaystack](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) methodology.
+
+**Quick Start:**
+```bash
+cargo bench --bench niah --features tok
+```
+
+**Documentation:** See [README-NIAH.md](README-NIAH.md) for:
+- Command-line filtering options
+- Environment variable configuration
+- Model and tokenizer configuration
+- Example configurations
+- Debug mode and troubleshooting
+
+## General Criterion Features
+
+All benchmarks support Criterion's built-in features:
+
 ### Filtering Benchmarks
 
-Use Criterion's built-in filtering to run specific benchmarks:
-
-Run only basic benchmarks:
+Run specific benchmarks by name pattern:
 ```bash
-cargo bench --bench haystack basic
+cargo bench --bench <benchmark_name> -- "<pattern>"
 ```
 
-Run only map-reduce benchmarks:
+### Baseline Comparison
+
+Save and compare against baselines:
 ```bash
-cargo bench --bench haystack map_reduce
+# Save a baseline
+cargo bench --bench <benchmark_name> -- --save-baseline my-baseline
+
+# Compare against baseline
+cargo bench --bench <benchmark_name> -- --baseline my-baseline
 ```
 
-Run basic benchmark with 2 documents only:
+### Output Formats
+
+Generate reports in different formats:
 ```bash
-cargo bench --bench haystack basic/2
+# HTML report (default, in target/criterion/)
+cargo bench --bench <benchmark_name>
+
+# JSON output
+cargo bench --bench <benchmark_name> -- --output-format json
 ```
 
-Run map-reduce with chunk size 4 only:
+## Common Environment Variables
+
+Most benchmarks support these common configuration options:
+
+- `BENCH_SAMPLE_SIZE` - Number of samples to collect
+- `BENCH_MEASUREMENT_TIME` - Maximum measurement time in seconds
+- `BENCH_DEBUG` - Enable debug output (usually for first sample only)
+
+See individual benchmark documentation for benchmark-specific variables.
+
+## Progress Bars
+
+All benchmarks use custom progress bars showing real-time statistics during execution. See `BENCHMARK_PROGRESS.md` for implementation details.
+
+## Requirements
+
+- Rust toolchain with Cargo
+- Ollama running locally (for LLM-based benchmarks)
+- Appropriate models installed in Ollama
+- For NIAH: `tok` feature enabled for tokenizer support
+
+## Tips for Faster Runs
+
+1. **Use command-line filtering** to test specific configurations
+2. **Reduce sample size** with `BENCH_SAMPLE_SIZE`
+3. **Reduce measurement time** with `BENCH_MEASUREMENT_TIME`
+4. **Test fewer configurations** using benchmark-specific environment variables
+5. **Combine filters** for maximum control
+
+Example quick test:
 ```bash
-cargo bench --bench haystack map_reduce/4
+BENCH_SAMPLE_SIZE=3 BENCH_MEASUREMENT_TIME=10 cargo bench --bench haystack -- "basic/2"
 ```
 
-### Configuring Benchmark Parameters
+## Benchmark Development
 
-Use environment variables to control benchmark behavior:
-
-#### `BENCH_SAMPLE_SIZE` (default: `100`)
-Number of samples to collect for statistics:
-```bash
-# Quick test with fewer samples
-BENCH_SAMPLE_SIZE=20 cargo bench --bench haystack
-
-# More thorough test
-BENCH_SAMPLE_SIZE=200 cargo bench --bench haystack
-```
-
-#### `BENCH_MEASUREMENT_TIME` (default: `320` seconds)
-Maximum time to spend measuring each benchmark:
-```bash
-# Quick test (may not complete all samples)
-BENCH_MEASUREMENT_TIME=60 cargo bench --bench haystack
-
-# Longer test for slower systems
-BENCH_MEASUREMENT_TIME=600 cargo bench --bench haystack
-```
-
-**Note:** If you see "Unable to complete N samples in Xs", either:
-- Increase `BENCH_MEASUREMENT_TIME`
-- Decrease `BENCH_SAMPLE_SIZE`
-- Use fewer test configurations (e.g., `BENCH_NUM_DOCS=2`)
-
-#### `BENCH_NUM_DOCS` (default: `2,4,8`)
-Comma-separated list of document counts for basic benchmarks:
-```bash
-# Test only with 2 documents
-BENCH_NUM_DOCS=2 cargo bench --bench haystack basic
-
-# Test with 2, 8, and 16 documents
-BENCH_NUM_DOCS=2,8,16 cargo bench --bench haystack basic
-```
-
-#### `BENCH_CHUNK_SIZES` (default: `2,4`)
-Comma-separated list of chunk sizes for map-reduce benchmarks:
-```bash
-# Test only chunk size 2
-BENCH_CHUNK_SIZES=2 cargo bench --bench haystack map_reduce
-
-# Test chunk sizes 2, 4, and 8
-BENCH_CHUNK_SIZES=2,4,8 cargo bench --bench haystack map_reduce
-```
-
-#### `BENCH_MAP_REDUCE_NUM_DOCS` (default: `8`)
-Number of documents to use for map-reduce benchmarks:
-```bash
-# Test map-reduce with 16 documents
-BENCH_MAP_REDUCE_NUM_DOCS=16 cargo bench --bench haystack map_reduce
-
-# Test with fewer documents for faster runs
-BENCH_MAP_REDUCE_NUM_DOCS=4 cargo bench --bench haystack map_reduce
-```
-
-#### `BENCH_DOC_LENGTH` (default: `100`)
-Number of lipsum words per document:
-```bash
-# Test with shorter documents (faster)
-BENCH_DOC_LENGTH=50 cargo bench --bench haystack
-
-# Test with longer documents
-BENCH_DOC_LENGTH=200 cargo bench --bench haystack
-```
-
-#### `BENCH_BASIC` and `BENCH_MAP_REDUCE` (default: `true`)
-Enable/disable entire benchmark categories:
-```bash
-# Skip basic benchmarks entirely
-BENCH_BASIC=false cargo bench --bench haystack
-
-# Run only map-reduce
-BENCH_BASIC=false BENCH_MAP_REDUCE=true cargo bench --bench haystack
-```
-
-### Configuring Test Values
-
-Control which parameter values are tested:
-
-Quick test with single configuration:
-```bash
-cargo bench --bench haystack basic/2
-```
-
-Test multiple document counts:
-```bash
-BENCH_NUM_DOCS=2,4,8,16 cargo bench --bench haystack basic
-```
-
-Test specific map-reduce configuration:
-```bash
-cargo bench --bench haystack map_reduce/4
-```
-
-Quick test with minimal configuration:
-```bash
-BENCH_SAMPLE_SIZE=20 BENCH_MEASUREMENT_TIME=60 BENCH_NUM_DOCS=2 cargo bench --bench haystack basic
-```
-
-Thorough test with more samples:
-```bash
-BENCH_SAMPLE_SIZE=200 BENCH_MEASUREMENT_TIME=600 cargo bench --bench haystack
-```
-
-### Progress Bars
-
-The benchmark displays real-time progress with running statistics:
-```
-[00:45] ⠋ [155] basic docs=2 | P:0.950 R:0.875
-```
-
-- **Elapsed time**: `[00:45]`
-- **Spinner**: `⠋` (animated)
-- **Iteration count**: `[155]` (includes Criterion warmup + measurement)
-- **Running stats**: `P:0.950 R:0.875` (precision and recall averages)
-
-See `BENCHMARK_PROGRESS.md` for more details on the progress bar implementation.
-
-### Output
-
-After each benchmark completes, you'll see:
-1. Criterion's timing statistics
-2. Quantile statistics for precision and recall (p25, p50, p75, p90, p99)
-
-### Requirements
-
-- Ollama running locally with `granite3.3:2b` model
-- Or configure a different model in the benchmark code
+See `BENCHMARK_PROGRESS.md` for details on implementing progress bars in new benchmarks.
