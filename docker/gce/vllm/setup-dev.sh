@@ -75,7 +75,45 @@ git fetch origin $VLLM_SHA
 git checkout $VLLM_SHA
 uv venv --seed
 source .venv/bin/activate
-VLLM_USE_PRECOMPILED=1 uv pip install --editable .
+
+# Default VLLM_PRECOMPILED_WHEEL_COMMIT to VLLM_SHA if not set
+# This allows using precompiled binaries from a different commit (e.g., main) while checking out a specific source commit
+VLLM_PRECOMPILED_WHEEL_COMMIT="${VLLM_PRECOMPILED_WHEEL_COMMIT:-${VLLM_SHA}}"
+
+# Detect if precompiled wheel exists (following llm-d approach)
+MACHINE=$(uname -m)
+case "${MACHINE}" in
+  x86_64|amd64) PLATFORM_TAG="manylinux_2_31_x86_64" ;;
+  aarch64|arm64) PLATFORM_TAG="manylinux_2_31_aarch64" ;;
+  *) echo "Unsupported architecture: ${MACHINE}"; PLATFORM_TAG="" ;;
+esac
+
+WHEEL_URL=""
+if [ -n "${PLATFORM_TAG}" ]; then
+  echo "Looking for precompiled wheel at: https://wheels.vllm.ai/${VLLM_PRECOMPILED_WHEEL_COMMIT}/vllm/"
+  WHEEL_INDEX_HTML=$(curl -sf "https://wheels.vllm.ai/${VLLM_PRECOMPILED_WHEEL_COMMIT}/vllm/" 2>/dev/null || echo "")
+  if [ -n "${WHEEL_INDEX_HTML}" ]; then
+    WHEEL_FILENAME=$(echo "${WHEEL_INDEX_HTML}" | grep -oE "vllm-[^\"]+${PLATFORM_TAG}\.whl" | head -1)
+    if [ -n "${WHEEL_FILENAME}" ]; then
+      # URL-encode the + sign in the wheel filename
+      WHEEL_URL="https://wheels.vllm.ai/${VLLM_PRECOMPILED_WHEEL_COMMIT}/${WHEEL_FILENAME}"
+      WHEEL_URL=$(echo "${WHEEL_URL}" | sed -E 's/\+/%2B/g')
+      echo "Found precompiled wheel: ${WHEEL_URL}"
+    fi
+  fi
+fi
+
+# Install vLLM with or without precompiled binaries
+if [ -n "${WHEEL_URL}" ]; then
+  echo "Using precompiled binaries from commit: ${VLLM_PRECOMPILED_WHEEL_COMMIT} (source: ${VLLM_SHA})"
+  export VLLM_USE_PRECOMPILED=1
+  export VLLM_PRECOMPILED_WHEEL_LOCATION="${WHEEL_URL}"
+  uv pip install --editable .
+else
+  echo "Compiling vLLM from source (no precompiled wheel found or unsupported platform)"
+  unset VLLM_USE_PRECOMPILED VLLM_PRECOMPILED_WHEEL_LOCATION 2>/dev/null || true
+  uv pip install --editable .
+fi
 
 # Wait for spnl build to complete
 echo "Waiting for spnl build to complete..."

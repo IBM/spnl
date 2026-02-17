@@ -55,6 +55,16 @@ pub struct GceConfig {
     /// vLLM commit SHA to use
     #[arg(long, env = "VLLM_SHA", default_value = "a1b2c3d4e5f6")]
     pub vllm_sha: String,
+
+    /// vLLM commit SHA to use for precompiled wheel lookup (defaults to vllm_sha)
+    /// This allows using stable precompiled binaries from a known commit (e.g., main)
+    /// while checking out a different source commit for testing
+    #[arg(
+        long,
+        env = "VLLM_PRECOMPILED_WHEEL_COMMIT",
+        default_value = "d7de043d55d1dd629554467e23874097e1c48993"
+    )]
+    pub vllm_precompiled_wheel_commit: String,
 }
 
 impl GceConfig {
@@ -73,6 +83,7 @@ impl GceConfig {
             vllm_org: "neuralmagic".to_string(),
             vllm_repo: "vllm".to_string(),
             vllm_sha: "a1b2c3d4e5f6".to_string(),
+            vllm_precompiled_wheel_commit: "d7de043d55d1dd629554467e23874097e1c48993".to_string(),
         }
     }
 
@@ -127,6 +138,10 @@ mod tests {
         assert_eq!(config.vllm_org, "neuralmagic");
         assert_eq!(config.vllm_repo, "vllm");
         assert_eq!(config.vllm_sha, "a1b2c3d4e5f6");
+        assert_eq!(
+            config.vllm_precompiled_wheel_commit,
+            "d7de043d55d1dd629554467e23874097e1c48993"
+        );
     }
 
     #[test]
