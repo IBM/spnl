@@ -61,9 +61,60 @@ Enable debug output for the first sample to see detailed information:
 BENCH_DEBUG=1 cargo bench --bench niah --features tok
 ```
 
+## Map-Reduce Chunking
+
+The benchmark supports splitting the context into chunks and using a map-reduce approach, similar to the haystack benchmark. This can help test how well models handle distributed retrieval tasks.
+
+### Basic Chunking
+
+Split context into 2 chunks:
+```bash
+BENCH_CHUNK_SIZES="2" cargo bench --bench niah --features tok
+```
+
+Test multiple chunk sizes:
+```bash
+BENCH_CHUNK_SIZES="2,4" cargo bench --bench niah --features tok
+```
+
+### How It Works
+
+When `chunk > 0`:
+1. **Map step**: Context is split into N chunks (based on token count)
+2. Each chunk gets its own query to answer the question
+3. **Reduce step**: If multiple chunks exist, a final query combines the answers
+
+When `chunk = 0` (default): Uses the original non-chunked query
+
+### Filtering Chunked Benchmarks
+
+All benchmarks include the chunk size in their ID: `"chunk={size}/len={length}/depth={percent}"`.
+
+Run only chunk=0 (non-chunked) benchmarks:
+```bash
+cargo bench --bench niah --features tok -- "chunk=0"
+```
+
+Run only chunk=2 benchmarks:
+```bash
+cargo bench --bench niah --features tok -- "chunk=2"
+```
+
+Run only chunked benchmarks (chunk > 0):
+```bash
+cargo bench --bench niah --features tok -- "chunk=(2|4)"
+```
+
+Compare all chunk sizes for a specific configuration:
+```bash
+cargo bench --bench niah --features tok -- "len=2000/depth=50"
+```
+
 ## Command-line Filtering
 
-Use Criterion's built-in filtering to run specific benchmark configurations. The benchmark IDs follow the pattern: `retrieval/len={context_length}/depth={depth_percent}`
+Use Criterion's built-in filtering to run specific benchmark configurations. The benchmark IDs follow these patterns:
+- Non-chunked: `retrieval/len={context_length}/depth={depth_percent}`
+- Chunked: `retrieval/chunk={chunk_size}/len={context_length}/depth={depth_percent}`
 
 ### Filter by Context Length
 
@@ -89,11 +140,45 @@ Run only middle depth:
 cargo bench --bench niah --features tok -- "depth=50"
 ```
 
+### Filter by Chunk Size
+
+All benchmarks include chunk size in their ID, making filtering straightforward.
+
+Run only chunk=0 (non-chunked) benchmarks:
+```bash
+cargo bench --bench niah --features tok -- "chunk=0"
+```
+
+Run only chunk=2 benchmarks:
+```bash
+cargo bench --bench niah --features tok -- "chunk=2"
+```
+
+Run only chunked benchmarks (chunk > 0):
+```bash
+cargo bench --bench niah --features tok -- "chunk=(2|4)"
+```
+
+Run chunk=2 with specific context length:
+```bash
+cargo bench --bench niah --features tok -- "chunk=2/len=4000"
+```
+
+Compare all chunk sizes for same configuration:
+```bash
+cargo bench --bench niah --features tok -- "len=2000/depth=50"
+```
+
 ### Filter by Specific Configuration
 
 Run a single specific configuration:
 ```bash
 cargo bench --bench niah --features tok -- "len=2000/depth=50"
+```
+
+Run chunked configuration:
+```bash
+cargo bench --bench niah --features tok -- "chunk=2/len=2000/depth=50"
 ```
 
 Run multiple specific configurations:
@@ -158,6 +243,23 @@ BENCH_DEPTH_PERCENTAGES="0,100" cargo bench --bench niah --features tok
 BENCH_DEPTH_PERCENTAGES="0,10,20,30,40,50,60,70,80,90,100" cargo bench --bench niah --features tok
 ```
 
+### `BENCH_CHUNK_SIZES` (default: `"0,2,4"`)
+
+Comma-separated chunk counts for map-reduce (0 means no chunking):
+```bash
+# Test with default chunk sizes (no chunking, 2-way, and 4-way)
+cargo bench --bench niah --features tok
+
+# Test with no chunking only
+BENCH_CHUNK_SIZES="0" cargo bench --bench niah --features tok
+
+# Test with 2-way chunking only
+BENCH_CHUNK_SIZES="2" cargo bench --bench niah --features tok
+
+# Test only chunked variants
+BENCH_CHUNK_SIZES="2,4" cargo bench --bench niah --features tok
+```
+
 ### `BENCH_MODEL` (default: `"ollama/granite3.3:8b"`)
 
 Model to use for inference (Ollama format):
@@ -220,16 +322,42 @@ BENCH_SAMPLE_SIZE=1 \
 cargo bench --bench niah --features tok -- "len=2000/depth=50"
 ```
 
+### Test Map-Reduce Chunking
+```bash
+# Compare non-chunked vs chunked performance
+BENCH_CHUNK_SIZES="0,2,4" \
+BENCH_CONTEXT_LENGTHS="4000,8000" \
+BENCH_DEPTH_PERCENTAGES="50" \
+cargo bench --bench niah --features tok
+```
+
+### Quick Chunking Test
+```bash
+# Fast test of chunking with minimal samples
+BENCH_SAMPLE_SIZE=3 \
+BENCH_CHUNK_SIZES="2" \
+BENCH_CONTEXT_LENGTHS="2000" \
+BENCH_DEPTH_PERCENTAGES="50" \
+cargo bench --bench niah --features tok
+```
+
 ## Progress Bars
 
 The benchmark displays real-time progress with running statistics:
+
+Non-chunked:
 ```
 [00:45] ⠋ len=2000 depth=50% | n=7 | Acc=85.7% | Perfect=6/7
 ```
 
+Chunked:
+```
+[00:45] ⠋ chunk=2 len=2000 depth=50% | n=7 | Acc=85.7% | Perfect=6/7
+```
+
 - **Elapsed time**: `[00:45]`
 - **Spinner**: `⠋` (animated)
-- **Configuration**: `len=2000 depth=50%`
+- **Configuration**: `chunk=2 len=2000 depth=50%` (or just `len=2000 depth=50%` for non-chunked)
 - **Sample count**: `n=7`
 - **Running accuracy**: `Acc=85.7%`
 - **Perfect retrievals**: `Perfect=6/7` (responses that got the exact answer)
@@ -238,8 +366,23 @@ The benchmark displays real-time progress with running statistics:
 
 After each configuration completes, you'll see detailed statistics:
 
+Non-chunked:
 ```
 === Accuracy Stats: len=2000 depth=50% (n=10) ===
+  avg:  85.0%
+  min:  0.0%
+  p25:  100.0%
+  p50:  100.0%
+  p75:  100.0%
+  p90:  100.0%
+  p99:  100.0%
+  max:  100.0%
+  perfect: 8/10
+```
+
+Chunked:
+```
+=== Accuracy Stats: chunk=2 len=2000 depth=50% (n=10) ===
   avg:  85.0%
   min:  0.0%
   p25:  100.0%
