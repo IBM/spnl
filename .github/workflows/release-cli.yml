@@ -94,8 +94,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        # Skip ARM builds on PRs (only run on release)
+        if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
 
       - name: Get version from release
+        # Skip ARM builds on PRs (only run on release)
+        if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
         id: version
         shell: bash
         run: |
@@ -104,6 +108,8 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Setup Rust toolchain
+        # Skip ARM builds on PRs (only run on release)
+        if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           # On Windows, rustup is already in PATH and doesn't need sourcing
@@ -116,7 +122,8 @@ jobs:
           rustup target add ${{ matrix.platform.target }}
 
       - name: Setup protoc (Linux)
-        if: runner.os == 'Linux'
+        # Skip ARM builds on PRs (only run on release)
+        if: runner.os == 'Linux' && (github.event_name == 'release' || matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           if [ "$RUNNER_ARCH" = "X64" ]; then
@@ -140,7 +147,8 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Setup protoc (Windows)
-        if: runner.os == 'Windows'
+        # Skip ARM builds on PRs (only run on release)
+        if: runner.os == 'Windows' && (github.event_name == 'release' || matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           # Create a local directory for protoc
@@ -157,6 +165,8 @@ jobs:
           ls -la "$RUNNER_TEMP/protoc/bin"
 
       - name: Build CLI
+        # Skip ARM builds on PRs (only run on release)
+        if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           # Only use openssl-vendored for musl builds (static linking)
@@ -210,7 +220,8 @@ jobs:
           .github/scripts/sign-and-notarize-macos.sh "$BINARY_PATH" "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_SPECIFIC_PASSWORD"
 
       - name: Prepare binary (Unix)
-        if: runner.os != 'Windows'
+        # Skip ARM builds on PRs (only run on release)
+        if: runner.os != 'Windows' && (github.event_name == 'release' || matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           cd target/$TARGET/$BUILD_DIR
@@ -225,7 +236,8 @@ jobs:
           echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Prepare binary (Windows)
-        if: runner.os == 'Windows'
+        # Skip ARM builds on PRs (only run on release)
+        if: runner.os == 'Windows' && (github.event_name == 'release' || matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           cd target/$TARGET/$BUILD_DIR
@@ -236,6 +248,8 @@ jobs:
           echo "ARCHIVE_PATH=target/$TARGET/$BUILD_DIR/$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Generate checksum
+        # Skip ARM builds on PRs (only run on release)
+        if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
