@@ -24,6 +24,7 @@ write_files:
       VLLM_ORG=${vllm_org}
       VLLM_REPO=${vllm_repo}
       VLLM_SHA=${vllm_sha}
+      VLLM_PRECOMPILED_WHEEL_COMMIT=${vllm_precompiled_wheel_commit}
       MODEL=${model}
       VLLM_PATCHFILE=/tmp/vllm.patch
 ${vllm_config_section}

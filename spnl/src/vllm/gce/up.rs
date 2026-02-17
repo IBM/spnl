@@ -72,6 +72,7 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
     let vllm_org = &args.config.vllm_org;
     let vllm_repo = &args.config.vllm_repo;
     let vllm_sha = &args.config.vllm_sha;
+    let vllm_precompiled_wheel_commit = &args.config.vllm_precompiled_wheel_commit;
     let model = args
         .model
         .clone()
@@ -188,6 +189,10 @@ cloud_final_modules: []"#
     substitutions.insert("vllm_org", vllm_org.as_str());
     substitutions.insert("vllm_repo", vllm_repo.as_str());
     substitutions.insert("vllm_sha", vllm_sha.as_str());
+    substitutions.insert(
+        "vllm_precompiled_wheel_commit",
+        vllm_precompiled_wheel_commit.as_str(),
+    );
     substitutions.insert("model", model.as_str());
     substitutions.insert("packages_section", &packages_section);
     substitutions.insert("setup_dev_script", &setup_dev_script);
