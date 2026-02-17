@@ -26,6 +26,7 @@
 //! - `BENCH_MEASUREMENT_TIME`: Measurement time in seconds (default: 60)
 //! - `BENCH_CONTEXT_LENGTHS`: Comma-separated context lengths in TOKENS (default: "1000,2000,4000,8000")
 //! - `BENCH_DEPTH_PERCENTAGES`: Comma-separated depth percentages (default: "0,25,50,75,100")
+//! - `BENCH_CHUNK_SIZES`: Comma-separated chunk counts for map-reduce (default: "0,2,4")
 //! - `BENCH_MODEL`: Model to use for inference (default: "ollama/granite3.3:2b")
 //! - `BENCH_TOKENIZER_MODEL`: HuggingFace model for tokenizer (default: "ibm-granite/granite-3.3-2b-instruct")
 //! - `BENCH_FINAL_CONTEXT_LENGTH_BUFFER`: Buffer for system/question/response (default: 200)
@@ -47,6 +48,21 @@
 //! # Custom configuration
 //! BENCH_SAMPLE_SIZE=20 BENCH_CONTEXT_LENGTHS="2000,4000,8000" \
 //!   cargo bench --bench niah --features tok
+//!
+//! # Test with map-reduce chunking (split context into 2 or 4 chunks)
+//! BENCH_CHUNK_SIZES="2,4" cargo bench --bench niah --features tok
+//!
+//! # Filter to run only chunk=0 (non-chunked) benchmarks
+//! cargo bench --bench niah --features tok -- "chunk=0"
+//!
+//! # Filter to run only chunk=2 benchmarks
+//! cargo bench --bench niah --features tok -- "chunk=2"
+//!
+//! # Run only chunked benchmarks (chunk > 0)
+//! cargo bench --bench niah --features tok -- "chunk=(2|4)"
+//!
+//! # Compare all chunk sizes for same configuration
+//! cargo bench --bench niah --features tok -- "len=2000/depth=50"
 //! ```
 
 mod bench_progress;
@@ -369,6 +385,7 @@ async fn run_niah_test(
     tokenizer: &Tokenizer,
     max_context_length: usize,
     debug: bool,
+    chunk: usize,
 ) -> Result<f64, Box<dyn std::error::Error>> {
     // Generate context with needle inserted
     let context_with_needle = generate_context(config, tokenizer, max_context_length)?;
@@ -410,16 +427,61 @@ async fn run_niah_test(
     let question = &config.question;
     let max_tokens = 300; // Match original Python implementation
 
-    let query: Query = spnl!(
-        g model
-            (cross
-                (system system_prompt)
-                (user context_with_needle)
-                (user question)
+    let query: Query = if chunk > 0 {
+        // Split context into token-based chunks for map-reduce
+        let encoding = tokenizer
+            .encode(context_with_needle.as_str(), false)
+            .map_err(|e| format!("Encoding error: {}", e))?;
+        let tokens = encoding.get_ids();
+
+        // Calculate chunk size in tokens
+        let chunk_size_tokens = (tokens.len() + chunk - 1) / chunk; // Round up division
+
+        let chunks: Vec<Query> = tokens
+            .chunks(chunk_size_tokens)
+            .map(|chunk_tokens| tokenizer.decode(chunk_tokens, false).unwrap_or_default())
+            .map(|chunk_text| {
+                spnl!(
+                    g model
+                        (cross
+                            (system system_prompt)
+                            (user chunk_text)
+                            (user question)
+                        )
+                        temperature
+                        max_tokens
+                )
+            })
+            .collect();
+
+        if chunks.len() == 1 {
+            chunks[0].clone()
+        } else {
+            // Reduce step: combine answers from all chunks
+            spnl!(
+                g model
+                    (cross
+                        (system system_prompt)
+                        (plus chunks)
+                        (user "Based on the above responses, what is the final answer to the question? Be concise and direct.")
+                    )
+                    temperature
+                    max_tokens
             )
-            temperature
-            max_tokens
-    );
+        }
+    } else {
+        // Original non-chunked query
+        spnl!(
+            g model
+                (cross
+                    (system system_prompt)
+                    (user context_with_needle)
+                    (user question)
+                )
+                temperature
+                max_tokens
+        )
+    };
 
     // Execute query
     let options = ExecuteOptions {
@@ -515,11 +577,20 @@ fn niah_benchmark(c: &mut Criterion) {
         })
         .unwrap_or_else(|| vec![0, 25, 50, 75, 100]);
 
-    let model = std::env::var("BENCH_MODEL").unwrap_or_else(|_| "ollama/granite3.3:8b".to_string());
+    let chunk_sizes: Vec<usize> = std::env::var("BENCH_CHUNK_SIZES")
+        .ok()
+        .and_then(|s| {
+            s.split(',')
+                .map(|n| n.trim().parse().ok())
+                .collect::<Option<Vec<_>>>()
+        })
+        .unwrap_or_else(|| vec![0, 2, 4]); // default: no chunking, 2-way, 4-way
+
+    let model = std::env::var("BENCH_MODEL").unwrap_or_else(|_| "ollama/granite3.3:2b".to_string());
 
     // Tokenizer model (HuggingFace format) - separate from inference model
     let tokenizer_model = std::env::var("BENCH_TOKENIZER_MODEL")
-        .unwrap_or_else(|_| "ibm-granite/granite-3.3-8b-instruct".to_string());
+        .unwrap_or_else(|_| "ibm-granite/granite-3.3-2b-instruct".to_string());
 
     let final_context_length_buffer = std::env::var("BENCH_FINAL_CONTEXT_LENGTH_BUFFER")
         .ok()
@@ -545,6 +616,7 @@ fn niah_benchmark(c: &mut Criterion) {
     eprintln!("Model: {}", model);
     eprintln!("Context lengths (tokens): {:?}", context_lengths);
     eprintln!("Depth percentages: {:?}", depth_percentages);
+    eprintln!("Chunk sizes: {:?}", chunk_sizes);
     eprintln!("Sample size: {}", sample_size);
     eprintln!("Temperature: {}", temperature);
     eprintln!(
@@ -552,113 +624,124 @@ fn niah_benchmark(c: &mut Criterion) {
         final_context_length_buffer
     );
 
-    // Run benchmarks for each combination of context length and depth
-    for context_length in &context_lengths {
-        for depth_percent in &depth_percentages {
-            let accuracy_values = Arc::new(Mutex::new(Vec::new()));
-            let accuracy_clone = Arc::clone(&accuracy_values);
+    // Run benchmarks for each combination of context length, depth, and chunk size
+    for chunk_size in &chunk_sizes {
+        for context_length in &context_lengths {
+            for depth_percent in &depth_percentages {
+                let accuracy_values = Arc::new(Mutex::new(Vec::new()));
+                let accuracy_clone = Arc::clone(&accuracy_values);
 
-            // Create progress bar
-            let base_msg = format!("len={} depth={}%", context_length, depth_percent);
-            let pb =
-                bench_progress::create_benchmark_progress(sample_size as u64, base_msg.clone());
-            let pb_clone = Arc::clone(&pb);
-            let base_msg = Arc::new(base_msg);
-            let base_msg_clone = Arc::clone(&base_msg);
-
-            group.bench_with_input(
-                BenchmarkId::new(
-                    "retrieval",
-                    format!("len={}/depth={}", context_length, depth_percent),
-                ),
-                &(*context_length, *depth_percent),
-                |b, &(len, depth)| {
-                    b.to_async(&runtime).iter(|| {
-                        let accuracy_clone = Arc::clone(&accuracy_clone);
-                        let pb = Arc::clone(&pb_clone);
-                        let base_msg = Arc::clone(&base_msg_clone);
-                        let model = model.clone();
-                        let tokenizer = tokenizer.clone();
-                        let debug_counter = Arc::clone(&debug_counter);
-
-                        async move {
-                            // Only debug first sample
-                            let mut counter = debug_counter.lock().unwrap();
-                            let should_debug = debug && *counter == 0;
-                            *counter += 1;
-                            drop(counter);
-                            let config = NeedleConfig {
-                                context_length: len,
-                                depth_percent: depth,
-                                final_context_length_buffer,
-                                ..Default::default()
-                            };
-
-                            let accuracy = run_niah_test(
-                                &config,
-                                &model,
-                                temperature,
-                                &tokenizer,
-                                max_context_length,
-                                should_debug,
-                            )
-                            .await
-                            .unwrap_or(0.0);
-
-                            // Collect metrics
-                            accuracy_clone.lock().unwrap().push(accuracy);
-
-                            // Update progress bar
-                            let accuracies = accuracy_clone.lock().unwrap();
-                            let total_count = accuracies.len();
-                            let avg_acc = accuracies.iter().sum::<f64>() / total_count as f64;
-                            let perfect_count = accuracies.iter().filter(|&&a| a >= 1.0).count();
-                            drop(accuracies);
-
-                            pb.set_message(format!(
-                                "{} | n={} | Acc={:.1}% | Perfect={}/{}",
-                                base_msg,
-                                total_count,
-                                avg_acc * 100.0,
-                                perfect_count,
-                                total_count
-                            ));
-                            pb.inc(1);
-
-                            accuracy
-                        }
-                    });
-                },
-            );
-
-            // Finish progress bar
-            bench_progress::finish_benchmark_progress(
-                &pb,
-                format!("✓ len={} depth={}%", context_length, depth_percent),
-            );
-
-            // Print statistics
-            let accuracies = accuracy_values.lock().unwrap();
-            if !accuracies.is_empty() {
-                let (min, p25, p50, p75, p90, p99, max) = compute_quantiles(&accuracies);
-                let avg = accuracies.iter().sum::<f64>() / accuracies.len() as f64;
-                let perfect_count = accuracies.iter().filter(|&&a| a >= 1.0).count();
-
-                eprintln!(
-                    "\n=== Accuracy Stats: len={} depth={}% (n={}) ===",
-                    context_length,
-                    depth_percent,
-                    accuracies.len()
+                // Create progress bar
+                let base_msg = format!(
+                    "chunk={} len={} depth={}%",
+                    chunk_size, context_length, depth_percent
                 );
-                eprintln!("  avg:  {:.1}%", avg * 100.0);
-                eprintln!("  min:  {:.1}%", min * 100.0);
-                eprintln!("  p25:  {:.1}%", p25 * 100.0);
-                eprintln!("  p50:  {:.1}%", p50 * 100.0);
-                eprintln!("  p75:  {:.1}%", p75 * 100.0);
-                eprintln!("  p90:  {:.1}%", p90 * 100.0);
-                eprintln!("  p99:  {:.1}%", p99 * 100.0);
-                eprintln!("  max:  {:.1}%", max * 100.0);
-                eprintln!("  perfect: {}/{}\n", perfect_count, accuracies.len());
+                let pb =
+                    bench_progress::create_benchmark_progress(sample_size as u64, base_msg.clone());
+                let pb_clone = Arc::clone(&pb);
+                let base_msg = Arc::new(base_msg);
+                let base_msg_clone = Arc::clone(&base_msg);
+
+                let bench_id = format!(
+                    "chunk={}/len={}/depth={}",
+                    chunk_size, context_length, depth_percent
+                );
+
+                group.bench_with_input(
+                    BenchmarkId::new("retrieval", bench_id),
+                    &(*context_length, *depth_percent, *chunk_size),
+                    |b, &(len, depth, chunk)| {
+                        b.to_async(&runtime).iter(|| {
+                            let accuracy_clone = Arc::clone(&accuracy_clone);
+                            let pb = Arc::clone(&pb_clone);
+                            let base_msg = Arc::clone(&base_msg_clone);
+                            let model = model.clone();
+                            let tokenizer = tokenizer.clone();
+                            let debug_counter = Arc::clone(&debug_counter);
+
+                            async move {
+                                // Only debug first sample
+                                let mut counter = debug_counter.lock().unwrap();
+                                let should_debug = debug && *counter == 0;
+                                *counter += 1;
+                                drop(counter);
+                                let config = NeedleConfig {
+                                    context_length: len,
+                                    depth_percent: depth,
+                                    final_context_length_buffer,
+                                    ..Default::default()
+                                };
+
+                                let accuracy = run_niah_test(
+                                    &config,
+                                    &model,
+                                    temperature,
+                                    &tokenizer,
+                                    max_context_length,
+                                    should_debug,
+                                    chunk,
+                                )
+                                .await
+                                .unwrap_or(0.0);
+
+                                // Collect metrics
+                                accuracy_clone.lock().unwrap().push(accuracy);
+
+                                // Update progress bar
+                                let accuracies = accuracy_clone.lock().unwrap();
+                                let total_count = accuracies.len();
+                                let avg_acc = accuracies.iter().sum::<f64>() / total_count as f64;
+                                let perfect_count =
+                                    accuracies.iter().filter(|&&a| a >= 1.0).count();
+                                drop(accuracies);
+
+                                pb.set_message(format!(
+                                    "{} | n={} | Acc={:.1}% | Perfect={}/{}",
+                                    base_msg,
+                                    total_count,
+                                    avg_acc * 100.0,
+                                    perfect_count,
+                                    total_count
+                                ));
+                                pb.inc(1);
+
+                                accuracy
+                            }
+                        });
+                    },
+                );
+
+                // Finish progress bar
+                let finish_msg = format!(
+                    "✓ chunk={} len={} depth={}%",
+                    chunk_size, context_length, depth_percent
+                );
+                bench_progress::finish_benchmark_progress(&pb, finish_msg);
+
+                // Print statistics
+                let accuracies = accuracy_values.lock().unwrap();
+                if !accuracies.is_empty() {
+                    let (min, p25, p50, p75, p90, p99, max) = compute_quantiles(&accuracies);
+                    let avg = accuracies.iter().sum::<f64>() / accuracies.len() as f64;
+                    let perfect_count = accuracies.iter().filter(|&&a| a >= 1.0).count();
+
+                    eprintln!(
+                        "\n=== Accuracy Stats: chunk={} len={} depth={}% (n={}) ===",
+                        chunk_size,
+                        context_length,
+                        depth_percent,
+                        accuracies.len()
+                    );
+                    eprintln!("  avg:  {:.1}%", avg * 100.0);
+                    eprintln!("  min:  {:.1}%", min * 100.0);
+                    eprintln!("  p25:  {:.1}%", p25 * 100.0);
+                    eprintln!("  p50:  {:.1}%", p50 * 100.0);
+                    eprintln!("  p75:  {:.1}%", p75 * 100.0);
+                    eprintln!("  p90:  {:.1}%", p90 * 100.0);
+                    eprintln!("  p99:  {:.1}%", p99 * 100.0);
+                    eprintln!("  max:  {:.1}%", max * 100.0);
+                    eprintln!("  perfect: {}/{}\n", perfect_count, accuracies.len());
+                }
             }
         }
     }
