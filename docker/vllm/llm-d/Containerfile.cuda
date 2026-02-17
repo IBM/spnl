@@ -1,4 +1,4 @@
-ARG LLMD_VERSION=0.4.0
+ARG LLMD_VERSION=0.5.0
 ARG MANYLINUX_VERSION=2_34 # use 2_39 for aarch64; TODO is it possible to infer this from the build platform?
 
 # Python version extractor
@@ -29,7 +29,7 @@ LABEL org.opencontainers.image.source=https://github.com/IBM/spnl
 LABEL org.opencontainers.image.description="Span Query support for llm-d's vLLM"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-ARG LLMD_VERSION=0.4.0 # sigh, we need to repeat this if we want to use it inside of the FROM
+ARG LLMD_VERSION=0.5.0 # sigh, we need to repeat this if we want to use it inside of the FROM
 
 COPY --from=builder target/wheels/ /tmp/wheels
 COPY docker/vllm/llm-d/patches/$LLMD_VERSION/ /tmp/patches
