@@ -434,8 +434,8 @@ jobs:
         if: github.event_name == 'release' || matrix.platform.features == 'cuda'
 
       - name: Cache Cargo registry
-        # Skip flash-attn variants on PRs (only run on release)
-        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
+        # Only use cache for flash-attn variants on releases (they take longer to build)
+        if: github.event_name == 'release' && matrix.platform.features != 'cuda'
         uses: actions/cache@v5
         with:
           path: |
@@ -447,8 +447,8 @@ jobs:
             linux-cargo-registry-
 
       - name: Cache Cargo build
-        # Skip flash-attn variants on PRs (only run on release)
-        if: github.event_name == 'release' || matrix.platform.features == 'cuda'
+        # Only use cache for flash-attn variants on releases (they take longer to build)
+        if: github.event_name == 'release' && matrix.platform.features != 'cuda'
         uses: actions/cache@v5
         with:
           path: target/
