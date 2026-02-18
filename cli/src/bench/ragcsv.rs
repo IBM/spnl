@@ -4,6 +4,7 @@ use spnl::{
     ir::{Message::Assistant, Query},
     spnl,
 };
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{Semaphore, mpsc};
@@ -42,6 +43,38 @@ pub struct RagcsvArgs {
     /// Enable debug output for first row
     #[arg(long)]
     pub debug: bool,
+
+    /// Comma-separated LLM-judge metrics to run: accuracy,faithfulness,relevancy,all
+    #[arg(long, default_value = "all", env = "RAGCSV_METRICS")]
+    pub metrics: String,
+}
+
+// ---------------------------------------------------------------------------
+// Metric flags
+// ---------------------------------------------------------------------------
+
+struct MetricFlags {
+    accuracy: bool,
+    faithfulness: bool,
+    relevancy: bool,
+}
+
+impl MetricFlags {
+    fn from_arg(arg: &str) -> Self {
+        let tokens: HashSet<&str> = arg.split(',').map(|s| s.trim()).collect();
+        if tokens.contains("all") {
+            return Self {
+                accuracy: true,
+                faithfulness: true,
+                relevancy: true,
+            };
+        }
+        Self {
+            accuracy: tokens.contains("accuracy"),
+            faithfulness: tokens.contains("faithfulness"),
+            relevancy: tokens.contains("relevancy"),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +107,11 @@ struct RowMetrics {
     #[allow(dead_code)]
     row_index: usize,
     accuracy: f64,
+    faithfulness: f64,
+    relevancy: f64,
+    token_f1: f64,
+    exact_match: f64,
+    bleu: f64,
     total_time_ms: f64,
 }
 
@@ -285,6 +323,162 @@ fn parse_accuracy(response: &str) -> f64 {
 }
 
 // ---------------------------------------------------------------------------
+// Non-LLM string metrics
+// ---------------------------------------------------------------------------
+
+fn normalize_tokens(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+fn token_f1(expected: &str, actual: &str) -> f64 {
+    let expected_tokens = normalize_tokens(expected);
+    let actual_tokens = normalize_tokens(actual);
+    if expected_tokens.is_empty() && actual_tokens.is_empty() {
+        return 100.0;
+    }
+    if expected_tokens.is_empty() || actual_tokens.is_empty() {
+        return 0.0;
+    }
+
+    let expected_counts: HashMap<&str, usize> =
+        expected_tokens.iter().fold(HashMap::new(), |mut m, t| {
+            *m.entry(t.as_str()).or_insert(0) += 1;
+            m
+        });
+    let actual_counts: HashMap<&str, usize> =
+        actual_tokens.iter().fold(HashMap::new(), |mut m, t| {
+            *m.entry(t.as_str()).or_insert(0) += 1;
+            m
+        });
+
+    let mut common = 0usize;
+    for (tok, &count) in &actual_counts {
+        common += count.min(*expected_counts.get(tok).unwrap_or(&0));
+    }
+
+    if common == 0 {
+        return 0.0;
+    }
+
+    let precision = common as f64 / actual_tokens.len() as f64;
+    let recall = common as f64 / expected_tokens.len() as f64;
+    let f1 = 2.0 * precision * recall / (precision + recall);
+    f1 * 100.0
+}
+
+fn exact_match(expected: &str, actual: &str) -> f64 {
+    let norm_expected: String = normalize_tokens(expected).join(" ");
+    let norm_actual: String = normalize_tokens(actual).join(" ");
+    if norm_expected == norm_actual {
+        100.0
+    } else {
+        0.0
+    }
+}
+
+fn bleu_1(expected: &str, actual: &str) -> f64 {
+    let ref_tokens = normalize_tokens(expected);
+    let hyp_tokens = normalize_tokens(actual);
+    if ref_tokens.is_empty() || hyp_tokens.is_empty() {
+        return 0.0;
+    }
+
+    let ref_counts: HashMap<&str, usize> = ref_tokens.iter().fold(HashMap::new(), |mut m, t| {
+        *m.entry(t.as_str()).or_insert(0) += 1;
+        m
+    });
+
+    let mut clipped = 0usize;
+    let mut hyp_counts: HashMap<&str, usize> = HashMap::new();
+    for tok in &hyp_tokens {
+        *hyp_counts.entry(tok.as_str()).or_insert(0) += 1;
+    }
+    for (tok, &count) in &hyp_counts {
+        clipped += count.min(*ref_counts.get(tok).unwrap_or(&0));
+    }
+
+    let precision = clipped as f64 / hyp_tokens.len() as f64;
+
+    // Brevity penalty
+    let bp = if hyp_tokens.len() >= ref_tokens.len() {
+        1.0
+    } else {
+        (1.0 - ref_tokens.len() as f64 / hyp_tokens.len() as f64).exp()
+    };
+
+    bp * precision * 100.0
+}
+
+// ---------------------------------------------------------------------------
+// LLM-judge: faithfulness & relevancy
+// ---------------------------------------------------------------------------
+
+fn build_faithfulness_query(model: &str, answer: &str, fragments: &[Fragment]) -> Query {
+    let model = model.to_string();
+    let system_prompt = "You are a faithfulness evaluator. Determine whether the answer is grounded in the provided documents. Return ONLY a single integer 0-100. 100 means fully grounded in the documents, 0 means completely fabricated.".to_string();
+    let docs: String = fragments
+        .iter()
+        .enumerate()
+        .map(|(i, f)| format!("Document {i}: {}", f.page_content))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let user_prompt =
+        format!("Documents:\n{docs}\n\nAnswer: {answer}\n\nFaithfulness score (0-100):");
+    let temperature: f32 = 0.0;
+    let max_tokens: i32 = 16;
+
+    spnl!(
+        g model
+            (cross
+                (system system_prompt)
+                (user user_prompt)
+            )
+            temperature
+            max_tokens
+    )
+}
+
+fn build_relevancy_query(model: &str, question: &str, answer: &str) -> Query {
+    let model = model.to_string();
+    let system_prompt = "You are a relevancy evaluator. Determine whether the answer addresses the question. Return ONLY a single integer 0-100. 100 means the answer fully addresses the question, 0 means it is completely off-topic.".to_string();
+    let user_prompt =
+        format!("Question: {question}\n\nAnswer: {answer}\n\nRelevancy score (0-100):");
+    let temperature: f32 = 0.0;
+    let max_tokens: i32 = 16;
+
+    spnl!(
+        g model
+            (cross
+                (system system_prompt)
+                (user user_prompt)
+            )
+            temperature
+            max_tokens
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Reporting helper
+// ---------------------------------------------------------------------------
+
+fn print_quantile_report(name: &str, values: &[f64], unit: &str) {
+    let (min, p25, p50, p75, p90, p99, max, avg) = compute_quantiles_with_avg(values);
+    eprintln!("\n=== RAGCSV {name} (n={}) ===", values.len());
+    eprintln!("  min:  {min:.1}{unit}");
+    eprintln!("  p25:  {p25:.1}{unit}");
+    eprintln!("  p50:  {p50:.1}{unit}");
+    eprintln!("  p75:  {p75:.1}{unit}");
+    eprintln!("  p90:  {p90:.1}{unit}");
+    eprintln!("  p99:  {p99:.1}{unit}");
+    eprintln!("  max:  {max:.1}{unit}");
+    eprintln!("  avg:  {avg:.1}{unit}");
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -295,6 +489,7 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
         .unwrap_or_else(|| args.model.clone());
     let max_tokens = args.max_tokens;
     let debug = args.debug;
+    let flags = MetricFlags::from_arg(&args.metrics);
 
     let rows = load_csv(&args.file, args.limit);
     let total = rows.len();
@@ -303,6 +498,7 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
         "Model: {} | Grading: {} | Concurrency: {} | Max tokens: {}",
         args.model, grading_model, args.concurrency, max_tokens
     );
+    eprintln!("Metrics: {}", args.metrics);
 
     if total == 0 {
         eprintln!("No rows to process.");
@@ -317,11 +513,14 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
         ..Default::default()
     };
 
+    let flags = Arc::new(flags);
+
     for row in rows {
         let sem = Arc::clone(&semaphore);
         let tx = tx.clone();
         let model = args.model.clone();
         let grading_model = grading_model.clone();
+        let flags = Arc::clone(&flags);
         let options = ExecuteOptions {
             silent: options.silent,
             ..Default::default()
@@ -358,27 +557,78 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
                 eprintln!("=== DEBUG: Row 0 Expected ===\n{}", row.expected);
             }
 
-            let grading_query = build_grading_query(&grading_model, &row.expected, &actual);
-            let accuracy = match execute(&grading_query, &options).await {
-                Ok(Query::Message(Assistant(s))) => {
-                    let acc = parse_accuracy(&s);
-                    if debug && row_idx == 0 {
-                        eprintln!("=== DEBUG: Row 0 Grading Response ===\n{s}");
-                        eprintln!("=== DEBUG: Row 0 Parsed Accuracy === {acc}%");
+            // Non-LLM metrics (zero cost, always run)
+            let tf1 = token_f1(&row.expected, &actual);
+            let em = exact_match(&row.expected, &actual);
+            let bl = bleu_1(&row.expected, &actual);
+
+            // LLM-judge metrics (gated by flags, run concurrently)
+            let acc_fut = async {
+                if flags.accuracy {
+                    let q = build_grading_query(&grading_model, &row.expected, &actual);
+                    match execute(&q, &options).await {
+                        Ok(Query::Message(Assistant(s))) => {
+                            let acc = parse_accuracy(&s);
+                            if debug && row_idx == 0 {
+                                eprintln!("=== DEBUG: Row 0 Grading Response ===\n{s}");
+                                eprintln!("=== DEBUG: Row 0 Parsed Accuracy === {acc}%");
+                            }
+                            acc
+                        }
+                        Ok(_) => 0.0,
+                        Err(e) => {
+                            eprintln!("Row {row_idx}: accuracy grading error: {e}");
+                            0.0
+                        }
                     }
-                    acc
-                }
-                Ok(_) => 0.0,
-                Err(e) => {
-                    eprintln!("Row {row_idx}: grading query error: {e}");
-                    0.0
+                } else {
+                    -1.0
                 }
             };
+
+            let faith_fut = async {
+                if flags.faithfulness {
+                    let q = build_faithfulness_query(&grading_model, &actual, &row.fragments);
+                    match execute(&q, &options).await {
+                        Ok(Query::Message(Assistant(s))) => parse_accuracy(&s),
+                        Ok(_) => 0.0,
+                        Err(e) => {
+                            eprintln!("Row {row_idx}: faithfulness grading error: {e}");
+                            0.0
+                        }
+                    }
+                } else {
+                    -1.0
+                }
+            };
+
+            let rel_fut = async {
+                if flags.relevancy {
+                    let q = build_relevancy_query(&grading_model, &row.question, &actual);
+                    match execute(&q, &options).await {
+                        Ok(Query::Message(Assistant(s))) => parse_accuracy(&s),
+                        Ok(_) => 0.0,
+                        Err(e) => {
+                            eprintln!("Row {row_idx}: relevancy grading error: {e}");
+                            0.0
+                        }
+                    }
+                } else {
+                    -1.0
+                }
+            };
+
+            let (accuracy, faithfulness, relevancy) = tokio::join!(acc_fut, faith_fut, rel_fut);
 
             let _ = tx
                 .send(RowMetrics {
                     row_index: row_idx,
                     accuracy,
+                    faithfulness,
+                    relevancy,
+                    token_f1: tf1,
+                    exact_match: em,
+                    bleu: bl,
                     total_time_ms,
                 })
                 .await;
@@ -393,14 +643,20 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
     let mut pass_count = 0usize;
 
     while let Some(m) = rx.recv().await {
-        accuracy_sum += m.accuracy;
-        if m.accuracy >= 75.0 {
-            pass_count += 1;
+        if m.accuracy >= 0.0 {
+            accuracy_sum += m.accuracy;
+            if m.accuracy >= 75.0 {
+                pass_count += 1;
+            }
         }
         metrics.push(m);
 
         let n = metrics.len();
-        let avg_acc = accuracy_sum / n as f64;
+        let avg_acc = if flags.accuracy {
+            accuracy_sum / n as f64
+        } else {
+            0.0
+        };
         pb.set_position(n as u64);
         pb.set_message(format!(
             "{n}/{total} | Avg Acc={avg_acc:.1}% | Pass(>=75%)={pass_count}/{n}"
@@ -421,32 +677,79 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
         return Ok(());
     }
 
-    let accuracies: Vec<f64> = metrics.iter().map(|m| m.accuracy).collect();
-    let (min, p25, p50, p75, p90, p99, max, avg) = compute_quantiles_with_avg(&accuracies);
+    // --- Quantile reports for each metric ---
 
-    eprintln!("\n=== RAGCSV Eval Accuracy (n={}) ===", metrics.len());
-    eprintln!("  min:  {min:.1}%");
-    eprintln!("  p25:  {p25:.1}%");
-    eprintln!("  p50:  {p50:.1}%");
-    eprintln!("  p75:  {p75:.1}%");
-    eprintln!("  p90:  {p90:.1}%");
-    eprintln!("  p99:  {p99:.1}%");
-    eprintln!("  max:  {max:.1}%");
-    eprintln!("  avg:  {avg:.1}%");
-    eprintln!("  pass (>=75%): {pass_count}/{}", metrics.len());
+    // LLM-judge metrics (only if enabled, filter out -1.0 sentinels)
+    let acc_values: Vec<f64> = metrics
+        .iter()
+        .map(|m| m.accuracy)
+        .filter(|&v| v >= 0.0)
+        .collect();
+    if !acc_values.is_empty() {
+        print_quantile_report("Accuracy", &acc_values, "%");
+        eprintln!("  pass (>=75%): {pass_count}/{}", acc_values.len());
+    }
 
+    let faith_values: Vec<f64> = metrics
+        .iter()
+        .map(|m| m.faithfulness)
+        .filter(|&v| v >= 0.0)
+        .collect();
+    if !faith_values.is_empty() {
+        print_quantile_report("Faithfulness", &faith_values, "%");
+    }
+
+    let rel_values: Vec<f64> = metrics
+        .iter()
+        .map(|m| m.relevancy)
+        .filter(|&v| v >= 0.0)
+        .collect();
+    if !rel_values.is_empty() {
+        print_quantile_report("Relevancy", &rel_values, "%");
+    }
+
+    // Non-LLM metrics (always present)
+    let f1_values: Vec<f64> = metrics.iter().map(|m| m.token_f1).collect();
+    print_quantile_report("Token F1", &f1_values, "%");
+
+    let em_values: Vec<f64> = metrics.iter().map(|m| m.exact_match).collect();
+    print_quantile_report("Exact Match", &em_values, "%");
+
+    let bleu_values: Vec<f64> = metrics.iter().map(|m| m.bleu).collect();
+    print_quantile_report("BLEU-1", &bleu_values, "%");
+
+    // Latency
     let times: Vec<f64> = metrics.iter().map(|m| m.total_time_ms).collect();
-    let (tmin, t25, t50, t75, t90, t99, tmax, tavg) = compute_quantiles_with_avg(&times);
+    print_quantile_report("Total Time", &times, "ms");
 
-    eprintln!("\n=== RAGCSV Eval Total Time (n={}) ===", metrics.len());
-    eprintln!("  min:  {tmin:.0}ms");
-    eprintln!("  p25:  {t25:.0}ms");
-    eprintln!("  p50:  {t50:.0}ms");
-    eprintln!("  p75:  {t75:.0}ms");
-    eprintln!("  p90:  {t90:.0}ms");
-    eprintln!("  p99:  {t99:.0}ms");
-    eprintln!("  max:  {tmax:.0}ms");
-    eprintln!("  avg:  {tavg:.0}ms");
+    // --- Summary table ---
+    let n = metrics.len() as f64;
+    eprintln!("\n=== RAGCSV Summary (n={}) ===", metrics.len());
+    if !acc_values.is_empty() {
+        eprintln!(
+            "  Accuracy:      {:.1}%",
+            acc_values.iter().sum::<f64>() / acc_values.len() as f64
+        );
+    }
+    if !faith_values.is_empty() {
+        eprintln!(
+            "  Faithfulness:  {:.1}%",
+            faith_values.iter().sum::<f64>() / faith_values.len() as f64
+        );
+    }
+    if !rel_values.is_empty() {
+        eprintln!(
+            "  Relevancy:     {:.1}%",
+            rel_values.iter().sum::<f64>() / rel_values.len() as f64
+        );
+    }
+    eprintln!("  Token F1:      {:.1}%", f1_values.iter().sum::<f64>() / n);
+    eprintln!("  Exact Match:   {:.1}%", em_values.iter().sum::<f64>() / n);
+    eprintln!(
+        "  BLEU-1:        {:.1}%",
+        bleu_values.iter().sum::<f64>() / n
+    );
+    eprintln!("  Avg Latency:   {:.0}ms", times.iter().sum::<f64>() / n);
 
     Ok(())
 }
