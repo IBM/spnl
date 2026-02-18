@@ -264,6 +264,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
             &args.config.vllm_org,
             &args.config.vllm_repo,
             &args.config.vllm_sha,
+            &args.config.vllm_precompiled_wheel_commit,
         );
         format!("projects/{}/global/images/{}", project, image_name)
     };
