@@ -1,13 +1,60 @@
-mod bench_progress;
-
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use super::{compute_quantiles, create_benchmark_progress, finish_benchmark_progress};
+use criterion::{BenchmarkId, Criterion};
 use petname::Generator;
 use spnl::{
-    ExecuteOptions, execute,
+    ExecuteOptions, SpnlError, execute,
     ir::{Message::Assistant, Query},
     spnl,
 };
 use std::sync::{Arc, Mutex};
+
+#[derive(clap::Args, Debug, serde::Serialize)]
+pub struct HaystackArgs {
+    /// Generative model
+    #[arg(
+        short,
+        long,
+        default_value = "ollama/granite3.3:2b",
+        env = "BENCH_MODEL"
+    )]
+    pub model: String,
+
+    /// Sample size per configuration
+    #[arg(long, default_value_t = 100, env = "BENCH_SAMPLE_SIZE")]
+    pub sample_size: usize,
+
+    /// Measurement time in seconds
+    #[arg(long, default_value_t = 320, env = "BENCH_MEASUREMENT_TIME")]
+    pub measurement_time: u64,
+
+    /// Comma-separated document counts for basic benchmark
+    #[arg(long, default_value = "2,4,8", value_parser = super::parse_csv_usize, env = "BENCH_NUM_DOCS")]
+    pub num_docs: Vec<usize>,
+
+    /// Comma-separated document lengths (words of filler per doc)
+    #[arg(long, default_value = "0,10,100,200,400,600,800,1000", value_parser = super::parse_csv_usize, env = "BENCH_DOC_LENGTH")]
+    pub doc_lengths: Vec<usize>,
+
+    /// Comma-separated chunk sizes for map-reduce benchmark
+    #[arg(long, default_value = "2,4", value_parser = super::parse_csv_usize, env = "BENCH_CHUNK_SIZES")]
+    pub chunk_sizes: Vec<usize>,
+
+    /// Number of documents for the map-reduce benchmark
+    #[arg(long, default_value_t = 8, env = "BENCH_MAP_REDUCE_NUM_DOCS")]
+    pub map_reduce_num_docs: usize,
+
+    /// Skip the basic (non-chunked) benchmark
+    #[arg(long)]
+    pub no_basic: bool,
+
+    /// Skip the map-reduce benchmark
+    #[arg(long)]
+    pub no_map_reduce: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Scoring helpers
+// ---------------------------------------------------------------------------
 
 type GeneratedNames = Vec<String>;
 #[derive(serde::Deserialize)]
@@ -37,6 +84,10 @@ fn score_chain(expected: &[String], actual: &[String]) -> (f64, f64) {
         0.0,
     )
 }
+
+// ---------------------------------------------------------------------------
+// Core test
+// ---------------------------------------------------------------------------
 
 async fn run_haystack_benchmark(
     model: &str,
@@ -139,9 +190,6 @@ async fn run_haystack_benchmark(
     };
     match execute(&query, &options).await? {
         Query::Message(Assistant(ss)) => {
-            // oof, be gracious here. sometimes the model wraps the
-            // requested json array with markdown even though we asked
-            // it not to
             let s = if let Some(idx) = ss.find("```json") {
                 ss[idx + 7..ss.len() - 3].trim()
             } else {
@@ -169,98 +217,31 @@ async fn run_haystack_benchmark(
     }
 }
 
-fn compute_quantiles(values: &[f64]) -> (f64, f64, f64, f64, f64, f64, f64) {
-    let mut sorted = values.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let len = sorted.len();
+// ---------------------------------------------------------------------------
+// Criterion benchmark function
+// ---------------------------------------------------------------------------
 
-    let min = sorted[0];
-    let p25 = sorted[len * 25 / 100];
-    let p50 = sorted[len * 50 / 100];
-    let p75 = sorted[len * 75 / 100];
-    let p90 = sorted[len * 90 / 100];
-    let p99 = sorted[len * 99 / 100];
-    let max = sorted[len - 1];
-
-    (min, p25, p50, p75, p90, p99, max)
-}
-
-fn haystack_benchmark(c: &mut Criterion) {
+fn haystack_benchmark(c: &mut Criterion, args: &HaystackArgs) {
     let runtime = tokio::runtime::Runtime::new().unwrap();
-
     let mut group = c.benchmark_group("haystack");
 
-    // Configure sample size (default 100 for meaningful quantile statistics)
-    let sample_size = std::env::var("BENCH_SAMPLE_SIZE")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(100);
-    group.sample_size(sample_size);
+    group.sample_size(args.sample_size);
+    group.measurement_time(std::time::Duration::from_secs(args.measurement_time));
 
-    // Configure measurement time (default 320s to allow 100 samples at ~3s per call)
-    let measurement_time = std::env::var("BENCH_MEASUREMENT_TIME")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(320);
-    group.measurement_time(std::time::Duration::from_secs(measurement_time));
-
-    // Read configuration from environment variables
-    let run_basic = std::env::var("BENCH_BASIC")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(true); // default to true
-
-    let run_map_reduce = std::env::var("BENCH_MAP_REDUCE")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(true); // default to true
-
-    let num_docs_list: Vec<usize> = std::env::var("BENCH_NUM_DOCS")
-        .ok()
-        .and_then(|s| {
-            s.split(',')
-                .map(|n| n.trim().parse().ok())
-                .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_else(|| vec![2, 4, 8]); // default
-
-    let doc_lengths: Vec<usize> = std::env::var("BENCH_DOC_LENGTH")
-        .ok()
-        .and_then(|s| {
-            s.split(',')
-                .map(|n| n.trim().parse().ok())
-                .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_else(|| vec![0, 10, 100, 200, 400, 600, 800, 1000]); // default
-
-    let chunk_sizes: Vec<usize> = std::env::var("BENCH_CHUNK_SIZES")
-        .ok()
-        .and_then(|s| {
-            s.split(',')
-                .map(|n| n.trim().parse().ok())
-                .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_else(|| vec![2, 4]); // default
-
-    let map_reduce_num_docs: usize = std::env::var("BENCH_MAP_REDUCE_NUM_DOCS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8); // default
+    let model = &args.model;
 
     // Basic haystack benchmark with different document counts
-    if run_basic {
-        for num_docs in num_docs_list {
-            for doc_length in &doc_lengths {
+    if !args.no_basic {
+        for &num_docs in &args.num_docs {
+            for &doc_length in &args.doc_lengths {
                 let precision_values = Arc::new(Mutex::new(Vec::new()));
                 let recall_values = Arc::new(Mutex::new(Vec::new()));
 
                 let precision_clone = Arc::clone(&precision_values);
                 let recall_clone = Arc::clone(&recall_values);
 
-                // Create progress bar for this benchmark
                 let base_msg = format!("basic docs={} len={}", num_docs, doc_length);
-                let pb = bench_progress::create_benchmark_progress(
-                    100, // sample_size
-                    base_msg.clone(),
-                );
+                let pb = create_benchmark_progress(args.sample_size as u64, base_msg.clone());
                 let pb_clone = Arc::clone(&pb);
                 let base_msg = Arc::new(base_msg);
                 let base_msg_clone = Arc::clone(&base_msg);
@@ -269,20 +250,18 @@ fn haystack_benchmark(c: &mut Criterion) {
                     BenchmarkId::new("basic", format!("docs={}/len={}", num_docs, doc_length)),
                     &num_docs,
                     |b, &num_docs| {
-                        let doc_length = *doc_length;
                         b.to_async(&runtime).iter(|| {
                             let precision_clone = Arc::clone(&precision_clone);
                             let recall_clone = Arc::clone(&recall_clone);
                             let pb = Arc::clone(&pb_clone);
                             let base_msg = Arc::clone(&base_msg_clone);
+                            let model = model.clone();
                             async move {
-                                let model = "ollama/granite3.3:2b";
                                 let temperature = 0.0;
-                                let length = doc_length;
                                 let (precision, recall) = run_haystack_benchmark(
-                                    model,
+                                    &model,
                                     temperature,
-                                    length,
+                                    doc_length,
                                     num_docs,
                                     false,
                                     0,
@@ -290,16 +269,9 @@ fn haystack_benchmark(c: &mut Criterion) {
                                 .await
                                 .unwrap();
 
-                                // Collect metrics
                                 precision_clone.lock().unwrap().push(precision);
                                 recall_clone.lock().unwrap().push(recall);
 
-                                /* println!(
-                                    "{} {} {} {} {} {}",
-                                    model, temperature, num_docs, length, precision, recall
-                                ); */
-
-                                // Update progress bar with running averages
                                 let precisions = precision_clone.lock().unwrap();
                                 let recalls = recall_clone.lock().unwrap();
                                 let total_count = precisions.len();
@@ -312,15 +284,15 @@ fn haystack_benchmark(c: &mut Criterion) {
                                 drop(precisions);
                                 drop(recalls);
 
-                                bench_progress::update_progress_with_stats(
-                                    &pb,
-                                    &base_msg,
-                                    avg_p,
-                                    avg_r,
-                                    high_precision_count,
-                                    high_recall_count,
+                                pb.set_message(format!(
+                                    "{} \x1b[1m|\x1b[0m n={} \x1b[1m|\x1b[0m P={:.1}% n≥75%={} \x1b[1m|\x1b[0m R={:.1}% n≥75%={}",
+                                    base_msg,
                                     total_count,
-                                );
+                                    avg_p * 100.0,
+                                    high_precision_count,
+                                    avg_r * 100.0,
+                                    high_recall_count
+                                ));
                                 pb.inc(1);
 
                                 (precision, recall)
@@ -329,13 +301,11 @@ fn haystack_benchmark(c: &mut Criterion) {
                     },
                 );
 
-                // Finish progress bar
-                bench_progress::finish_benchmark_progress(
+                finish_benchmark_progress(
                     &pb,
                     format!("✓ basic docs={} len={}", num_docs, doc_length),
                 );
 
-                // Print quantiles after benchmark completes
                 let precisions = precision_values.lock().unwrap();
                 let recalls = recall_values.lock().unwrap();
                 if !precisions.is_empty() {
@@ -372,24 +342,22 @@ fn haystack_benchmark(c: &mut Criterion) {
     }
 
     // Map-reduce benchmark with chunking
-    if run_map_reduce {
-        for chunk_size in chunk_sizes {
-            for doc_length in &doc_lengths {
+    if !args.no_map_reduce {
+        let map_reduce_num_docs = args.map_reduce_num_docs;
+
+        for &chunk_size in &args.chunk_sizes {
+            for &doc_length in &args.doc_lengths {
                 let precision_values = Arc::new(Mutex::new(Vec::new()));
                 let recall_values = Arc::new(Mutex::new(Vec::new()));
 
                 let precision_clone = Arc::clone(&precision_values);
                 let recall_clone = Arc::clone(&recall_values);
 
-                // Create progress bar for this benchmark
                 let base_msg = format!(
                     "map_reduce chunk={} docs={} len={}",
                     chunk_size, map_reduce_num_docs, doc_length
                 );
-                let pb = bench_progress::create_benchmark_progress(
-                    100, // sample_size
-                    base_msg.clone(),
-                );
+                let pb = create_benchmark_progress(args.sample_size as u64, base_msg.clone());
                 let pb_clone = Arc::clone(&pb);
                 let base_msg = Arc::new(base_msg);
                 let base_msg_clone = Arc::clone(&base_msg);
@@ -404,38 +372,28 @@ fn haystack_benchmark(c: &mut Criterion) {
                     ),
                     &chunk_size,
                     |b, &chunk_size| {
-                        let doc_length = *doc_length;
                         b.to_async(&runtime).iter(|| {
                             let precision_clone = Arc::clone(&precision_clone);
                             let recall_clone = Arc::clone(&recall_clone);
                             let pb = Arc::clone(&pb_clone);
                             let base_msg = Arc::clone(&base_msg_clone);
+                            let model = model.clone();
                             async move {
-                                let model = "ollama/granite3.3:2b";
                                 let temperature = 0.0;
-                                let num_docs = map_reduce_num_docs;
-                                let length = doc_length;
                                 let (precision, recall) = run_haystack_benchmark(
-                                    model,
+                                    &model,
                                     temperature,
-                                    length,
-                                    num_docs,
+                                    doc_length,
+                                    map_reduce_num_docs,
                                     false,
                                     chunk_size,
                                 )
                                 .await
                                 .unwrap();
 
-                                // Collect metrics
                                 precision_clone.lock().unwrap().push(precision);
                                 recall_clone.lock().unwrap().push(recall);
 
-                                /* println!(
-                                    "{} {} {} {} {} {}",
-                                    model, temperature, num_docs, length, precision, recall
-                                ); */
-
-                                // Update progress bar with running averages
                                 let precisions = precision_clone.lock().unwrap();
                                 let recalls = recall_clone.lock().unwrap();
                                 let total_count = precisions.len();
@@ -448,15 +406,15 @@ fn haystack_benchmark(c: &mut Criterion) {
                                 drop(precisions);
                                 drop(recalls);
 
-                                bench_progress::update_progress_with_stats(
-                                    &pb,
-                                    &base_msg,
-                                    avg_p,
-                                    avg_r,
-                                    high_precision_count,
-                                    high_recall_count,
+                                pb.set_message(format!(
+                                    "{} \x1b[1m|\x1b[0m n={} \x1b[1m|\x1b[0m P={:.1}% n≥75%={} \x1b[1m|\x1b[0m R={:.1}% n≥75%={}",
+                                    base_msg,
                                     total_count,
-                                );
+                                    avg_p * 100.0,
+                                    high_precision_count,
+                                    avg_r * 100.0,
+                                    high_recall_count
+                                ));
                                 pb.inc(1);
 
                                 (precision, recall)
@@ -465,8 +423,7 @@ fn haystack_benchmark(c: &mut Criterion) {
                     },
                 );
 
-                // Finish progress bar
-                bench_progress::finish_benchmark_progress(
+                finish_benchmark_progress(
                     &pb,
                     format!(
                         "✓ map_reduce chunk={} docs={} len={}",
@@ -474,7 +431,6 @@ fn haystack_benchmark(c: &mut Criterion) {
                     ),
                 );
 
-                // Print quantiles after benchmark completes
                 let precisions = precision_values.lock().unwrap();
                 let recalls = recall_values.lock().unwrap();
                 if !precisions.is_empty() {
@@ -513,12 +469,13 @@ fn haystack_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-// Configure Criterion to be quieter
-criterion_group! {
-    name = benches;
-    config = Criterion::default();
-    targets = haystack_benchmark
-}
-criterion_main!(benches);
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
 
-// Made with Bob
+pub fn run(args: HaystackArgs) -> Result<(), SpnlError> {
+    let mut criterion = Criterion::default();
+    haystack_benchmark(&mut criterion, &args);
+    criterion.final_summary();
+    Ok(())
+}

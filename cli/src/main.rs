@@ -21,6 +21,8 @@ use spnl::vllm::k8s as k8s_vllm;
 use spnl::AugmentOptionsBuilder;
 
 mod args;
+#[cfg(feature = "bench")]
+mod bench;
 mod builtins;
 
 #[tokio::main]
@@ -32,6 +34,9 @@ async fn main() -> Result<(), SpnlError> {
 
     match args.command {
         Commands::Run(run_args) => run(run_args).await,
+
+        #[cfg(feature = "bench")]
+        Commands::Bench { command } => bench::run(command).await,
 
         #[cfg(feature = "local")]
         Commands::List => list_local_models(),

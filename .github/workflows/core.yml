@@ -92,7 +92,7 @@ jobs:
             # - Excluded: local (CPU inference - pulls in CUDA deps via mistralrs)
             # - Excluded: cuda, cuda-flash-attn, cuda-flash-attn-v3 (CUDA features)
             cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored -- --nocapture
-            cargo test -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
+            cargo test -p spnl-cli --features bench,rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
           else
             # Test default features on Linux (no GPU features)
             cargo test -p spnl -p spnl-cli -- --nocapture
@@ -108,7 +108,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored --tests --no-deps -- -D warnings
-          cargo clippy -p spnl-cli --features rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
+          cargo clippy -p spnl-cli --features bench,rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
 
       - name: rustfmt
         run: cargo fmt --all -- --check

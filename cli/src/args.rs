@@ -17,6 +17,13 @@ pub enum Commands {
     #[cfg(feature = "local")]
     List,
 
+    /// Run benchmarks
+    #[cfg(feature = "bench")]
+    Bench {
+        #[command(subcommand)]
+        command: crate::bench::BenchCommands,
+    },
+
     /// Bring up vLLM in a Kubernetes cluster
     #[cfg(feature = "vllm")]
     Vllm {
