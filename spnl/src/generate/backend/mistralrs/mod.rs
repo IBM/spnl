@@ -20,6 +20,9 @@ use crate::{
 mod loader;
 use loader::ModelPool;
 
+#[cfg(feature = "rag")]
+pub mod embed;
+
 // Global model pool - initialized once and reused across all requests
 static MODEL_POOL: OnceLock<ModelPool> = OnceLock::new();
 

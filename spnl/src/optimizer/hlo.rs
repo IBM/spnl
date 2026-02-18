@@ -268,13 +268,21 @@ mod tests {
     #[cfg(feature = "rag")]
     #[tokio::test] // <-- needed for async tests
     async fn retrieve() -> anyhow::Result<()> {
+        // Skip test with warning if HF_TOKEN is not set in CI environment
+        if std::env::var("CI").is_ok() && std::env::var("HF_TOKEN").is_err() {
+            eprintln!(
+                "WARNING: HF_TOKEN is not set in CI environment. Skipping retrieve test to avoid failures when accessing Hugging Face models."
+            );
+            return Ok(());
+        }
+
         let model = "spnl/m"; // This should work, because we use SimpleEmbedRetrieve which won't do any generation
         let q = Message(User("Hello".to_string()));
         let d = "I know all about Hello and stuff";
         let outer_generate = GenerateBuilder::default()
             .metadata(GenerateMetadataBuilder::default().model(model).build()?)
             .input(Box::new(Query::Augment(crate::ir::Augment {
-                embedding_model: "ollama/mxbai-embed-large:335m".to_string(),
+                embedding_model: "local/google/embeddinggemma-300m".to_string(),
                 body: Box::new(q),
                 doc: (
                     "path/to/doc.txt".to_string(),
