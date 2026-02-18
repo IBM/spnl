@@ -66,7 +66,13 @@ jobs:
 
           if [ "$RUNNER_OS" = "Linux" ]; then
             curl -fsSL https://ollama.com/install.sh | bash
-            # note: install.sh will start ollama as an systemd service, no need to start it ourselves (actively harmful -- port conflict)
+            # Wait for the server to actually be ready (install.sh starts it, but the
+            # "API is now available" message is printed before it accepts connections)
+            for i in $(seq 1 30); do
+              curl -sf http://localhost:11434/api/tags > /dev/null 2>&1 && break
+              [ "$i" = "30" ] && { echo "Ollama server failed to start"; exit 1; }
+              sleep 1
+            done
           elif [ "$RUNNER_OS" = "macOS" ]; then
             brew update
             brew install ollama
