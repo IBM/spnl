@@ -63,6 +63,7 @@ jobs:
         run: |
           # Disk space cleanup # https://dev.to/mathio/squeezing-disk-space-from-github-actions-runners-an-engineers-guide-3pjg
           ./.github/scripts/free-up-disk-space-fast.sh &
+          DISK_CLEANUP_PID=$!
 
           if [ "$RUNNER_OS" = "Linux" ]; then
             curl -fsSL https://ollama.com/install.sh | bash
@@ -79,7 +80,7 @@ jobs:
             brew install ollama
             brew services start ollama
           fi
-          wait # for disk space cleanup
+          wait "$DISK_CLEANUP_PID" # for disk space cleanup
 
       - name: cargo test
         run: |
