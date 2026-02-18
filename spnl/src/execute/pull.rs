@@ -89,131 +89,180 @@ async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
 
 // The Ollama implementation of a single model pull
 async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
-    let mut err: Option<anyhow::Error> = None;
-    for _ in 0..5 {
-        if !ollama_exists(model).await? {
-            // creating client and request body
-            let http_client = reqwest::Client::new();
-            let request_body = PullRequest {
-                model: model.to_string(),
-                insecure: Some(false),
-                stream: Some(true),
-            };
+    let mut last_err: Option<anyhow::Error> = None;
 
-            // receiving response and error handling
-            let response = http_client
-                .post(format!("{}/pull", api_base()))
-                .json(&request_body)
-                .send()
-                .await?;
-            if !response.status().is_success() {
-                eprintln!("API request failed with status: {}", response.status(),);
-                return Err(anyhow::anyhow!("Ollama API request failed"));
+    for attempt in 0..5 {
+        if attempt > 0 {
+            tokio::time::sleep(::std::time::Duration::from_millis(2000)).await;
+        }
+
+        // Check if model already exists
+        match ollama_exists(model).await {
+            Ok(true) => return Ok(()),
+            Ok(false) => {}
+            Err(e) => {
+                eprintln!(
+                    "Failed to check ollama model (attempt {}/5): {e}",
+                    attempt + 1
+                );
+                last_err = Some(e);
+                continue;
             }
+        }
 
-            // creating streaming structure
-            let byte_stream = response
-                .bytes_stream()
-                .map(|r| r.map_err(std::io::Error::other));
-            let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
-            let buf_reader = BufReader::new(stream_reader);
-            let mut lines = buf_reader.lines();
+        // creating client and request body
+        let http_client = reqwest::Client::new();
+        let request_body = PullRequest {
+            model: model.to_string(),
+            insecure: Some(false),
+            stream: Some(true),
+        };
 
-            // creation of multiprogress container and style
-            let m = MultiProgress::new();
-            let style =
-                ProgressStyle::with_template("{msg:<20} {percent:>3}% ▕{wide_bar}▏ {bytes:>7}")
-                    .expect("Failed to create progress style template")
-                    .progress_chars("█ ");
-            let mut digests: HashMap<String, ProgressBar> = HashMap::new();
-            let mut final_status_lines: Vec<String> = Vec::new();
+        // receiving response and error handling
+        let response = match http_client
+            .post(format!("{}/pull", api_base()))
+            .json(&request_body)
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!(
+                    "Ollama pull request failed (attempt {}/5): {e}",
+                    attempt + 1
+                );
+                last_err = Some(e.into());
+                continue;
+            }
+        };
+        if !response.status().is_success() {
+            eprintln!(
+                "Ollama API request failed with status: {} (attempt {}/5)",
+                response.status(),
+                attempt + 1
+            );
+            last_err = Some(anyhow::anyhow!(
+                "Ollama API request failed with status: {}",
+                response.status()
+            ));
+            continue;
+        }
 
-            while let Some(line) = lines.next_line().await? {
-                // stores in pull response struct
-                let update = match serde_json::from_str(&line) {
-                    Ok(PullResponse::Ok(u)) => {
-                        err = None; // clear any prior error
-                        Ok(u)
-                    }
-                    Ok(PullResponse::Err(e)) => {
-                        if e.error == "pull model manifest: file does not exist" {
-                            return Err(anyhow::anyhow!(e.error));
-                        }
-                        eprintln!("Possible transient error in ollama pull {}", e.error);
-                        err = Some(anyhow::anyhow!(e.error));
+        // creating streaming structure
+        let byte_stream = response
+            .bytes_stream()
+            .map(|r| r.map_err(std::io::Error::other));
+        let stream_reader = tokio_util::io::StreamReader::new(byte_stream);
+        let buf_reader = BufReader::new(stream_reader);
+        let mut lines = buf_reader.lines();
 
-                        let _ = http_client
-                            .post("http://localhost:11434/api/delete") // TODO use OLLAMA_API_BASE?
-                            .json(&DeleteRequest {
-                                model: model.to_string(),
-                                name: model.to_string(),
-                            })
-                            .send()
-                            .await;
+        // creation of multiprogress container and style
+        let m = MultiProgress::new();
+        let style = ProgressStyle::with_template("{msg:<20} {percent:>3}% ▕{wide_bar}▏ {bytes:>7}")
+            .expect("Failed to create progress style template")
+            .progress_chars("█ ");
+        let mut digests: HashMap<String, ProgressBar> = HashMap::new();
+        let mut final_status_lines: Vec<String> = Vec::new();
+        let mut stream_failed = false;
 
-                        ::std::thread::sleep(::std::time::Duration::from_millis(2000));
-                        break; // break out of while iteration over lines
-                    }
-                    Err(e) => {
-                        eprintln!("Invalid response from ollama pull: {line}");
-                        eprintln!("Parse error: {e}");
-                        Err(anyhow::anyhow!("Ollama API request failed"))
-                    }
-                }?;
-
-                let my_status = update.status.to_lowercase();
-
-                if let Some(digest) = update.digest {
-                    // handles multiple progress bars
-                    let current_pb = digests.entry(digest.clone()).or_insert_with(|| {
-                        let new_pb = m.add(ProgressBar::new(0));
-                        new_pb.set_style(style.clone());
-                        new_pb
-                    });
-
-                    current_pb.set_message(my_status.clone());
-
-                    // sets progress bar length
-                    if let (Some(total), Some(done)) = (update.total, update.completed) {
-                        if current_pb.length().unwrap_or(0) == 0 {
-                            current_pb.set_length(total);
-                        }
-                        current_pb.set_position(done);
-                    }
-                } else if digests.is_empty() {
-                    // prints out status updates (before download)
-                    m.println(&my_status).unwrap();
-                } else {
-                    // stores to print out status updates (after download)
-                    final_status_lines.push(my_status.clone());
-                }
-
-                // checks for error or end of stream
-                if my_status == "error" {
-                    return Err(anyhow::anyhow!("Ollama streaming error: {}", line));
-                } else if my_status == "success" {
+        loop {
+            let line = match lines.next_line().await {
+                Ok(Some(line)) => line,
+                Ok(None) => break,
+                Err(e) => {
+                    eprintln!(
+                        "Error reading ollama pull stream (attempt {}/5): {e}",
+                        attempt + 1
+                    );
+                    last_err = Some(e.into());
+                    stream_failed = true;
                     break;
                 }
+            };
+
+            // stores in pull response struct
+            let update = match serde_json::from_str(&line) {
+                Ok(PullResponse::Ok(u)) => u,
+                Ok(PullResponse::Err(e)) => {
+                    // model name is wrong - don't retry
+                    if e.error == "pull model manifest: file does not exist" {
+                        return Err(anyhow::anyhow!(e.error));
+                    }
+                    eprintln!("Possible transient error in ollama pull: {}", e.error);
+                    last_err = Some(anyhow::anyhow!(e.error));
+
+                    let _ = http_client
+                        .post(format!("{}/delete", api_base()))
+                        .json(&DeleteRequest {
+                            model: model.to_string(),
+                            name: model.to_string(),
+                        })
+                        .send()
+                        .await;
+
+                    stream_failed = true;
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("Invalid response from ollama pull: {line}");
+                    eprintln!("Parse error: {e}");
+                    last_err = Some(anyhow::anyhow!("Invalid response from ollama pull: {e}"));
+                    stream_failed = true;
+                    break;
+                }
+            };
+
+            let my_status = update.status.to_lowercase();
+
+            if let Some(digest) = update.digest {
+                // handles multiple progress bars
+                let current_pb = digests.entry(digest.clone()).or_insert_with(|| {
+                    let new_pb = m.add(ProgressBar::new(0));
+                    new_pb.set_style(style.clone());
+                    new_pb
+                });
+
+                current_pb.set_message(my_status.clone());
+
+                // sets progress bar length
+                if let (Some(total), Some(done)) = (update.total, update.completed) {
+                    if current_pb.length().unwrap_or(0) == 0 {
+                        current_pb.set_length(total);
+                    }
+                    current_pb.set_position(done);
+                }
+            } else if digests.is_empty() {
+                // prints out status updates (before download)
+                m.println(&my_status).unwrap();
+            } else {
+                // stores to print out status updates (after download)
+                final_status_lines.push(my_status.clone());
             }
 
-            if err.is_some() {
-                continue; // continue for retry loop
+            // checks for error or end of stream
+            if my_status == "error" {
+                last_err = Some(anyhow::anyhow!("Ollama streaming error: {}", line));
+                stream_failed = true;
+                break;
+            } else if my_status == "success" {
+                break;
             }
-
-            // finishes drawing progress bars and outputs rest of status updates
-            m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
-            for line in final_status_lines {
-                eprintln!("{}", line);
-            }
-
-            break; // break out of retry loop
         }
+
+        if stream_failed {
+            continue; // retry
+        }
+
+        // finishes drawing progress bars and outputs rest of status updates
+        m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+        for line in final_status_lines {
+            eprintln!("{}", line);
+        }
+
+        return Ok(());
     }
 
-    match err {
-        Some(err) => Err(err),
-        None => Ok(()),
-    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("Ollama pull failed after 5 attempts")))
 }
 
 /// Extract models referenced by the query
