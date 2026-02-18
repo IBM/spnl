@@ -43,6 +43,7 @@ async fn main() -> Result<(), SpnlError> {
                 target,
                 name,
                 model,
+                #[cfg(feature = "k8s")]
                 tokenizer,
                 hf_token,
                 gpus: _gpus,
@@ -50,6 +51,7 @@ async fn main() -> Result<(), SpnlError> {
                 remote_port: _remote_port,
                 #[cfg(feature = "gce")]
                 gce_config,
+                ..
             } => match target {
                 #[cfg(feature = "k8s")]
                 VllmTarget::K8s => {
