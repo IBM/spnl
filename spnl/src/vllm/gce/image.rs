@@ -1,19 +1,49 @@
 use super::args::GceConfig;
 
+pub(super) const DEFAULTS_ENV: &str = include_str!("../../../docker/vllm/llm-d/defaults.env");
+
+pub(super) fn env_default(key: &str) -> &'static str {
+    for line in DEFAULTS_ENV.lines() {
+        if let Some((k, v)) = line.split_once('=')
+            && k.trim() == key
+        {
+            return v.trim();
+        }
+    }
+    panic!("key not found in defaults.env: {key}");
+}
+
+fn default_vllm_org() -> String {
+    env_default("VLLM_ORG").to_string()
+}
+fn default_vllm_repo() -> String {
+    env_default("VLLM_REPO").to_string()
+}
+fn default_vllm_sha() -> String {
+    env_default("VLLM_COMMIT_SHA").to_string()
+}
+fn default_llmd_version() -> String {
+    env_default("LLMD_VERSION").to_string()
+}
+
 /// Generate image name from patch content hash and vLLM source identifier
 pub fn generate_image_name(
     patch_content: &[u8],
     vllm_org: &str,
     vllm_repo: &str,
     vllm_sha: &str,
+    precompiled_wheel_commit: &str,
 ) -> String {
     use sha2::{Digest, Sha256};
 
     // Compute patch content hash
     let patch_hash = format!("{:x}", Sha256::digest(patch_content));
 
-    // Create vLLM source identifier
-    let vllm_source_id = format!("{}/{}@{}", vllm_org, vllm_repo, vllm_sha);
+    // Create vLLM source identifier (includes precompiled wheel commit since it affects binaries)
+    let vllm_source_id = format!(
+        "{}/{}@{}+wheel@{}",
+        vllm_org, vllm_repo, vllm_sha, precompiled_wheel_commit
+    );
 
     // Combine and hash (GCE image names have 63 char limit, format is "vllm-spnl-{hash}")
     let combined = format!("{}{}", patch_hash, vllm_source_id);
@@ -34,20 +64,24 @@ pub struct ImageCreateArgs {
     pub(crate) force_overwrite: bool,
 
     /// vLLM organization on GitHub
-    #[builder(setter(into), default = "neuralmagic".to_string())]
+    #[builder(setter(into), default = default_vllm_org())]
     pub(crate) vllm_org: String,
 
     /// vLLM repository name
-    #[builder(setter(into), default = "vllm".to_string())]
+    #[builder(setter(into), default = default_vllm_repo())]
     pub(crate) vllm_repo: String,
 
     /// vLLM commit SHA to use
-    #[builder(setter(into), default = "a1b2c3d4e5f6".to_string())]
+    #[builder(setter(into), default = default_vllm_sha())]
     pub(crate) vllm_sha: String,
 
     /// LLM-D version for patch file
-    #[builder(setter(into), default = "0.5.0".to_string())]
+    #[builder(setter(into), default = default_llmd_version())]
     pub(crate) llmd_version: String,
+
+    /// Commit SHA for precompiled wheel lookup (defaults to VLLM_COMMIT_SHA from defaults.env)
+    #[builder(setter(into), default = default_vllm_sha())]
+    pub(crate) vllm_precompiled_wheel_commit: String,
 
     /// Custom image name (defaults to auto-generated from hash)
     #[builder(default)]
@@ -67,6 +101,7 @@ fn generate_startup_script(
     vllm_org: &str,
     vllm_repo: &str,
     vllm_sha: &str,
+    vllm_precompiled_wheel_commit: &str,
     patch_content_b64: &str,
 ) -> String {
     format!(
@@ -115,7 +150,37 @@ rm /tmp/vllm-patch.gz
 echo "=== Installing vLLM with dependencies ==="
 uv venv --seed
 source .venv/bin/activate
-VLLM_USE_PRECOMPILED=1 uv pip install --editable .
+
+# Detect if precompiled wheel exists
+VLLM_PRECOMPILED_WHEEL_COMMIT="{}"
+MACHINE=$(uname -m)
+case "${{MACHINE}}" in
+  x86_64|amd64) PLATFORM_TAG="manylinux_2_31_x86_64" ;;
+  aarch64|arm64) PLATFORM_TAG="manylinux_2_31_aarch64" ;;
+  *) echo "Unsupported architecture: ${{MACHINE}}"; PLATFORM_TAG="" ;;
+esac
+
+WHEEL_URL=""
+if [ -n "${{PLATFORM_TAG}}" ]; then
+  echo "Looking for precompiled wheel at: https://wheels.vllm.ai/${{VLLM_PRECOMPILED_WHEEL_COMMIT}}/vllm/"
+  WHEEL_INDEX_HTML=$(curl -sf "https://wheels.vllm.ai/${{VLLM_PRECOMPILED_WHEEL_COMMIT}}/vllm/" 2>/dev/null || echo "")
+  if [ -n "${{WHEEL_INDEX_HTML}}" ]; then
+    WHEEL_FILENAME=$(echo "${{WHEEL_INDEX_HTML}}" | grep -oE "vllm-[^\"]+${{PLATFORM_TAG}}\.whl" | head -1)
+    if [ -n "${{WHEEL_FILENAME}}" ]; then
+      WHEEL_URL="https://wheels.vllm.ai/${{VLLM_PRECOMPILED_WHEEL_COMMIT}}/${{WHEEL_FILENAME}}"
+      WHEEL_URL=$(echo "${{WHEEL_URL}}" | sed -E 's/\+/%2B/g')
+      echo "Found precompiled wheel: ${{WHEEL_URL}}"
+    fi
+  fi
+fi
+
+if [ -n "${{WHEEL_URL}}" ]; then
+  echo "Using precompiled binaries from commit: ${{VLLM_PRECOMPILED_WHEEL_COMMIT}}"
+  VLLM_USE_PRECOMPILED=1 VLLM_PRECOMPILED_WHEEL_LOCATION="${{WHEEL_URL}}" uv pip install --editable .
+else
+  echo "Compiling vLLM from source (no precompiled wheel found or unsupported platform)"
+  uv pip install --editable .
+fi
 
 echo "=== Installing ollama ==="
 curl -fsSL https://ollama.com/install.sh | sh
@@ -181,7 +246,7 @@ sudo rm -rf /var/lib/apt/lists/*
 
 echo "=== Image preparation complete ==="
 "#,
-        vllm_org, vllm_repo, vllm_sha, vllm_sha, patch_content_b64
+        vllm_org, vllm_repo, vllm_sha, vllm_sha, patch_content_b64, vllm_precompiled_wheel_commit
     )
 }
 
@@ -563,6 +628,10 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
     eprintln!("  VLLM_ORG: {}", args.vllm_org);
     eprintln!("  VLLM_REPO: {}", args.vllm_repo);
     eprintln!("  VLLM_SHA: {}", args.vllm_sha);
+    eprintln!(
+        "  VLLM_PRECOMPILED_WHEEL_COMMIT: {}",
+        args.vllm_precompiled_wheel_commit
+    );
     eprintln!("  LLMD_VERSION: {}", args.llmd_version);
     eprintln!("  IMAGE_FAMILY: {}", args.image_family);
     eprintln!("  IMAGE_PROJECT: {}", project);
@@ -595,6 +664,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
             &args.vllm_org,
             &args.vllm_repo,
             &args.vllm_sha,
+            &args.vllm_precompiled_wheel_commit,
         )
     };
 
@@ -629,6 +699,7 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
         &args.vllm_org,
         &args.vllm_repo,
         &args.vllm_sha,
+        &args.vllm_precompiled_wheel_commit,
         &patch_content_b64,
     );
 
@@ -683,18 +754,28 @@ mod tests {
     #[test]
     fn test_generate_image_name() {
         let test_content = b"test content";
-        let name = generate_image_name(test_content, "neuralmagic", "vllm", "main");
+        let name = generate_image_name(test_content, "neuralmagic", "vllm", "main", "abc123");
 
         assert!(name.starts_with("vllm-spnl-"));
         assert!(name.len() <= 63); // GCE limit
 
         // Test determinism - same input should produce same output
-        let name2 = generate_image_name(test_content, "neuralmagic", "vllm", "main");
+        let name2 = generate_image_name(test_content, "neuralmagic", "vllm", "main", "abc123");
         assert_eq!(name, name2);
 
         // Different content should produce different name
-        let name3 = generate_image_name(b"different content", "neuralmagic", "vllm", "main");
+        let name3 = generate_image_name(
+            b"different content",
+            "neuralmagic",
+            "vllm",
+            "main",
+            "abc123",
+        );
         assert_ne!(name, name3);
+
+        // Different precompiled wheel commit should produce different name
+        let name4 = generate_image_name(test_content, "neuralmagic", "vllm", "main", "def456");
+        assert_ne!(name, name4);
     }
 
     #[test]
@@ -715,6 +796,28 @@ mod tests {
         assert_eq!(args.vllm_sha, "abc123def456");
         assert_eq!(args.llmd_version, "0.5.0");
         assert_eq!(args.image_family, "test-family");
+    }
+
+    #[test]
+    fn test_defaults_env_parsing() {
+        assert_eq!(env_default("VLLM_ORG"), "vllm-project");
+        assert_eq!(env_default("VLLM_REPO"), "vllm");
+        assert!(!env_default("VLLM_COMMIT_SHA").is_empty());
+        assert!(!env_default("LLMD_VERSION").is_empty());
+    }
+
+    #[test]
+    fn test_image_create_args_defaults_from_env() {
+        let args = ImageCreateArgsBuilder::default().build().unwrap();
+
+        assert_eq!(args.vllm_org, env_default("VLLM_ORG"));
+        assert_eq!(args.vllm_repo, env_default("VLLM_REPO"));
+        assert_eq!(args.vllm_sha, env_default("VLLM_COMMIT_SHA"));
+        assert_eq!(args.llmd_version, env_default("LLMD_VERSION"));
+        assert_eq!(
+            args.vllm_precompiled_wheel_commit,
+            env_default("VLLM_COMMIT_SHA")
+        );
     }
 }
 

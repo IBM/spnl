@@ -1,6 +1,18 @@
 use clap::Args;
 use serde::Serialize;
 
+use super::image::env_default;
+
+fn default_vllm_org() -> String {
+    env_default("VLLM_ORG").to_string()
+}
+fn default_vllm_repo() -> String {
+    env_default("VLLM_REPO").to_string()
+}
+fn default_vllm_sha() -> String {
+    env_default("VLLM_COMMIT_SHA").to_string()
+}
+
 /// GCE configuration that can be set via environment variables or command-line arguments
 #[derive(Debug, Clone, Args, Serialize)]
 pub struct GceConfig {
@@ -45,25 +57,21 @@ pub struct GceConfig {
     pub github_ref: Option<String>,
 
     /// vLLM organization on GitHub
-    #[arg(long, env = "VLLM_ORG", default_value = "neuralmagic")]
+    #[arg(long, env = "VLLM_ORG", default_value_t = default_vllm_org())]
     pub vllm_org: String,
 
     /// vLLM repository name
-    #[arg(long, env = "VLLM_REPO", default_value = "vllm")]
+    #[arg(long, env = "VLLM_REPO", default_value_t = default_vllm_repo())]
     pub vllm_repo: String,
 
     /// vLLM commit SHA to use
-    #[arg(long, env = "VLLM_SHA", default_value = "a1b2c3d4e5f6")]
+    #[arg(long, env = "VLLM_SHA", default_value_t = default_vllm_sha())]
     pub vllm_sha: String,
 
     /// vLLM commit SHA to use for precompiled wheel lookup (defaults to vllm_sha)
     /// This allows using stable precompiled binaries from a known commit (e.g., main)
     /// while checking out a different source commit for testing
-    #[arg(
-        long,
-        env = "VLLM_PRECOMPILED_WHEEL_COMMIT",
-        default_value = "d7de043d55d1dd629554467e23874097e1c48993"
-    )]
+    #[arg(long, env = "VLLM_PRECOMPILED_WHEEL_COMMIT", default_value_t = default_vllm_sha())]
     pub vllm_precompiled_wheel_commit: String,
 }
 
@@ -80,10 +88,10 @@ impl GceConfig {
             spnl_github: None,
             github_sha: None,
             github_ref: None,
-            vllm_org: "neuralmagic".to_string(),
-            vllm_repo: "vllm".to_string(),
-            vllm_sha: "a1b2c3d4e5f6".to_string(),
-            vllm_precompiled_wheel_commit: "d7de043d55d1dd629554467e23874097e1c48993".to_string(),
+            vllm_org: default_vllm_org(),
+            vllm_repo: default_vllm_repo(),
+            vllm_sha: default_vllm_sha(),
+            vllm_precompiled_wheel_commit: default_vllm_sha(),
         }
     }
 
@@ -135,12 +143,12 @@ mod tests {
         assert_eq!(config.machine_type, "g2-standard-4");
         assert_eq!(config.gcs_bucket, "spnl-test");
         assert_eq!(config.spnl_github, None);
-        assert_eq!(config.vllm_org, "neuralmagic");
-        assert_eq!(config.vllm_repo, "vllm");
-        assert_eq!(config.vllm_sha, "a1b2c3d4e5f6");
+        assert_eq!(config.vllm_org, env_default("VLLM_ORG"));
+        assert_eq!(config.vllm_repo, env_default("VLLM_REPO"));
+        assert_eq!(config.vllm_sha, env_default("VLLM_COMMIT_SHA"));
         assert_eq!(
             config.vllm_precompiled_wheel_commit,
-            "d7de043d55d1dd629554467e23874097e1c48993"
+            env_default("VLLM_COMMIT_SHA")
         );
     }
 
@@ -180,6 +188,20 @@ mod tests {
         assert_eq!(config.get_service_account().unwrap(), "test-sa");
         assert_eq!(config.get_github_sha(), "abc123");
         assert_eq!(config.get_github_ref(), "refs/heads/main");
+    }
+
+    /// Verify that GceConfig defaults match defaults.env (both come from the same
+    /// env_default() helper, so this is really a sanity check that the wiring is correct).
+    #[test]
+    fn test_vllm_defaults_match_defaults_env() {
+        let config = GceConfig::new();
+        assert_eq!(config.vllm_org, env_default("VLLM_ORG"));
+        assert_eq!(config.vllm_repo, env_default("VLLM_REPO"));
+        assert_eq!(config.vllm_sha, env_default("VLLM_COMMIT_SHA"));
+        assert_eq!(
+            config.vllm_precompiled_wheel_commit,
+            env_default("VLLM_COMMIT_SHA")
+        );
     }
 }
 
