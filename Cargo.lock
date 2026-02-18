@@ -10328,6 +10328,7 @@ dependencies = [
  "cargo-husky",
  "clap",
  "criterion",
+ "csv",
  "derive_builder",
  "dirs",
  "either",
