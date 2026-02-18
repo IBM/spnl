@@ -398,22 +398,6 @@ pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
 }
 
 #[cfg(feature = "rag")]
-pub fn contentify(input: &Query) -> Vec<String> {
-    match input {
-        Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.iter().flat_map(contentify).collect(),
-        Query::Message(Assistant(s)) | Query::Message(System(s)) => vec![s.clone()],
-        o => {
-            let s = o.to_string();
-            if s.is_empty() {
-                vec![]
-            } else {
-                vec![o.to_string()]
-            }
-        }
-    }
-}
-
-#[cfg(feature = "rag")]
 pub async fn embed(
     provider: Provider,
     embedding_model: &str,
@@ -426,7 +410,7 @@ pub async fn embed(
     let docs = match data {
         EmbedData::String(s) => &vec![s.clone()],
         EmbedData::Vec(v) => v,
-        EmbedData::Query(u) => &contentify(u),
+        EmbedData::Query(u) => &crate::augment::embed::contentify(u),
     };
 
     let request = CreateEmbeddingRequestArgs::default()
