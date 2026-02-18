@@ -118,6 +118,6 @@ Only benchmark progress bar visible
 
 ## Future Enhancements
 
-- Add progress bar support to other benchmarks (`inner_outer.rs`, `mt_rag.rs`)
+- Add progress bar support to other benchmarks (`inner_outer.rs`)
 - Consider adding progress bar styles/themes
 - Add option to show/hide elapsed time in progress bars
