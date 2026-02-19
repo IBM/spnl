@@ -92,6 +92,7 @@ async fn main() -> Result<(), SpnlError> {
             VllmCommands::Down {
                 target,
                 name,
+                force,
                 #[cfg(feature = "gce")]
                 gce_config,
             } => match target {
@@ -99,7 +100,13 @@ async fn main() -> Result<(), SpnlError> {
                 VllmTarget::K8s => k8s_vllm::down(&name.name, name.namespace.clone()).await,
                 #[cfg(feature = "gce")]
                 VllmTarget::Gce => {
-                    gce_vllm::down(&name.name, name.namespace.clone(), gce_config.clone()).await
+                    gce_vllm::down(
+                        &name.name,
+                        name.namespace.clone(),
+                        gce_config.clone(),
+                        *force,
+                    )
+                    .await
                 }
             },
             #[cfg(feature = "gce")]

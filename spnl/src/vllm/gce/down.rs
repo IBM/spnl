@@ -1,10 +1,31 @@
 use crate::vllm::gce::GceConfig;
 use tabled::{Table, Tabled, settings::Style};
 
+/// Returns true if the error indicates the resource was not found (HTTP 404 / gRPC NOT_FOUND).
+fn is_not_found(err: &google_cloud_compute_v1::Error) -> bool {
+    if err.http_status_code() == Some(404) {
+        return true;
+    }
+    // GCE can return code UNKNOWN with "was not found" in the message,
+    // or code NOT_FOUND — check the status message as a catch-all.
+    if let Some(status) = err.status()
+        && status.message.contains("was not found")
+    {
+        return true;
+    }
+    false
+}
+
 /// Delete a GCE instance
 ///
-/// This function deletes a GCE instance by name using the Google Cloud Compute API.
-pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> anyhow::Result<()> {
+/// When `force` is true, a "not found" error is treated as success (the
+/// instance is already gone).  Any other error is still propagated.
+pub async fn down(
+    name: &str,
+    _namespace: Option<String>,
+    config: GceConfig,
+    force: bool,
+) -> anyhow::Result<()> {
     use google_cloud_compute_v1::client::Instances;
     use google_cloud_lro::Poller;
 
@@ -55,6 +76,13 @@ pub async fn down(name: &str, _namespace: Option<String>, config: GceConfig) -> 
     {
         Ok(_) => {
             eprintln!("Instance '{}' found, proceeding with deletion...", name);
+        }
+        Err(e) if force && is_not_found(&e) => {
+            eprintln!(
+                "Instance '{}' not found in zone '{}' (ignored due to --force)",
+                name, zone
+            );
+            return Ok(());
         }
         Err(e) => {
             return Err(anyhow::anyhow!(

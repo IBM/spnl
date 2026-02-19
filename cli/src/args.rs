@@ -196,6 +196,10 @@ pub enum VllmCommands {
         #[command(flatten)]
         name: NameArgs,
 
+        /// Treat "not found" errors as success (instance already gone)
+        #[arg(short = 'f', long)]
+        force: bool,
+
         /// GCE configuration (only used when target is gce)
         #[cfg(feature = "gce")]
         #[command(flatten)]
