@@ -81,7 +81,7 @@ jobs:
         if: always() # this gives us a "finally" block
         run: |
           if which spnl > /dev/null 2>&1; then
-            spnl vllm down --target=gce "vllm-$RUN_ID"
+            spnl vllm down --target=gce --force "vllm-$RUN_ID"
           else
             echo "Nothing to destroy (spnl not installed)"
           fi
