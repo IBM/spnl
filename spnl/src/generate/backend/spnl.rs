@@ -26,10 +26,10 @@ impl Spec {
         }
     }
 
-    fn metadata(&self) -> GenerateMetadata {
+    fn metadata(&self) -> &GenerateMetadata {
         match self {
-            Spec::Map(m) => m.metadata.clone(),
-            Spec::Repeat(r) => r.generate.metadata.clone(),
+            Spec::Map(m) => &m.metadata,
+            Spec::Repeat(r) => &r.generate.metadata,
         }
     }
 
@@ -66,7 +66,7 @@ pub async fn generate(
     let pbs = if options.silent {
         None
     } else {
-        super::progress::bars(spec.n(), &spec.metadata(), &m, None)?
+        super::progress::bars(spec.n(), spec.metadata(), &m, None)?
     };
     let mut response_strings = ::std::iter::repeat_n(String::new(), spec.n()).collect::<Vec<_>>();
 

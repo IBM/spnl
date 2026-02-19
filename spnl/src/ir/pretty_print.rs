@@ -109,28 +109,34 @@ impl ptree::TreeItem for Query {
         )
     }
     fn children(&self) -> ::std::borrow::Cow<'_, [Self::Child]> {
-        ::std::borrow::Cow::from(match self {
-            Query::Message(_) | Query::Print(_) => {
-                vec![]
+        match self {
+            Query::Message(_) | Query::Print(_) => ::std::borrow::Cow::Borrowed(&[]),
+            Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => {
+                ::std::borrow::Cow::Borrowed(v)
             }
-            Query::Par(v) | Query::Seq(v) | Query::Plus(v) | Query::Cross(v) => v.clone(),
-            Query::Zip(z) => vec![*z.first.clone(), *z.second.clone()],
-            Query::Monad(q) => vec![*q.clone()],
-            Query::Bulk(Bulk::Repeat(Repeat { generate, .. })) => vec![*generate.input.clone()],
-            Query::Bulk(Bulk::Map(Map { inputs, .. })) => inputs
-                .iter()
-                .map(|m| Query::Message(Message::User(m.to_string())))
-                .collect(),
-            Query::Generate(Generate { input, .. }) => vec![*input.clone()],
+            Query::Zip(z) => ::std::borrow::Cow::Owned(vec![*z.first.clone(), *z.second.clone()]),
+            Query::Monad(q) => ::std::borrow::Cow::Owned(vec![*q.clone()]),
+            Query::Bulk(Bulk::Repeat(Repeat { generate, .. })) => {
+                ::std::borrow::Cow::Owned(vec![*generate.input.clone()])
+            }
+            Query::Bulk(Bulk::Map(Map { inputs, .. })) => ::std::borrow::Cow::Owned(
+                inputs
+                    .iter()
+                    .map(|m| Query::Message(Message::User(m.to_string())))
+                    .collect(),
+            ),
+            Query::Generate(Generate { input, .. }) => {
+                ::std::borrow::Cow::Owned(vec![*input.clone()])
+            }
             #[cfg(feature = "rag")]
             Query::Augment(Augment {
                 body,
                 doc: (filename, _),
                 ..
-            }) => vec![
+            }) => ::std::borrow::Cow::Owned(vec![
                 *body.clone(),
                 Query::Message(Message::User(format!("\x1b[35m<{filename}>\x1b[0m"))),
-            ],
-        })
+            ]),
+        }
     }
 }

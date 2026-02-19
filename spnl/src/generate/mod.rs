@@ -28,31 +28,31 @@ pub async fn map(
             None
         }
     });
-    match spec.metadata.model.splitn(2, '/').collect::<Vec<_>>()[..] {
+    match spec.metadata.model.split_once('/') {
         #[cfg(feature = "ollama")]
-        ["ollama", m] => {
+        Some(("ollama", m)) => {
             backend::openai::generate_completion(Ollama, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "openai")]
-        ["openai", m] => {
+        Some(("openai", m)) => {
             backend::openai::generate_completion(OpenAI, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "gemini")]
-        ["gemini", m] => {
+        Some(("gemini", m)) => {
             backend::openai::generate_completion(Gemini, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "spnl-api")]
-        ["spnl", m] => {
+        Some(("spnl", m)) => {
             backend::spnl::generate(backend::spnl::Spec::Map(spec.with_model(m)?), mp, options)
                 .await
             // FYI this is what we would do to invoke via the openai bulk api directly: backend::openai::generate_completion(OpenAI, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "local")]
-        ["local", m] => {
+        Some(("local", m)) => {
             backend::mistralrs::generate_completion(spec.with_model(m)?, mp, options).await
         }
 
@@ -72,30 +72,24 @@ pub async fn generate(
     mp: Option<&indicatif::MultiProgress>,
     options: &GenerateOptions,
 ) -> SpnlResult {
-    match spec
-        .generate
-        .metadata
-        .model
-        .splitn(2, '/')
-        .collect::<Vec<_>>()[..]
-    {
+    match spec.generate.metadata.model.split_once('/') {
         #[cfg(feature = "ollama")]
-        ["ollama", m] => {
+        Some(("ollama", m)) => {
             backend::openai::generate_chat(Ollama, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "openai")]
-        ["openai", m] => {
+        Some(("openai", m)) => {
             backend::openai::generate_chat(OpenAI, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "gemini")]
-        ["gemini", m] => {
+        Some(("gemini", m)) => {
             backend::openai::generate_chat(Gemini, spec.with_model(m)?, mp, options).await
         }
 
         #[cfg(feature = "spnl-api")]
-        ["spnl", m] => {
+        Some(("spnl", m)) => {
             backend::spnl::generate(
                 backend::spnl::Spec::Repeat(spec.with_model(m)?),
                 mp,
@@ -105,7 +99,9 @@ pub async fn generate(
         }
 
         #[cfg(feature = "local")]
-        ["local", m] => backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await,
+        Some(("local", m)) => {
+            backend::mistralrs::generate_chat(spec.with_model(m)?, mp, options).await
+        }
 
         #[cfg(feature = "local")]
         _ => {
