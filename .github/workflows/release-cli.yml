@@ -271,6 +271,7 @@ jobs:
           if-no-files-found: error
 
   build-musl:
+    if: github.event_name == 'release'
     name: Build ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.runner }}
     container:
