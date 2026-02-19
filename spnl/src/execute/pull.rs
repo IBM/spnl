@@ -7,13 +7,8 @@ use crate::ir::{Generate, GenerateMetadata, Query};
 
 /// Pull models (in parallel, if needed) used by the given query
 pub async fn pull_if_needed(query: &Query) -> anyhow::Result<()> {
-    futures::future::try_join_all(
-        extract_models(query)
-            .iter()
-            .map(String::as_str)
-            .map(pull_model_if_needed),
-    )
-    .await?;
+    futures::future::try_join_all(extract_models(query).into_iter().map(pull_model_if_needed))
+        .await?;
 
     Ok(())
 }
@@ -72,8 +67,11 @@ enum PullResponse {
     Err(InvalidPullResponse),
 }
 
-fn api_base() -> String {
-    ::std::env::var("OLLAMA_API_BASE").unwrap_or("http://localhost:11434/api".to_string())
+fn api_base() -> std::borrow::Cow<'static, str> {
+    match ::std::env::var("OLLAMA_API_BASE") {
+        Ok(v) => std::borrow::Cow::Owned(v),
+        Err(_) => std::borrow::Cow::Borrowed("http://localhost:11434/api"),
+    }
 }
 
 async fn ollama_exists(model: &str) -> anyhow::Result<bool> {
@@ -266,7 +264,7 @@ async fn ollama_pull_if_needed(model: &str) -> anyhow::Result<()> {
 }
 
 /// Extract models referenced by the query
-pub fn extract_models(query: &Query) -> Vec<String> {
+pub fn extract_models(query: &Query) -> Vec<&str> {
     let mut models = vec![];
     extract_models_iter(query, &mut models);
 
@@ -278,16 +276,16 @@ pub fn extract_models(query: &Query) -> Vec<String> {
 }
 
 /// Produce a vector of the models used by the given `query`
-fn extract_models_iter(query: &Query, models: &mut Vec<String>) {
+fn extract_models_iter<'a>(query: &'a Query, models: &mut Vec<&'a str>) {
     match query {
         #[cfg(feature = "rag")]
         Query::Augment(crate::ir::Augment {
             embedding_model, ..
-        }) => models.push(embedding_model.clone()),
+        }) => models.push(embedding_model),
         Query::Generate(Generate {
             metadata: GenerateMetadata { model, .. },
             ..
-        }) => models.push(model.clone()),
+        }) => models.push(model),
         Query::Plus(v) | Query::Cross(v) => {
             v.iter().for_each(|vv| extract_models_iter(vv, models));
         }

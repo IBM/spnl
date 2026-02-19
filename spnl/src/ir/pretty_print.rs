@@ -3,14 +3,15 @@ use super::*;
 impl ::std::fmt::Display for Query {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
-            Query::Cross(v) | Query::Plus(v) | Query::Par(v) | Query::Seq(v) => write!(
-                f,
-                "{}",
-                v.iter()
-                    .map(|u| format!("{u}"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
+            Query::Cross(v) | Query::Plus(v) | Query::Par(v) | Query::Seq(v) => {
+                for (i, u) in v.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str("\n")?;
+                    }
+                    write!(f, "{u}")?;
+                }
+                Ok(())
+            }
             Query::Message(m) => write!(f, "{m}"),
             _ => Ok(()),
         }
@@ -69,7 +70,7 @@ impl ptree::TreeItem for Query {
                     {
                         format!("max_tokens={mt} ")
                     } else {
-                        "".to_string()
+                        String::new()
                     }
                 )),
                 Query::Zip(_) => style.paint("\x1b[2mZip\x1b[0m".to_string()),
@@ -81,7 +82,7 @@ impl ptree::TreeItem for Query {
                     {
                         format!("max_tokens={mt} ")
                     } else {
-                        "".to_string()
+                        String::new()
                     },
                     generate.metadata.model,
                 )),
@@ -99,7 +100,7 @@ impl ptree::TreeItem for Query {
                     {
                         format!("max_tokens={mt} ")
                     } else {
-                        "".to_string()
+                        String::new()
                     }
                 )),
                 Query::Print(m) => style.paint(format!("Print {}", truncate(m, 700))),

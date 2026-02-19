@@ -495,7 +495,7 @@ pub fn apply(tmpl: ChatTemplate, chat: &[Message], add_ass: bool) -> String {
             .iter()
             .map(|m| match m {
                 Message::User(s) => {
-                    format!("<{}>{}<AI>", String::from("<用户>"), s.trim())
+                    format!("<用户>{}<AI>", s.trim())
                 }
                 _ => m.content().trim().to_string(),
             })
@@ -508,7 +508,7 @@ pub fn apply(tmpl: ChatTemplate, chat: &[Message], add_ass: bool) -> String {
                 Message::System(s) => format!("{s}\n\n"),
                 Message::User(s) => format!("User: {s}\n\n"),
                 Message::Assistant(s) => {
-                    format!("Assistant: {s}{}", String::from("<｜end▁of▁sentence｜>"))
+                    format!("Assistant: {s}<｜end▁of▁sentence｜>")
                 }
             })
             .chain(
@@ -524,12 +524,10 @@ pub fn apply(tmpl: ChatTemplate, chat: &[Message], add_ass: bool) -> String {
             .iter()
             .map(|m| match m {
                 Message::System(s) => format!("{s}\n\n"),
-                Message::User(s) => format!("{}User: {s}\n\n", String::from("<｜User｜>")),
-                Message::Assistant(s) => format!(
-                    "{}{s}{}",
-                    String::from("<｜Assistant｜>"),
-                    String::from("<｜end▁of▁sentence｜>")
-                ),
+                Message::User(s) => format!("<｜User｜>User: {s}\n\n"),
+                Message::Assistant(s) => {
+                    format!("<｜Assistant｜>{s}<｜end▁of▁sentence｜>")
+                }
             })
             .chain(
                 add_ass
