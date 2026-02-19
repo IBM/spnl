@@ -805,7 +805,7 @@ pub fn apply(tmpl: ChatTemplate, chat: &[Message], add_ass: bool) -> String {
                     "<seed:bos>{}\n{}<seed:eos>",
                     m.role(),
                     match m {
-                        Message::Assistant(s) => s.trim().to_string(),
+                        Message::Assistant(s) => s.trim(),
                         _ => m.content(),
                     }
                 )

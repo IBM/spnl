@@ -31,9 +31,9 @@ impl Message {
             Message::System(_) => "system",
         }
     }
-    pub fn content(&self) -> String {
+    pub fn content(&self) -> &str {
         match self {
-            Message::Assistant(s) | Message::User(s) | Message::System(s) => s.to_string(),
+            Message::Assistant(s) | Message::User(s) | Message::System(s) => s,
         }
     }
 }
