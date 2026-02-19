@@ -34,21 +34,21 @@ fn default_temperature() -> Option<f32> {
 
 impl From<GenerateMetadata> for GenerateMetadataBuilder {
     fn from(other: GenerateMetadata) -> Self {
-        GenerateMetadataBuilder::default()
-            .model(other.model)
-            .max_tokens(other.max_tokens)
-            .temperature(other.temperature)
-            .clone()
+        let mut b = GenerateMetadataBuilder::default();
+        b.model(other.model);
+        b.max_tokens(other.max_tokens);
+        b.temperature(other.temperature);
+        b
     }
 }
 
 impl From<&GenerateMetadata> for GenerateMetadataBuilder {
     fn from(other: &GenerateMetadata) -> Self {
-        GenerateMetadataBuilder::default()
-            .model(other.model.clone())
-            .max_tokens(other.max_tokens)
-            .temperature(other.temperature)
-            .clone()
+        let mut b = GenerateMetadataBuilder::default();
+        b.model(other.model.clone());
+        b.max_tokens(other.max_tokens);
+        b.temperature(other.temperature);
+        b
     }
 }
 
@@ -83,19 +83,19 @@ impl Generate {
 
 impl From<Generate> for GenerateBuilder {
     fn from(other: Generate) -> Self {
-        GenerateBuilder::default()
-            .metadata(other.metadata)
-            .input(other.input)
-            .clone()
+        let mut b = GenerateBuilder::default();
+        b.metadata(other.metadata);
+        b.input(other.input);
+        b
     }
 }
 
 impl From<&Generate> for GenerateBuilder {
     fn from(other: &Generate) -> Self {
-        GenerateBuilder::default()
-            .metadata(other.metadata.clone())
-            .input(other.input.clone())
-            .clone()
+        let mut b = GenerateBuilder::default();
+        b.metadata(other.metadata.clone());
+        b.input(other.input.clone());
+        b
     }
 }
 

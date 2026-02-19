@@ -57,7 +57,7 @@ fn intersperse(a: Query, b: Vec<Query>) -> Vec<Query> {
     match a {
         Query::Plus(p) => b
             .into_iter()
-            .map(|bb| Query::Plus(p.iter().cloned().chain(vec![bb]).collect()))
+            .map(|bb| Query::Plus(p.iter().cloned().chain(std::iter::once(bb)).collect()))
             .collect(),
         _ => ::std::iter::repeat_n(a, b.len())
             .zip(b) // [(a1,b1),(a1,b2),...]

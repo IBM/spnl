@@ -14,6 +14,8 @@ use futures::StreamExt;
 use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};
 
+use std::borrow::Cow;
+
 use crate::{
     SpnlResult,
     generate::GenerateOptions,
@@ -29,22 +31,28 @@ pub enum Provider {
     Ollama,
 }
 
-fn api_base(provider: &Provider) -> (String, ReasoningEffort) {
+fn api_base(provider: &Provider) -> (Cow<'static, str>, ReasoningEffort) {
     match provider {
         // Note: NO TRAILING SLASHES!
         Provider::OpenAI => (
-            ::std::env::var("OPENAI_API_BASE").unwrap_or("https://api.openai.com/v1".to_string()),
+            match ::std::env::var("OPENAI_API_BASE") {
+                Ok(v) => Cow::Owned(v),
+                Err(_) => Cow::Borrowed("https://api.openai.com/v1"),
+            },
             ReasoningEffort::Low,
         ),
         Provider::Gemini => (
-            ::std::env::var("GEMINI_API_BASE")
-                .unwrap_or("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+            match ::std::env::var("GEMINI_API_BASE") {
+                Ok(v) => Cow::Owned(v),
+                Err(_) => Cow::Borrowed("https://generativelanguage.googleapis.com/v1beta/openai"),
+            },
             ReasoningEffort::Low,
         ),
         Provider::Ollama => (
-            ::std::env::var("OLLAMA_API_BASE")
-                .map(|b| format!("{b}/v1"))
-                .unwrap_or("http://localhost:11434/v1".to_string()),
+            match ::std::env::var("OLLAMA_API_BASE") {
+                Ok(b) => Cow::Owned(format!("{b}/v1")),
+                Err(_) => Cow::Borrowed("http://localhost:11434/v1"),
+            },
             ReasoningEffort::None,
         ),
     }
@@ -389,7 +397,7 @@ pub fn messagify(input: &Query) -> Vec<ChatCompletionRequestMessage> {
                 vec![ChatCompletionRequestMessage::User(
                     ChatCompletionRequestUserMessage {
                         name: None,
-                        content: ChatCompletionRequestUserMessageContent::Text(o.to_string()),
+                        content: ChatCompletionRequestUserMessageContent::Text(s),
                     },
                 )]
             }
@@ -407,16 +415,20 @@ pub async fn embed(
 
     let client = Client::with_config(OpenAIConfig::new().with_api_base(api_base(&provider).0));
 
-    let docs = match data {
-        EmbedData::String(s) => &vec![s.clone()],
-        EmbedData::Vec(v) => v,
-        EmbedData::Query(u) => &crate::augment::embed::contentify(u),
+    let request = match data {
+        EmbedData::String(s) => CreateEmbeddingRequestArgs::default()
+            .model(embedding_model)
+            .input(s.as_str())
+            .build()?,
+        EmbedData::Vec(v) => CreateEmbeddingRequestArgs::default()
+            .model(embedding_model)
+            .input(v)
+            .build()?,
+        EmbedData::Query(u) => CreateEmbeddingRequestArgs::default()
+            .model(embedding_model)
+            .input(crate::augment::embed::contentify(u))
+            .build()?,
     };
-
-    let request = CreateEmbeddingRequestArgs::default()
-        .model(embedding_model)
-        .input(docs)
-        .build()?;
 
     Ok(client
         .embeddings()

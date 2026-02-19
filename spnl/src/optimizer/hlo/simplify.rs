@@ -101,16 +101,16 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
             // One-entry sequence
             [q] => simplify_iter(q),
 
-            otherwise => vec![Query::Seq(
-                otherwise
-                    .iter()
-                    .flat_map(simplify_iter)
-                    .flat_map(|q| match q {
-                        Query::Seq(v) => v, // Seq inside a Seq? flatten
-                        _ => vec![q],
-                    })
-                    .collect(),
-            )],
+            otherwise => {
+                let mut items = Vec::new();
+                for q in otherwise.iter().flat_map(simplify_iter) {
+                    match q {
+                        Query::Seq(v) => items.extend(v), // Seq inside a Seq? flatten
+                        _ => items.push(q),
+                    }
+                }
+                vec![Query::Seq(items)]
+            }
         },
         Query::Par(v) => match &v[..] {
             // One-entry parallel
@@ -161,14 +161,16 @@ fn simplify_iter(query: &Query) -> Vec<Query> {
                         v2.iter().chain(&v[1..]).flat_map(simplify_iter).collect()
                     }
 
-                    otherwise => otherwise
-                        .iter()
-                        .flat_map(simplify_iter)
-                        .flat_map(|child| match child {
-                            Query::Plus(v2) => v2,
-                            _ => vec![child],
-                        })
-                        .collect(),
+                    otherwise => {
+                        let mut items = Vec::new();
+                        for child in otherwise.iter().flat_map(simplify_iter) {
+                            match child {
+                                Query::Plus(v2) => items.extend(v2),
+                                _ => items.push(child),
+                            }
+                        }
+                        items
+                    }
                 })]
             }
         }
