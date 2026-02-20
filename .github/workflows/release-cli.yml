@@ -448,29 +448,22 @@ jobs:
         # Skip flash-attn variants on PRs (only run on release)
         if: github.event_name == 'release' || matrix.platform.features == 'cuda'
 
-      - name: Cache Cargo registry
-        # Only use cache for flash-attn variants on releases (they take longer to build)
-        if: github.event_name == 'release' && matrix.platform.features != 'cuda'
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: linux-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            linux-cargo-registry-
-
       - name: Cache Cargo build
-        # Only use cache for flash-attn variants on releases (they take longer to build)
+        # Cache target/ for flash-attn variants on releases (they take ~45min to build).
+        # Note: ~/.cargo/registry is NOT cached because this is a container job — JS actions
+        # (like actions/cache) run on the host, which can't access the container's ~/.cargo.
+        # The target/ dir works because it's in the workspace, which is host-mounted.
+        #
+        # Key is stable (no Cargo.lock hash) so the cache actually hits across releases.
+        # On exact match, actions/cache skips the expensive Post save step entirely.
+        # Cargo's fingerprinting handles staleness — it recompiles changed deps regardless.
         if: github.event_name == 'release' && matrix.platform.features != 'cuda'
         uses: actions/cache@v5
         with:
           path: target/
-          key: linux-${{ matrix.platform.arch }}-cargo-build-cuda-${{ matrix.platform.features }}-${{ hashFiles('**/Cargo.lock') }}
+          key: cuda-build-${{ matrix.platform.features }}-${{ matrix.platform.cuda_compute_cap }}
           restore-keys: |
-            linux-${{ matrix.platform.arch }}-cargo-build-cuda-${{ matrix.platform.features }}-
-            linux-${{ matrix.platform.arch }}-cargo-build-cuda-
+            cuda-build-${{ matrix.platform.features }}-
 
       - name: Install build dependencies
         # Skip flash-attn variants on PRs (only run on release)
