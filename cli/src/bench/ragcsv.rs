@@ -462,6 +462,128 @@ fn build_relevancy_query(model: &str, question: &str, answer: &str) -> Query {
 }
 
 // ---------------------------------------------------------------------------
+// Document reuse analysis
+// ---------------------------------------------------------------------------
+
+fn print_document_reuse_report(rows: &[EvalRow]) {
+    // Build flat sequence of documents in order across all rows.
+    let mut doc_sequence: Vec<&str> = Vec::new();
+    let mut doc_titles: HashMap<&str, &str> = HashMap::new();
+
+    for row in rows {
+        for frag in &row.fragments {
+            doc_sequence.push(&frag.page_content);
+            if !frag.metadata.title.is_empty() {
+                doc_titles.insert(&frag.page_content, &frag.metadata.title);
+            }
+        }
+    }
+
+    if doc_sequence.is_empty() {
+        return;
+    }
+
+    // Token count per slot and prefix sums for fast range queries.
+    let token_counts: Vec<usize> = doc_sequence
+        .iter()
+        .map(|d| normalize_tokens(d).len())
+        .collect();
+    let mut prefix_tokens: Vec<usize> = Vec::with_capacity(token_counts.len() + 1);
+    prefix_tokens.push(0);
+    for &c in &token_counts {
+        prefix_tokens.push(prefix_tokens.last().unwrap() + c);
+    }
+
+    // Track ordered positions of each document.
+    let mut doc_positions: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (pos, doc) in doc_sequence.iter().enumerate() {
+        doc_positions.entry(doc).or_default().push(pos);
+    }
+
+    let total_slots = doc_sequence.len();
+    let unique_count = doc_positions.len();
+
+    // Documents that appear more than once, sorted by use count descending.
+    let mut reused: Vec<(&str, &Vec<usize>)> = doc_positions
+        .iter()
+        .filter(|(_, positions)| positions.len() > 1)
+        .map(|(doc, positions)| (*doc, positions))
+        .collect();
+    reused.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
+    // Reuse distance = total tokens of intervening documents between
+    // consecutive occurrences of the same document.
+    let intervening_tokens = |i: usize, j: usize| -> usize {
+        // Tokens in slots (i+1)..j  (exclusive of both endpoints)
+        prefix_tokens[j] - prefix_tokens[i + 1]
+    };
+
+    let mut all_distances: Vec<usize> = Vec::new();
+    for (_, positions) in &reused {
+        for w in positions.windows(2) {
+            all_distances.push(intervening_tokens(w[0], w[1]));
+        }
+    }
+
+    eprintln!("\n=== RAGCSV Document Reuse ===");
+    eprintln!("  Total document slots:  {total_slots}");
+    eprintln!("  Unique documents:      {unique_count}");
+    eprintln!(
+        "  Reused (>1 use):       {} ({:.1}% of unique)",
+        reused.len(),
+        if unique_count > 0 {
+            reused.len() as f64 / unique_count as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+
+    if !reused.is_empty() {
+        let max_uses = reused[0].1.len();
+        let avg_uses =
+            reused.iter().map(|(_, p)| p.len()).sum::<usize>() as f64 / reused.len() as f64;
+        eprintln!("  Avg uses (reused):     {avg_uses:.1}");
+        eprintln!("  Max uses:              {max_uses}");
+
+        if !all_distances.is_empty() {
+            let avg_dist = all_distances.iter().sum::<usize>() as f64 / all_distances.len() as f64;
+            let min_dist = *all_distances.iter().min().unwrap();
+            let max_dist = *all_distances.iter().max().unwrap();
+            eprintln!("  Avg reuse distance:    {avg_dist:.1} tokens");
+            eprintln!("  Min reuse distance:    {min_dist} tokens");
+            eprintln!("  Max reuse distance:    {max_dist} tokens");
+        }
+
+        eprintln!("  Top reused:");
+        for (doc, positions) in reused.iter().take(5) {
+            let label = doc_titles.get(doc).copied().unwrap_or_else(|| {
+                let end = doc
+                    .char_indices()
+                    .nth(60)
+                    .map(|(i, _)| i)
+                    .unwrap_or(doc.len());
+                &doc[..end]
+            });
+            let dists: Vec<usize> = positions
+                .windows(2)
+                .map(|w| intervening_tokens(w[0], w[1]))
+                .collect();
+            let avg_d = if dists.is_empty() {
+                0.0
+            } else {
+                dists.iter().sum::<usize>() as f64 / dists.len() as f64
+            };
+            eprintln!(
+                "    {}x  avg_dist={:.0}tok  \"{}\"",
+                positions.len(),
+                avg_d,
+                label
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Reporting helper
 // ---------------------------------------------------------------------------
 
@@ -499,6 +621,8 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
         args.model, grading_model, args.concurrency, max_tokens
     );
     eprintln!("Metrics: {}", args.metrics);
+
+    print_document_reuse_report(&rows);
 
     if total == 0 {
         eprintln!("No rows to process.");
