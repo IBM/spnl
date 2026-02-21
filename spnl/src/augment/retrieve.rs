@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 // for .unique()
 use itertools::Itertools;
 
@@ -8,16 +10,28 @@ use crate::{
     augment::{
         AugmentOptions,
         embed::{EmbedData, embed},
-        storage,
     },
     ir::{Document, Query},
 };
 
-/// Retrieve relevant
+use leann_core::hnsw::{
+    graph::VectorStorage,
+    io::read_hnsw_index,
+    search::{SearchParams, search_hnsw},
+};
+use leann_core::index::IndexPaths;
+use leann_core::passages::{PassageManager, load_id_map};
+
+/// Sanitize a name for use as a filesystem path component (mirrors layer1)
+fn sanitize_name(name: &str) -> String {
+    name.replace("/", "_").replace(":", "_")
+}
+
+/// Retrieve relevant document fragments using HNSW vector search
 pub async fn retrieve(
     embedding_model: &String,
     body: &Query,
-    (filename, content): &(String, Document),
+    (filename, _content): &(String, Document),
     options: &AugmentOptions,
 ) -> anyhow::Result<Vec<String>> {
     #[cfg(feature = "rag-deep-debug")]
@@ -28,120 +42,92 @@ pub async fn retrieve(
     #[cfg(feature = "rag-deep-debug")]
     let now = ::std::time::Instant::now();
 
-    // Maximum number of relevant fragments to consider
     let max_matches: usize = options.max_aug.unwrap_or(10);
 
-    let window_size = match content {
-        Document::Text(_) => 1,
-        Document::Binary(_) => 8,
+    // Derive the index path (must match layer1.rs naming)
+    let index_name = sanitize_name(&format!(
+        "default.{embedding_model}.{filename}.{:?}",
+        options.indexer
+    ));
+    let index_dir = PathBuf::from(&options.index_dir);
+    let index_path = index_dir.join(format!("{index_name}.leann"));
+    let paths = IndexPaths::new(&index_path);
+
+    // Load HNSW graph from disk
+    let mut index_file = std::fs::File::open(paths.index_file_path())?;
+    let graph = read_hnsw_index(&mut index_file)?;
+
+    // Extract stored vectors
+    let stored_vectors: Vec<f32> = match &graph.vector_storage {
+        VectorStorage::Raw { data, .. } => data
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect(),
+        VectorStorage::Null => {
+            anyhow::bail!("HNSW index has no stored vectors; was it built with is_recompute=false?")
+        }
     };
 
-    let table_name = storage::VecDB::sanitize_table_name(
-        format!(
-            "{}.{embedding_model}.{window_size}.{filename}.{:?}",
-            options.vecdb_table, options.indexer
-        )
-        .as_str(),
-    );
-    let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
+    // Load passage manager and ID map
+    let passage_source = leann_core::index::PassageSource {
+        source_type: "jsonl".to_string(),
+        path: paths.passages_path().to_string_lossy().to_string(),
+        index_path: paths.offset_path().to_string_lossy().to_string(),
+        path_relative: None,
+        index_path_relative: None,
+    };
+    let passages = PassageManager::load(&[passage_source], None)?;
+    let id_map = load_id_map(&paths.id_map_path())?;
 
     #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("Embedding question {body}");
     }
 
-    let body_vectors = embed(embedding_model, EmbedData::Query(body.clone()))
+    // Embed the query
+    let body_vectors: Vec<Vec<f32>> = embed(embedding_model, EmbedData::Query(body.clone()))
         .await?
-        .map(|v| {
-            if v.len() < 1024 {
-                let mut vv = v.clone();
-                vv.resize(1024, 0.0);
-                vv
-            } else {
-                v
-            }
-        });
+        .collect();
 
     #[cfg(feature = "rag-deep-debug")]
     if verbose {
         eprintln!("Matching question to document");
     }
 
-    // TODO find a way to use db.find_similar_keys() to avoid
-    // replicating the filter_map logic below. Blocker: `db` is shared
-    // across the asyncs because find_similar_keys() returns an
-    // Iterator whereas find_similar() returns a vector.
-    let matching_docs = futures::future::try_join_all(
-        body_vectors
-            .into_iter()
-            .map(|v| db.find_similar(v, max_matches, None, None)),
-    )
-    .await?
-    .into_iter()
-    .flatten()
-    .filter_map(|record_batch| {
-        if let Some(files_array) = record_batch.column_by_name("filename")
-            && let Some(files) = files_array
-                .as_any()
-                .downcast_ref::<arrow_array::StringArray>()
-        {
-            return Some(
-                files
-                    .iter()
-                    .filter_map(|b| b.map(|b| b.to_string()))
-                    .collect::<Vec<String>>(),
-            );
-        }
+    // Search for each query vector
+    let params = SearchParams::default();
+    let matching_ids: Vec<String> = body_vectors
+        .into_iter()
+        .flat_map(|query_vec| {
+            let (labels, _distances) =
+                search_hnsw(&graph, &query_vec, max_matches, &stored_vectors, &params);
+            labels
+                .into_iter()
+                .filter_map(|label| id_map.get(label).cloned())
+        })
+        .unique()
+        .collect();
 
-        // no matching docs for this body vector
-        None
-    })
-    .flatten()
-    .unique();
-
+    // Resolve passage text
     #[cfg(feature = "rag-deep-debug")]
     if verbose {
-        use sha2::Digest;
         eprintln!(
-            "RAGSizes {}",
-            matching_docs.clone().map(|doc| doc.len()).join(" ")
-        );
-        eprintln!(
-            "RAGHashes {}",
-            matching_docs
-                .clone()
-                .map(|doc| {
-                    let mut hasher = sha2::Sha256::new();
-                    hasher.update(doc);
-                    format!("{:x}", hasher.finalize())
-                })
-                .join(" ")
-        );
-
-        let len1 = match content {
-            Document::Text(c) => c.len(),
-            Document::Binary(b) => b.len(),
-        } as f64;
-        let len2 = matching_docs.clone().map(|doc| doc.len()).sum::<usize>() as f64;
-        eprintln!(
-            "RAG fragments total_fragments {} relevant_fragments {}",
-            match content {
-                Document::Text(t) => t.len(),
-                Document::Binary(b) => b.len(),
-            },
-            matching_docs.clone().count()
-        );
-        eprintln!(
-            "RAG size reduction factor {:.2} {len1} -> {len2} bytes",
-            len1 / len2,
+            "RAG fragments total_passages {} relevant_fragments {}",
+            passages.len(),
+            matching_ids.len()
         );
     }
 
-    let mut d = matching_docs
+    let mut d: Vec<String> = matching_ids
         .into_iter()
-        .rev() // reverse so that we can present the most relevant closest to the query (at the end)
-        .map(|doc| format!("Relevant Document {doc}"))
-        .collect::<Vec<_>>();
+        .rev() // reverse so most relevant is closest to query (at end)
+        .filter_map(|id| {
+            passages
+                .get_passage(&id)
+                .ok()
+                .map(|p| format!("Relevant Document {id}: {}", p.text))
+        })
+        .collect();
 
     #[cfg(feature = "rag-deep-debug")]
     if verbose {

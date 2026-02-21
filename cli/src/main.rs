@@ -164,13 +164,7 @@ async fn run(args: Args) -> Result<(), SpnlError> {
             .verbose(args.verbose)
             .max_aug(args.max_aug)
             .shuffle(args.shuffle)
-            .vecdb_uri(args.vecdb_uri.clone())
-            .vecdb_table(
-                args.builtin
-                    .clone()
-                    .map(|builtin| format!("builtin.{builtin:?}"))
-                    .unwrap_or_else(|| args.file.clone().unwrap_or("default".to_string())),
-            )
+            .index_dir(args.index_dir.clone())
             .build()?,
     };
 

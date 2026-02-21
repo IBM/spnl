@@ -20,7 +20,7 @@ pub mod optimizer;
 #[cfg(feature = "rag")]
 mod augment;
 #[cfg(feature = "rag")]
-pub use augment::{AugmentOptionsBuilder, Indexer, windowing};
+pub use augment::{AugmentOptionsBuilder, Indexer};
 
 #[cfg(feature = "k8s")]
 pub mod k8s;
