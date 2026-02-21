@@ -276,6 +276,12 @@ mod tests {
             return Ok(());
         }
 
+        // Remove stale index sentinel so the index is always rebuilt
+        // with the current leann-core format.
+        let _ = std::fs::remove_file(
+            "data/spnl/default.local_google_embeddinggemma-300m.path_to_doc.txt.SimpleEmbedRetrieve.ok",
+        );
+
         let model = "spnl/m"; // This should work, because we use SimpleEmbedRetrieve which won't do any generation
         let q = Message(User("Hello".to_string()));
         let d = "I know all about Hello and stuff";

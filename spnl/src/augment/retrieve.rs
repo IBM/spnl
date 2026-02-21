@@ -96,14 +96,12 @@ pub async fn retrieve(
 
     // Search for each query vector
     let params = SearchParams::default();
-    let matching_ids: Vec<String> = body_vectors
+    let matching_labels: Vec<usize> = body_vectors
         .into_iter()
         .flat_map(|query_vec| {
             let (labels, _distances) =
                 search_hnsw(&graph, &query_vec, max_matches, &stored_vectors, &params);
-            labels
-                .into_iter()
-                .filter_map(|label| id_map.get(label).cloned())
+            labels.into_iter()
         })
         .unique()
         .collect();
@@ -114,16 +112,17 @@ pub async fn retrieve(
         eprintln!(
             "RAG fragments total_passages {} relevant_fragments {}",
             passages.len(),
-            matching_ids.len()
+            matching_labels.len()
         );
     }
 
-    let mut d: Vec<String> = matching_ids
+    let mut d: Vec<String> = matching_labels
         .into_iter()
         .rev() // reverse so most relevant is closest to query (at end)
-        .filter_map(|id| {
+        .filter_map(|label| {
+            let id = id_map.get(label).map(|s| s.as_str()).unwrap_or("?");
             passages
-                .get_passage(&id)
+                .get_passage_by_index(label)
                 .ok()
                 .map(|p| format!("Relevant Document {id}: {}", p.text))
         })
