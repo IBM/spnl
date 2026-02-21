@@ -15,13 +15,17 @@ pub struct AugmentOptions {
     #[builder(default)]
     pub max_aug: Option<usize>,
 
-    /// URI of vector database, which can be a local filepath
-    #[builder(default = "data/spnl".to_string())]
-    pub vecdb_uri: String,
+    /// Directory where HNSW indexes are stored
+    #[builder(default = "\"data/spnl\".to_string()")]
+    pub index_dir: String,
 
-    /// Name of table to use in vector database
-    #[builder(default = "default".to_string())]
-    pub vecdb_table: String,
+    /// Chunk size for sentence-based chunking (characters)
+    #[builder(default = "512")]
+    pub chunk_size: usize,
+
+    /// Chunk overlap for sentence-based chunking (characters)
+    #[builder(default = "50")]
+    pub chunk_overlap: usize,
 
     /// Scheme to use for indexing the corpus
     #[builder(default)]

@@ -1,7 +1,6 @@
-mod layer1;
+pub(crate) mod layer1;
 mod raptor;
 mod simple_embed_retrieve;
-pub mod windowing;
 
 use indicatif::MultiProgress;
 

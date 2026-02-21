@@ -1,35 +1,17 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use anyhow::anyhow;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use super::windowing;
-
 use crate::{
-    augment::{
-        AugmentOptions,
-        embed::{EmbedData, embed},
-        storage,
-    },
+    augment::{AugmentOptions, embed::SpnlEmbeddingProvider},
     ir::{Augment, Document},
 };
 
-/// Number of fragment embeddings to perform in a single call
-const BATCH_SIZE: usize = 64;
-
-pub struct Fragments {
-    /// Name of corpus
-    pub filename: String,
-
-    /// Name of vector db table to use for subsequent indexing tasks
-    pub table_name: String,
-
-    /// The model to be used to generate over these fragments
-    pub enclosing_model: String,
-
-    /// The model to be used to generate over these fragments
-    pub embedding_model: String,
-
-    /// A list of vector embeddings
-    pub fragments: Vec<Vec<f32>>,
+/// Sanitize a name for use as a filesystem path component
+fn sanitize_name(name: &str) -> String {
+    name.replace("/", "_").replace(":", "_")
 }
 
 /// Fragment, embed, and index the corpora implied by the given
@@ -38,14 +20,34 @@ pub async fn process_corpora(
     a: &[(String, Augment)], // (enclosing_model, Augment)
     options: &AugmentOptions,
     m: &MultiProgress,
-) -> anyhow::Result<impl Iterator<Item = Fragments>> {
-    Ok(futures::future::try_join_all(
-        a.iter()
-            .map(|augmentation| process_document(augmentation, options, m)),
-    )
-    .await?
-    .into_iter()
-    .flatten())
+) -> anyhow::Result<Vec<IndexedCorpus>> {
+    // Process documents sequentially since LeannBuilder uses
+    // block_in_place internally for embedding computation
+    let mut results = Vec::new();
+    for augmentation in a {
+        if let Some(corpus) = process_document(augmentation, options, m).await? {
+            results.push(corpus);
+        }
+    }
+    Ok(results)
+}
+
+/// Metadata about an indexed corpus, used by RAPTOR for cross-indexing
+pub struct IndexedCorpus {
+    /// Name of corpus
+    pub filename: String,
+
+    /// The leann index path (e.g. data/spnl/name.leann)
+    pub index_path: PathBuf,
+
+    /// The model to be used to generate over these fragments
+    pub enclosing_model: String,
+
+    /// The embedding model used
+    pub embedding_model: String,
+
+    /// Embedding dimensions
+    pub dimensions: usize,
 }
 
 /// Fragment, embed, and index the given document
@@ -53,118 +55,120 @@ async fn process_document(
     (enclosing_model, a): &(String, Augment),
     options: &AugmentOptions,
     m: &MultiProgress,
-) -> anyhow::Result<Option<Fragments>> {
+) -> anyhow::Result<Option<IndexedCorpus>> {
     #[cfg(feature = "pull")]
     crate::pull::pull_model_if_needed(a.embedding_model.as_str()).await?;
 
     let (filename, content) = &a.doc;
-    let window_size = match content {
-        Document::Text(_) => 1,
-        Document::Binary(_) => 8,
-    };
 
     let file_base_name = ::std::path::Path::new(filename)
         .file_name()
         .ok_or(anyhow!("Could not determine base name"))?
-        .display();
-    let table_name = storage::VecDB::sanitize_table_name(
-        format!(
-            "{}.{}.{window_size}.{filename}.{:?}",
-            options.vecdb_table, a.embedding_model, options.indexer,
-        )
-        .as_str(),
-    );
-    let done_file = ::std::path::PathBuf::from(&options.vecdb_uri).join(format!("{table_name}.ok"));
+        .display()
+        .to_string();
 
-    if !::std::fs::exists(&done_file)? {
-        // this is a list of fragment strings, i.e. we have broken up
-        // the `content` into a list of fragments
-        let fragments = match (
-            content,
-            ::std::path::Path::new(filename)
-                .extension()
-                .and_then(std::ffi::OsStr::to_str),
-        ) {
-            (Document::Text(content), Some("txt")) => windowing::text(content),
-            (Document::Text(content), Some("jsonl")) => windowing::jsonl(content),
-            (Document::Binary(content), Some("pdf")) => windowing::pdf(content, window_size),
-            _ => Err(anyhow!("Unsupported `index` document type: {filename}")),
-        }?;
+    let index_name = sanitize_name(&format!(
+        "default.{}.{filename}.{:?}",
+        a.embedding_model, options.indexer,
+    ));
+    let index_dir = PathBuf::from(&options.index_dir);
+    let index_path = index_dir.join(format!("{index_name}.leann"));
+    let done_file = index_dir.join(format!("{index_name}.ok"));
 
-        let pb = m.add(
-            ProgressBar::new(fragments.len().try_into()?)
-                .with_style(ProgressStyle::with_template(
-                    "{msg} {wide_bar:.cyan/blue} {pos:>7}/{len:7} [{elapsed_precise}]",
-                )?)
-                .with_message(format!("Indexing {}", file_base_name,)),
-        );
-
-        // Needed to render the progress bar immediately (it will show
-        // "0/N"). Otherwise, the progress bar would not even appear
-        // until the first update.
-        pb.inc(0);
-
-        // This will be a parallel array (to `fragments`), containing
-        // one vector embedding per fragment.
-        let mut vector_embeddings = vec![];
-
-        // For efficiency (confirm?) we ask for BATCH_SIZE embeddings at a time.
-        for docs in fragments.chunks(BATCH_SIZE) {
-            let n = docs.len();
-            let vecs = embed(&a.embedding_model, EmbedData::Vec(docs.to_vec()))
-                .await?
-                .map(|vec| {
-                    if vec.len() < 1024 {
-                        // pad out to 1024
-                        let mut ee = vec.clone();
-                        ee.resize(1024, 0.0);
-                        ee
-                    } else {
-                        vec
-                    }
-                });
-
-            pb.inc(n.try_into()?);
-            vector_embeddings.extend(vecs);
-        }
-        pb.finish();
-
-        let db = storage::VecDB::connect(&options.vecdb_uri, table_name.as_str()).await?;
-
-        if options.verbose {
-            m.println(format!(
-                "Inserting document embeddings {}",
-                vector_embeddings.len()
-            ))?;
-        }
-
-        // Recall that `fragments` and `vector_embeddings` have been
-        // constructed as parallel arrays.
-        db.add_vector(
-            fragments
-                .iter()
-                .enumerate()
-                .map(|(idx, fragment)| format!("@base-{}-{idx}: {fragment}", file_base_name)),
-            vector_embeddings.clone(),
-            1024,
-        )
-        .await?;
-
-        // mark this filename as done
-        ::std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(done_file)?;
-
-        return Ok(Some(Fragments {
+    if ::std::fs::exists(&done_file)? {
+        // Detect dimensions from existing index metadata
+        let meta = leann_core::IndexMeta::load(
+            &leann_core::index::IndexPaths::new(&index_path).meta_path(),
+        )?;
+        return Ok(Some(IndexedCorpus {
             filename: filename.clone(),
-            table_name,
+            index_path,
             enclosing_model: enclosing_model.clone(),
             embedding_model: a.embedding_model.clone(),
-            fragments: vector_embeddings,
+            dimensions: meta.dimensions,
         }));
     }
 
-    Ok(None)
+    // Extract text from document
+    let text = match (
+        content,
+        ::std::path::Path::new(filename)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str),
+    ) {
+        (Document::Text(content), _) => content.clone(),
+        (Document::Binary(content), Some("pdf")) => pdf_extract::extract_text_from_mem(content)?,
+        _ => return Err(anyhow!("Unsupported `index` document type: {filename}")),
+    };
+
+    // Chunk with leann-rs sentence-based chunking
+    let chunks = leann_core::chunking::chunk_text(&text, options.chunk_size, options.chunk_overlap);
+    if chunks.is_empty() {
+        return Err(anyhow!("No chunks produced from document: {filename}"));
+    }
+
+    let pb = m.add(
+        ProgressBar::new(chunks.len().try_into()?)
+            .with_style(ProgressStyle::with_template(
+                "{msg} {wide_bar:.cyan/blue} {pos:>7}/{len:7} [{elapsed_precise}]",
+            )?)
+            .with_message(format!("Indexing {file_base_name}")),
+    );
+    pb.inc(0);
+
+    // Detect embedding dimensions via a probe embedding
+    let probe = crate::augment::embed::embed(
+        &a.embedding_model,
+        crate::augment::embed::EmbedData::String("probe".to_string()),
+    )
+    .await?
+    .next()
+    .ok_or_else(|| anyhow!("Embedding model returned no vectors for probe"))?;
+    let dimensions = probe.len();
+
+    // Create LeannBuilder with stored vectors (is_recompute=false) so
+    // we can search without a ZMQ embedding server at retrieve time.
+    // is_compact=false because CSR conversion prunes stored vectors.
+    let mut builder = leann_core::LeannBuilder::new(&a.embedding_model, Some(dimensions), "spnl")
+        .with_recompute(false)
+        .with_compact(false);
+
+    // Add chunks as passages with @base-{name}-{idx} IDs
+    for (idx, chunk) in chunks.iter().enumerate() {
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "id".to_string(),
+            serde_json::Value::String(format!("@base-{file_base_name}-{idx}")),
+        );
+        builder.add_text(chunk, metadata);
+    }
+
+    pb.set_length(chunks.len() as u64);
+
+    // Ensure index directory exists
+    ::std::fs::create_dir_all(&index_dir)?;
+
+    // Build the HNSW index
+    let provider = SpnlEmbeddingProvider {
+        model: a.embedding_model.clone(),
+        dimensions,
+    };
+    builder.build_index(&index_path, &provider)?;
+
+    pb.finish();
+
+    // Mark as done
+    ::std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&done_file)?;
+
+    Ok(Some(IndexedCorpus {
+        filename: filename.clone(),
+        index_path,
+        enclosing_model: enclosing_model.clone(),
+        embedding_model: a.embedding_model.clone(),
+        dimensions,
+    }))
 }

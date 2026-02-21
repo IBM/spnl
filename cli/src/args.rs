@@ -83,10 +83,10 @@ pub struct Args {
     #[arg(short = 'k', long)]
     pub chunk_size: Option<usize>,
 
-    /// Vector DB Url
+    /// Directory where HNSW indexes are stored
     #[cfg(feature = "rag")]
     #[arg(long, default_value = "data/spnl")]
-    pub vecdb_uri: String,
+    pub index_dir: String,
 
     /// Reverse order
     #[arg(short, long, default_value_t = false)]

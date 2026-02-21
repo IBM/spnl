@@ -1,5 +1,23 @@
 use itertools::Itertools;
 
+/// Parse JSONL lines, extracting the "text" field from each line.
+fn parse_jsonl(s: &str) -> Vec<String> {
+    #[derive(serde::Deserialize)]
+    struct JsonlText {
+        text: String,
+    }
+    serde_json::Deserializer::from_str(s)
+        .into_iter::<JsonlText>()
+        .filter_map(|line| match line {
+            Ok(JsonlText { text }) => Some(text),
+            Err(e) => {
+                eprintln!("Error parsing jsonl line {e}");
+                None
+            }
+        })
+        .collect()
+}
+
 pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
     let crate::args::Args {
         model,
@@ -38,13 +56,13 @@ pub fn query(args: crate::args::Args) -> anyhow::Result<spnl::ir::Query> {
                     .unwrap_or("none".to_string())
             ),
             spnl::ir::Document::Text(
-                spnl::windowing::jsonl(include_str!("fiqa-first100lines.jsonl"))?
+                parse_jsonl(include_str!("fiqa-first100lines.jsonl"))
                     .into_iter()
-                    .map(|line| {
+                    .map(|line: String| {
                         if chunk_size.is_none() || line.len() == chunk_size.unwrap() {
-                            line.to_string()
+                            line
                         } else {
-                            let width = chunk_size.unwrap_or(1000); // this could probably safely be `.unwrap()`
+                            let width = chunk_size.unwrap_or(1000);
                             if line.len() < width {
                                 format!(
                                     "{}{}",
