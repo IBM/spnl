@@ -119,9 +119,8 @@ async fn cross_index(
     let params = SearchParams::default();
 
     let summary_futures = (0..num_passages).map(|idx| {
-        let passage_id = &id_map[idx];
         let _passage_text = passage_mgr
-            .get_passage(passage_id)
+            .get_passage_by_index(idx)
             .map(|p| p.text.clone())
             .unwrap_or_default();
 
@@ -137,12 +136,10 @@ async fn cross_index(
         let similar_texts: Vec<Query> = labels
             .into_iter()
             .filter_map(|label| {
-                id_map.get(label).and_then(|id| {
-                    passage_mgr
-                        .get_passage(id)
-                        .ok()
-                        .map(|p| Query::Message(User(p.text.clone())))
-                })
+                passage_mgr
+                    .get_passage_by_index(label)
+                    .ok()
+                    .map(|p| Query::Message(User(p.text.clone())))
             })
             .collect();
 
@@ -180,8 +177,8 @@ async fn cross_index(
         .with_compact(false);
 
     // Re-add original passages
-    for id in &id_map {
-        if let Ok(p) = passage_mgr.get_passage(id) {
+    for (idx, id) in id_map.iter().enumerate() {
+        if let Ok(p) = passage_mgr.get_passage_by_index(idx) {
             let mut metadata = HashMap::new();
             metadata.insert("id".to_string(), serde_json::Value::String(id.clone()));
             builder.add_text(&p.text, metadata);
