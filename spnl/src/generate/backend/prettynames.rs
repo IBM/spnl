@@ -30,9 +30,12 @@ fn init_model_lookup() -> HashMap<&'static str, &'static str> {
     m.insert("llama3.3:70b", "unsloth/Llama-3.3-70B-Instruct-GGUF");
 
     // Gemma models
-    m.insert("gemma2:2b", "unsloth/gemma-2-2b-it-GGUF");
-    m.insert("gemma2:9b", "unsloth/gemma-2-9b-it-GGUF");
-    m.insert("gemma2:27b", "unsloth/gemma-2-27b-it-GGUF");
+    m.insert("gemma2:3b", "unsloth/gemma-2-it-GGUF");
+    m.insert("gemma3:270m", "unsloth/gemma-3-270m-it-GGUF");
+    m.insert("gemma3:1b", "unsloth/gemma-3-1b-it-GGUF");
+    m.insert("gemma3:4b", "unsloth/gemma-3-4b-it-GGUF");
+    m.insert("gemma3:12b", "unsloth/gemma-3-12b-it-GGUF");
+    m.insert("gemma3:27b", "unsloth/gemma-3-27b-it-GGUF");
 
     // Phi models
     m.insert("phi3:3b", "unsloth/Phi-3-mini-4k-instruct-GGUF");
@@ -40,16 +43,16 @@ fn init_model_lookup() -> HashMap<&'static str, &'static str> {
     m.insert("phi4:14b", "unsloth/Phi-4-GGUF");
 
     // Qwen models
-    m.insert("qwen2:0.5b", "unsloth/Qwen2-0.5B-Instruct-GGUF");
-    m.insert("qwen2:1.5b", "unsloth/Qwen2-1.5B-Instruct-GGUF");
-    m.insert("qwen2:7b", "unsloth/Qwen2-7B-Instruct-GGUF");
-    m.insert("qwen2.5:0.5b", "unsloth/Qwen2.5-0.5B-Instruct-GGUF");
-    m.insert("qwen2.5:1.5b", "unsloth/Qwen2.5-1.5B-Instruct-GGUF");
-    m.insert("qwen2.5:3b", "unsloth/Qwen2.5-3B-Instruct-GGUF");
-    m.insert("qwen2.5:7b", "unsloth/Qwen2.5-7B-Instruct-GGUF");
-    m.insert("qwen2.5:14b", "unsloth/Qwen2.5-14B-Instruct-GGUF");
-    m.insert("qwen2.5:32b", "unsloth/Qwen2.5-32B-Instruct-GGUF");
-    m.insert("qwen2.5:72b", "unsloth/Qwen2.5-72B-Instruct-GGUF");
+    //m.insert("qwen2:0.5b", "unsloth/Qwen2-0.5B-Instruct-GGUF");
+    //m.insert("qwen2:1.5b", "unsloth/Qwen2-1.5B-Instruct-GGUF");
+    //m.insert("qwen2:7b", "unsloth/Qwen2-7B-Instruct-GGUF");
+    m.insert("qwen2.5:0.5b", "unsloth/Qwen2.5-Coder-0.5B-Instruct-GGUF");
+    m.insert("qwen2.5:1.5b", "unsloth/Qwen2.5-Coder-1.5B-Instruct-GGUF");
+    m.insert("qwen2.5:3b", "unsloth/Qwen2.5-Coder-3B-Instruct-GGUF");
+    m.insert("qwen2.5:7b", "unsloth/Qwen2.5-Coder-7B-Instruct-GGUF");
+    m.insert("qwen2.5:14b", "unsloth/Qwen2.5-Coder-14B-Instruct-GGUF");
+    m.insert("qwen2.5:32b", "unsloth/Qwen2.5-Coder-32B-Instruct-GGUF");
+    m.insert("qwen2.5:72b", "unsloth/Qwen2.5-Coder-72B-Instruct-GGUF");
 
     m
 }
