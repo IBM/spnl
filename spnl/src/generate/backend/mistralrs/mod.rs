@@ -271,6 +271,12 @@ pub async fn generate_completion(
     Ok(Query::Par(final_results))
 }
 
+/// Unload all models from the global pool, releasing GPU memory.
+/// Call between benchmark runs to avoid accumulating models in VRAM.
+pub async fn unload_all_models() {
+    get_model_pool().unload_all().await
+}
+
 /// Generate multiple completions for the same input (Repeat operation)
 pub async fn generate_chat(
     spec: Repeat,

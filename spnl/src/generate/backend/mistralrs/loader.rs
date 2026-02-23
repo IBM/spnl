@@ -185,6 +185,12 @@ impl ModelPool {
         }
     }
 
+    /// Unload all models, releasing GPU memory.
+    pub async fn unload_all(&self) {
+        let mut models = self.models.write().await;
+        models.clear();
+    }
+
     /// Get or load a model
     pub async fn get_or_load(&self, model_name: &str) -> anyhow::Result<Arc<Model>> {
         // Check if model is already loaded
