@@ -99,7 +99,7 @@ pub async fn generate_completion(
 
     // Get or load the model
     let pool = get_model_pool();
-    let model = pool.get_or_load(&model_name).await?;
+    let model = pool.get_or_load(&model_name, options.silent).await?;
 
     // Timing tracking
     let start_time = if options.time {
@@ -318,7 +318,7 @@ pub async fn generate_chat(
 
     // Get or load the model
     let pool = get_model_pool();
-    let model = pool.get_or_load(&model_name).await?;
+    let model = pool.get_or_load(&model_name, options.silent).await?;
 
     // Create semaphore for concurrency control
     let max_parallel = get_max_parallel();
@@ -492,8 +492,18 @@ pub async fn generate_chat(
     Ok(Query::Par(final_results))
 }
 
-/// Add messages from a Query to a RequestBuilder
+/// Add messages from a Query to a RequestBuilder.
+/// When `in_plus` is true, messages are tagged with a `pic_plus` metadata field
+/// so the engine can identify Plus blocks after tokenization.
 fn add_messages_from_query(builder: &mut RequestBuilder, query: &Query) -> anyhow::Result<()> {
+    add_messages_from_query_inner(builder, query, false)
+}
+
+fn add_messages_from_query_inner(
+    builder: &mut RequestBuilder,
+    query: &Query,
+    in_plus: bool,
+) -> anyhow::Result<()> {
     match query {
         Query::Message(msg) => {
             let (role, content) = match msg {
@@ -501,14 +511,25 @@ fn add_messages_from_query(builder: &mut RequestBuilder, query: &Query) -> anyho
                 Assistant(content) => (TextMessageRole::Assistant, content),
                 System(content) => (TextMessageRole::System, content),
             };
-            *builder = builder.clone().add_message(role, content.clone());
+            if in_plus {
+                // Tag this message so the engine knows it's a Plus block.
+                // Uses add_message_with_metadata to attach an in-band flag
+                // that add_request.rs will extract and strip before templating.
+                *builder = builder
+                    .clone()
+                    .add_message(role, format!("\x00PIC_PLUS\x00{}", content));
+            } else {
+                *builder = builder.clone().add_message(role, content.clone());
+            }
         }
-        Query::Seq(queries)
-        | Query::Par(queries)
-        | Query::Plus(queries)
-        | Query::Cross(queries) => {
+        Query::Plus(queries) => {
             for q in queries {
-                add_messages_from_query(builder, q)?;
+                add_messages_from_query_inner(builder, q, true)?;
+            }
+        }
+        Query::Seq(queries) | Query::Par(queries) | Query::Cross(queries) => {
+            for q in queries {
+                add_messages_from_query_inner(builder, q, in_plus)?;
             }
         }
         _ => {
@@ -518,6 +539,95 @@ fn add_messages_from_query(builder: &mut RequestBuilder, query: &Query) -> anyho
         }
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "local"))]
+mod tests {
+    use super::*;
+    use mistralrs::{MessageContent, RequestLike};
+
+    /// Extract the text content of a message (the "content" key, Left variant).
+    fn content_str(msg: &indexmap::IndexMap<String, MessageContent>) -> &str {
+        match msg.get("content").unwrap() {
+            either::Either::Left(s) => s.as_str(),
+            _ => panic!("expected Left(String) content"),
+        }
+    }
+
+    #[test]
+    fn plain_user_message() {
+        let query = Query::Message(User("hello".to_string()));
+        let mut builder = RequestBuilder::new();
+        add_messages_from_query_inner(&mut builder, &query, false).unwrap();
+        let msgs = builder.messages_ref();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(content_str(&msgs[0]), "hello");
+    }
+
+    #[test]
+    fn plus_tags_messages() {
+        let query = Query::Plus(vec![Query::Message(User("doc1".to_string()))]);
+        let mut builder = RequestBuilder::new();
+        add_messages_from_query(&mut builder, &query).unwrap();
+        let msgs = builder.messages_ref();
+        assert_eq!(msgs.len(), 1);
+        assert!(
+            content_str(&msgs[0]).starts_with("\x00PIC_PLUS\x00"),
+            "expected PIC_PLUS prefix, got: {:?}",
+            content_str(&msgs[0])
+        );
+    }
+
+    #[test]
+    fn seq_inside_plus_all_tagged() {
+        let query = Query::Plus(vec![Query::Seq(vec![
+            Query::Message(User("a".to_string())),
+            Query::Message(User("b".to_string())),
+        ])]);
+        let mut builder = RequestBuilder::new();
+        add_messages_from_query(&mut builder, &query).unwrap();
+        let msgs = builder.messages_ref();
+        assert_eq!(msgs.len(), 2);
+        for msg in msgs {
+            assert!(
+                content_str(msg).starts_with("\x00PIC_PLUS\x00"),
+                "expected PIC_PLUS prefix, got: {:?}",
+                content_str(msg)
+            );
+        }
+    }
+
+    #[test]
+    fn plus_inside_cross() {
+        let query = Query::Cross(vec![
+            Query::Message(User("q".to_string())),
+            Query::Plus(vec![Query::Message(User("doc".to_string()))]),
+        ]);
+        let mut builder = RequestBuilder::new();
+        add_messages_from_query(&mut builder, &query).unwrap();
+        let msgs = builder.messages_ref();
+        assert_eq!(msgs.len(), 2);
+        // First message: plain (no prefix)
+        assert_eq!(content_str(&msgs[0]), "q");
+        // Second message: tagged with PIC_PLUS
+        assert_eq!(content_str(&msgs[1]), "\x00PIC_PLUS\x00doc");
+    }
+
+    #[test]
+    fn unsupported_query_type() {
+        use crate::ir::{Generate, GenerateMetadata};
+        let query = Query::Generate(Generate {
+            metadata: GenerateMetadata {
+                model: "test".to_string(),
+                max_tokens: Some(1),
+                temperature: Some(0.0),
+            },
+            input: Box::new(Query::Message(User("hi".to_string()))),
+        });
+        let mut builder = RequestBuilder::new();
+        let result = add_messages_from_query(&mut builder, &query);
+        assert!(result.is_err());
+    }
 }
 
 // Made with Bob

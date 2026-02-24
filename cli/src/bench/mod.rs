@@ -1,5 +1,6 @@
 mod haystack;
 mod niah;
+mod pic;
 mod ragcsv;
 mod ruler;
 
@@ -16,6 +17,8 @@ pub enum BenchCommands {
     Ruler(ruler::RulerArgs),
     /// RAG CSV evaluation (accuracy grading from a CSV dataset)
     Ragcsv(ragcsv::RagcsvArgs),
+    /// PIC cross-request cache reuse benchmark (latency)
+    Pic(pic::PicArgs),
 }
 
 pub async fn run(command: BenchCommands) -> Result<(), SpnlError> {
@@ -24,6 +27,7 @@ pub async fn run(command: BenchCommands) -> Result<(), SpnlError> {
         BenchCommands::Niah(args) => niah::run(args),
         BenchCommands::Ruler(args) => ruler::run(args),
         BenchCommands::Ragcsv(args) => ragcsv::run(args).await,
+        BenchCommands::Pic(args) => pic::run(args).await,
     }
 }
 
