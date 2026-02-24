@@ -1,10 +1,7 @@
 use pyo3::prelude::*;
 
 use crate::{
-    ir::{
-        GenerateMetadata,
-        Message::{self, *},
-    },
+    ir::Message::{self, *},
     optimizer::llo::chat_template::{self, ChatTemplate},
 };
 
@@ -212,72 +209,6 @@ impl TokenizedChatCompletionQuery {
     #[getter]
     fn messages(&self) -> Vec<u32> {
         self.messages_.clone()
-    }
-}
-
-fn pad(pad_token: u32, block_size: usize, mut toklist: Vec<u32>) -> Vec<u32> {
-    let n_pads = block_size - (toklist.len() % block_size);
-    if n_pads > 0 && n_pads < block_size {
-        let last = toklist.pop().unwrap();
-        toklist.extend(::std::iter::repeat_n(pad_token, n_pads));
-        toklist.push(last);
-    }
-    toklist
-}
-
-fn encode_nonplus_part(
-    part: &str,
-    tok: &Tokenizer,
-    pad_token: u32,
-    block_size: usize,
-) -> tokenizers::tokenizer::Result<Vec<u32>> {
-    let encoded = tok.tok.encode_fast(part, false)?;
-    let toks = encoded.get_ids();
-    Ok(pad(pad_token, block_size, toks.to_vec()))
-}
-
-fn encode_plus_part(
-    toks: &[u32],
-    pad_token: u32,
-    plus_token: Option<u32>,
-    block_size: usize,
-) -> tokenizers::tokenizer::Result<Vec<u32>> {
-    if let Some(plus_token) = plus_token {
-        Ok(pad(pad_token, block_size, [&[plus_token], toks].concat()))
-    } else {
-        Ok(toks.to_vec())
-    }
-}
-
-fn extract_up_to_plus(tok: &Tokenizer, q: &NonGenerateInput) -> Vec<String> {
-    match q {
-        NonGenerateInput::Par(v) | NonGenerateInput::Seq(v) | NonGenerateInput::Cross(v) => v
-            .iter()
-            .flat_map(|qq| extract_up_to_plus(tok, qq))
-            .collect(),
-        NonGenerateInput::Plus(_) => vec![],
-        NonGenerateInput::Message(Assistant(m)) => vec![tok.assistant(m)],
-        NonGenerateInput::Message(System(m)) => vec![tok.system(m)],
-        NonGenerateInput::Message(User(m)) => vec![tok.user(m)],
-    }
-}
-
-fn extract_parts(tok: &Tokenizer, q: &NonGenerateInput, in_plus: bool) -> Vec<String> {
-    match (q, in_plus) {
-        (NonGenerateInput::Par(v), _)
-        | (NonGenerateInput::Seq(v), _)
-        | (NonGenerateInput::Cross(v), _) => v
-            .iter()
-            .flat_map(|qq| extract_parts(tok, qq, in_plus))
-            .collect(),
-        (NonGenerateInput::Plus(v), _) => v
-            .iter()
-            .map(|qq| extract_parts(tok, qq, true).join(""))
-            .collect(),
-        (NonGenerateInput::Message(Assistant(m)), true) => vec![tok.assistant(m)],
-        (NonGenerateInput::Message(System(m)), true) => vec![tok.system(m)],
-        (NonGenerateInput::Message(User(m)), true) => vec![tok.user(m)],
-        _ => vec![],
     }
 }
 
@@ -507,68 +438,6 @@ pub fn tokenize_query(
                 temperature: map.metadata.temperature,
                 stream: None,
             }))
-        }
-    }
-}
-
-/// Extract the relocatable spans from the given query `q`. If
-/// `collect_prefix_too`, then include also every span of input that
-/// precedes the first relocatable span.
-#[pyfunction]
-pub fn tokenize_prepare(
-    state: &mut TokenizerState,
-    q: &str,
-    collect_prefix_too: bool,
-    pad_token: u32,
-    plus_token: Option<u32>,
-    block_size: usize,
-) -> Result<Vec<Vec<u32>>, PyErr> {
-    match serde_json::from_str(q).map_err(handle_serde_err)? {
-        SingleGenerateQuery::SingleGenerate(SingleGenerate {
-            input,
-            metadata: GenerateMetadata { model, .. },
-        }) => {
-            let s = ::std::time::Instant::now();
-            let tok = state
-                .get_or_create(&model, pad_token, None, plus_token, block_size)
-                .map_err(handle_arc_err)?;
-            println!(
-                "Spnl tokenize_plus from pretrained {model}. Loaded in {:?}",
-                s.elapsed()
-            );
-
-            let parts = extract_parts(&tok, &input, false).into_iter().map(|part| {
-                encode_plus_part(
-                    tok.tok.encode_fast(part, false)?.get_ids(),
-                    pad_token,
-                    plus_token,
-                    block_size,
-                )
-            });
-
-            if collect_prefix_too {
-                parts
-                    .chain(
-                        extract_up_to_plus(&tok, &input)
-                            .into_iter()
-                            .map(|part| encode_nonplus_part(&part, &tok, pad_token, block_size)),
-                    )
-                    .collect::<Result<_, _>>()
-                    .map_err(handle_err)
-            } else {
-                parts.collect::<Result<_, _>>().map_err(handle_err)
-            }
-        }
-
-        // SingleGenerateQuery::Bulk(Bulk::Repeat(Repeat { n, generate })) => {
-        //     todo!()
-        // }
-
-        // SingleGenerateQuery::Bulk(Bulk::Map(Map { metadata, inputs })) => {
-        //     todo!()
-        // }
-        _ => {
-            todo!()
         }
     }
 }

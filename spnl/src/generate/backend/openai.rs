@@ -64,10 +64,6 @@ pub async fn generate_completion(
     m: Option<&MultiProgress>,
     options: &GenerateOptions,
 ) -> SpnlResult {
-    if let Some(true) = options.prepare {
-        todo!()
-    }
-
     let n_prompts = spec.inputs.len();
     let mut stdout = stdout();
 
@@ -203,10 +199,6 @@ pub async fn generate_chat(
     m: Option<&MultiProgress>,
     options: &GenerateOptions,
 ) -> SpnlResult {
-    if let Some(true) = options.prepare {
-        todo!()
-    }
-
     let input_messages = messagify(&spec.generate.input);
 
     let mut stdout = stdout();

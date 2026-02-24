@@ -82,12 +82,6 @@ pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(
-        crate::optimizer::llo::tokenize::tokenize_prepare,
-        m
-    )?)?;
-
-    #[cfg(feature = "tok")]
     m.add_function(wrap_pyfunction!(crate::optimizer::llo::tokenize::init, m)?)?;
 
     //m.add_class::<SimpleQuery>()?;

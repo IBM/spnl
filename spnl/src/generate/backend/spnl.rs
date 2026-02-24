@@ -43,7 +43,7 @@ impl Spec {
 
 const DATA_COLON: &[u8] = &[100, 97, 116, 97, 58, 32];
 
-/// Call the /api/query/{prepare|execute} API, passing the given query `spec`
+/// Call the /api/query/execute API, passing the given query `spec`
 pub async fn generate(
     spec: Spec,
     m: Option<&MultiProgress>,
@@ -55,11 +55,6 @@ pub async fn generate(
         None
     };
 
-    let exec = if let Some(true) = options.prepare {
-        "prepare"
-    } else {
-        "execute"
-    };
     let client = reqwest::Client::new();
 
     // eprintln!("Sending query {:?}", to_string(&query)?);
@@ -73,7 +68,7 @@ pub async fn generate(
     let is_map = matches!(spec, Spec::Map(_));
     let non_streaming = matches!(spec.metadata().max_tokens, Some(1));
     let response = client
-        .post(format!("http://localhost:8000/v1/query/{exec}"))
+        .post("http://localhost:8000/v1/query/execute")
         .query(&[("stream", if non_streaming { "false" } else { "true" })])
         .header("Content-Type", "text/plain")
         .body(to_string(&spec.query())?)
@@ -95,9 +90,7 @@ pub async fn generate(
         // between Bulk::Map and Bulk::Repeat cases. The OpenAI data
         // structures for Completion are close but not identical to
         // those for ChatCompletion.
-        response_strings = if let Some(true) = options.prepare {
-            vec!["prepared".to_string()]
-        } else if is_map {
+        response_strings = if is_map {
             // Non-streaming Bulk::Map case
             response
                 .json::<CreateCompletionResponse>()
