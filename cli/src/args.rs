@@ -92,10 +92,6 @@ pub struct Args {
     #[arg(short, long, default_value_t = false)]
     pub reverse: bool,
 
-    /// Prepare query
-    #[arg(long, default_value_t = false)]
-    pub prepare: bool,
-
     /// Question to pose
     #[arg(short, long)]
     pub prompt: Option<String>,

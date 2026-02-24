@@ -153,7 +153,6 @@ async fn run(args: Args) -> Result<(), SpnlError> {
     let dry_run = args.dry_run;
     let rp = ExecuteOptions {
         time: args.time,
-        prepare: Some(args.prepare),
         silent: false,
     };
 

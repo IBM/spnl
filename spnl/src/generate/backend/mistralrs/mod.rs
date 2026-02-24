@@ -69,12 +69,6 @@ pub async fn generate_completion(
 ) -> SpnlResult {
     use tokio::io::AsyncWriteExt;
 
-    if let Some(true) = options.prepare {
-        return Err(anyhow::anyhow!(
-            "Prepare mode not supported for mistralrs backend"
-        ));
-    }
-
     let n_prompts = spec.inputs.len();
 
     let quiet = mp.is_some() || options.time || options.silent;
@@ -284,12 +278,6 @@ pub async fn generate_chat(
     options: &GenerateOptions,
 ) -> SpnlResult {
     use tokio::io::AsyncWriteExt;
-
-    if let Some(true) = options.prepare {
-        return Err(anyhow::anyhow!(
-            "Prepare mode not supported for mistralrs backend"
-        ));
-    }
 
     let n_usize = spec.n as usize;
 

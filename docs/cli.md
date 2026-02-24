@@ -69,7 +69,6 @@ spnl run [OPTIONS]
 #### Query Execution Options
 
 - `-r, --reverse` - Reverse order
-- `--prepare` - Prepare query without executing
 - `--dry-run` - Dry run (do not execute query)
 
 #### Output Options
