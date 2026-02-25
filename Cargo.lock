@@ -7776,7 +7776,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -7832,7 +7832,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-cli"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "clap",
