@@ -20,9 +20,15 @@ pub enum BenchCommands {
 
 pub async fn run(command: BenchCommands) -> Result<(), SpnlError> {
     match command {
-        BenchCommands::Haystack(args) => haystack::run(args),
-        BenchCommands::Niah(args) => niah::run(args),
-        BenchCommands::Ruler(args) => ruler::run(args),
+        BenchCommands::Haystack(args) => {
+            Ok(tokio::task::spawn_blocking(move || haystack::run(args)).await??)
+        }
+        BenchCommands::Niah(args) => {
+            Ok(tokio::task::spawn_blocking(move || niah::run(args)).await??)
+        }
+        BenchCommands::Ruler(args) => {
+            Ok(tokio::task::spawn_blocking(move || ruler::run(args)).await??)
+        }
         BenchCommands::Ragcsv(args) => ragcsv::run(args).await,
     }
 }
@@ -179,13 +185,120 @@ pub fn encode_and_trim(
     }
 }
 
-/// Parse a comma-separated list of integers from a string
-pub fn parse_csv_usize(s: &str) -> Result<Vec<usize>, String> {
-    s.split(',')
-        .map(|n| {
-            n.trim()
-                .parse()
-                .map_err(|e| format!("invalid number '{}': {}", n.trim(), e))
-        })
-        .collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- compute_quantiles ----
+
+    #[test]
+    fn quantiles_single_value() {
+        let (min, p25, p50, p75, p90, p99, max) = compute_quantiles(&[42.0]);
+        assert_eq!(min, 42.0);
+        assert_eq!(p25, 42.0);
+        assert_eq!(p50, 42.0);
+        assert_eq!(p75, 42.0);
+        assert_eq!(p90, 42.0);
+        assert_eq!(p99, 42.0);
+        assert_eq!(max, 42.0);
+    }
+
+    #[test]
+    fn quantiles_multiple_values() {
+        let values: Vec<f64> = (1..=100).map(|i| i as f64).collect();
+        let (min, p25, p50, p75, p90, p99, max) = compute_quantiles(&values);
+        assert_eq!(min, 1.0);
+        assert_eq!(p25, 26.0);
+        assert_eq!(p50, 51.0);
+        assert_eq!(p75, 76.0);
+        assert_eq!(p90, 91.0);
+        assert_eq!(p99, 100.0);
+        assert_eq!(max, 100.0);
+    }
+
+    #[test]
+    fn quantiles_unsorted_input_produces_sorted_output() {
+        let values = vec![5.0, 1.0, 3.0, 4.0, 2.0];
+        let (min, _, _, _, _, _, max) = compute_quantiles(&values);
+        assert_eq!(min, 1.0);
+        assert_eq!(max, 5.0);
+    }
+
+    #[test]
+    fn quantiles_empty_returns_zeros() {
+        let (min, p25, p50, p75, p90, p99, max) = compute_quantiles(&[]);
+        assert_eq!(
+            (min, p25, p50, p75, p90, p99, max),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        );
+    }
+
+    // ---- compute_quantiles_with_avg ----
+
+    #[test]
+    fn quantiles_with_avg_computes_average() {
+        let values = vec![10.0, 20.0, 30.0];
+        let (_, _, _, _, _, _, _, avg) = compute_quantiles_with_avg(&values);
+        assert!((avg - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn quantiles_with_avg_empty_returns_zeros() {
+        let (min, p25, p50, p75, p90, p99, max, avg) = compute_quantiles_with_avg(&[]);
+        assert_eq!(
+            (min, p25, p50, p75, p90, p99, max, avg),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        );
+    }
+
+    // ---- clap arg-parsing smoke tests ----
+
+    use crate::args::FullArgs;
+    use clap::Parser;
+
+    #[test]
+    fn parse_bench_ruler_defaults() {
+        FullArgs::try_parse_from(["spnl", "bench", "ruler"]).unwrap();
+    }
+
+    #[test]
+    fn parse_bench_niah_defaults() {
+        FullArgs::try_parse_from(["spnl", "bench", "niah"]).unwrap();
+    }
+
+    #[test]
+    fn parse_bench_haystack_defaults() {
+        FullArgs::try_parse_from(["spnl", "bench", "haystack"]).unwrap();
+    }
+
+    #[test]
+    fn parse_bench_ruler_csv_context_lengths() {
+        let args = FullArgs::try_parse_from([
+            "spnl",
+            "bench",
+            "ruler",
+            "--context-lengths",
+            "1000,2000,4000",
+        ])
+        .unwrap();
+        match args.command {
+            crate::args::Commands::Bench {
+                command: BenchCommands::Ruler(r),
+            } => assert_eq!(r.context_lengths, vec![1000, 2000, 4000]),
+            other => panic!("unexpected command: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_bench_niah_csv_depth_percentages() {
+        let args =
+            FullArgs::try_parse_from(["spnl", "bench", "niah", "--depth-percentages", "0,50,100"])
+                .unwrap();
+        match args.command {
+            crate::args::Commands::Bench {
+                command: BenchCommands::Niah(n),
+            } => assert_eq!(n.depth_percentages, vec![0, 50, 100]),
+            other => panic!("unexpected command: {:?}", other),
+        }
+    }
 }

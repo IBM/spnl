@@ -40,7 +40,12 @@ pub struct RulerArgs {
     pub measurement_time: u64,
 
     /// Comma-separated context lengths in tokens
-    #[arg(long, default_value = "4000,8000", value_parser = super::parse_csv_usize, env = "BENCH_CONTEXT_LENGTHS")]
+    #[arg(
+        long,
+        default_value = "4000,8000",
+        value_delimiter = ',',
+        env = "BENCH_CONTEXT_LENGTHS"
+    )]
     pub context_lengths: Vec<usize>,
 
     /// Comma-separated tasks to run (niah, variable_tracking)
@@ -69,7 +74,12 @@ pub struct RulerArgs {
     pub niah_num_needle_q: usize,
 
     /// Comma-separated depth percentages for NIAH
-    #[arg(long, default_value = "50", value_parser = super::parse_csv_usize, env = "BENCH_NIAH_DEPTH_PERCENTAGES")]
+    #[arg(
+        long,
+        default_value = "50",
+        value_delimiter = ',',
+        env = "BENCH_NIAH_DEPTH_PERCENTAGES"
+    )]
     pub niah_depth_percentages: Vec<usize>,
 
     // -- Variable Tracking-specific --
@@ -634,4 +644,33 @@ pub fn run(args: RulerArgs) -> Result<(), SpnlError> {
     ruler_benchmark(&mut criterion, &args);
     criterion.final_summary();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_match_all_all_found() {
+        let refs = vec!["alpha".into(), "beta".into()];
+        assert!((string_match_all("alpha and beta are here", &refs) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn string_match_all_partial() {
+        let refs = vec!["alpha".into(), "beta".into(), "gamma".into()];
+        assert!((string_match_all("only alpha and gamma", &refs) - 2.0 / 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn string_match_all_none_found() {
+        let refs = vec!["alpha".into(), "beta".into()];
+        assert!(string_match_all("nothing here", &refs).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn string_match_all_case_insensitive() {
+        let refs = vec!["HELLO".into()];
+        assert!((string_match_all("hello world", &refs) - 1.0).abs() < f64::EPSILON);
+    }
 }
