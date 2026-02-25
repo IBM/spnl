@@ -154,6 +154,7 @@ declare -x GCS_BUCKET
 declare -x RUN_ID
 declare -x MODEL
 declare -x OPENAI_API_BASE=http://localhost:8000/v1
+declare -x RUST_BACKTRACE=1
 
 cd $HOME
 TESTS_DIR=$HOME/spnl/docker/gce/vllm/test.d
