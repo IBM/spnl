@@ -877,3 +877,160 @@ pub async fn run(args: RagcsvArgs) -> Result<(), SpnlError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- python_repr_to_json ----
+
+    #[test]
+    fn python_repr_single_quoted_strings() {
+        assert_eq!(python_repr_to_json("{'a': 'b'}"), r#"{"a": "b"}"#);
+    }
+
+    #[test]
+    fn python_repr_none_true_false() {
+        assert_eq!(
+            python_repr_to_json("{'x': None, 'y': True, 'z': False}"),
+            r#"{"x": null, "y": true, "z": false}"#
+        );
+    }
+
+    #[test]
+    fn python_repr_embedded_double_quotes() {
+        // A single-quoted Python string containing a double quote should escape it
+        assert_eq!(
+            python_repr_to_json(r#"{'a': 'he said "hi"'}"#),
+            r#"{"a": "he said \"hi\""}"#
+        );
+    }
+
+    #[test]
+    fn python_repr_escaped_single_quotes() {
+        // Python: 'it\'s' -> JSON: "it's"
+        assert_eq!(python_repr_to_json(r"{'a': 'it\'s'}"), r#"{"a": "it's"}"#);
+    }
+
+    // ---- parse_accuracy ----
+
+    #[test]
+    fn parse_accuracy_numeric_string() {
+        assert!((parse_accuracy("85") - 85.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_accuracy_text_with_number() {
+        assert!((parse_accuracy("The accuracy is 72 percent") - 72.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_accuracy_clamps_above_100() {
+        assert!((parse_accuracy("150") - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_accuracy_no_number_returns_zero() {
+        assert!((parse_accuracy("no numbers here")).abs() < f64::EPSILON);
+    }
+
+    // ---- normalize_tokens ----
+
+    #[test]
+    fn normalize_tokens_splits_punctuation() {
+        let tokens = normalize_tokens("Hello, world!");
+        assert_eq!(tokens, vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn normalize_tokens_case_folding() {
+        let tokens = normalize_tokens("ABC def GHI");
+        assert_eq!(tokens, vec!["abc", "def", "ghi"]);
+    }
+
+    #[test]
+    fn normalize_tokens_empty_filtering() {
+        let tokens = normalize_tokens("  ...  ");
+        assert!(tokens.is_empty());
+    }
+
+    // ---- token_f1 ----
+
+    #[test]
+    fn token_f1_identical() {
+        assert!((token_f1("the cat sat", "the cat sat") - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn token_f1_no_overlap() {
+        assert!(token_f1("alpha beta", "gamma delta").abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn token_f1_partial_overlap() {
+        let score = token_f1("the cat sat on the mat", "the cat");
+        assert!(score > 0.0 && score < 100.0);
+    }
+
+    #[test]
+    fn token_f1_both_empty() {
+        assert!((token_f1("", "") - 100.0).abs() < f64::EPSILON);
+    }
+
+    // ---- exact_match ----
+
+    #[test]
+    fn exact_match_identical_after_normalization() {
+        assert!((exact_match("Hello, World!", "hello world") - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn exact_match_different() {
+        assert!(exact_match("foo", "bar").abs() < f64::EPSILON);
+    }
+
+    // ---- bleu_1 ----
+
+    #[test]
+    fn bleu_1_identical() {
+        assert!((bleu_1("the cat sat", "the cat sat") - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn bleu_1_no_overlap() {
+        assert!(bleu_1("alpha beta", "gamma delta").abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn bleu_1_brevity_penalty() {
+        // hyp is shorter than ref, so brevity penalty applies
+        let long_ref = "the quick brown fox jumps over the lazy dog";
+        let short_hyp = "the fox";
+        let score = bleu_1(long_ref, short_hyp);
+        assert!(score > 0.0 && score < 100.0);
+    }
+
+    // ---- MetricFlags::from_arg ----
+
+    #[test]
+    fn metric_flags_all() {
+        let f = MetricFlags::from_arg("all");
+        assert!(f.accuracy && f.faithfulness && f.relevancy);
+    }
+
+    #[test]
+    fn metric_flags_single() {
+        let f = MetricFlags::from_arg("accuracy");
+        assert!(f.accuracy);
+        assert!(!f.faithfulness);
+        assert!(!f.relevancy);
+    }
+
+    #[test]
+    fn metric_flags_comma_separated() {
+        let f = MetricFlags::from_arg("accuracy,relevancy");
+        assert!(f.accuracy);
+        assert!(!f.faithfulness);
+        assert!(f.relevancy);
+    }
+}

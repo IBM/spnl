@@ -28,15 +28,30 @@ pub struct HaystackArgs {
     pub measurement_time: u64,
 
     /// Comma-separated document counts for basic benchmark
-    #[arg(long, default_value = "2,4,8", value_parser = super::parse_csv_usize, env = "BENCH_NUM_DOCS")]
+    #[arg(
+        long,
+        default_value = "2,4,8",
+        value_delimiter = ',',
+        env = "BENCH_NUM_DOCS"
+    )]
     pub num_docs: Vec<usize>,
 
     /// Comma-separated document lengths (words of filler per doc)
-    #[arg(long, default_value = "0,10,100,200,400,600,800,1000", value_parser = super::parse_csv_usize, env = "BENCH_DOC_LENGTH")]
+    #[arg(
+        long,
+        default_value = "0,10,100,200,400,600,800,1000",
+        value_delimiter = ',',
+        env = "BENCH_DOC_LENGTH"
+    )]
     pub doc_lengths: Vec<usize>,
 
     /// Comma-separated chunk sizes for map-reduce benchmark
-    #[arg(long, default_value = "2,4", value_parser = super::parse_csv_usize, env = "BENCH_CHUNK_SIZES")]
+    #[arg(
+        long,
+        default_value = "2,4",
+        value_delimiter = ',',
+        env = "BENCH_CHUNK_SIZES"
+    )]
     pub chunk_sizes: Vec<usize>,
 
     /// Number of documents for the map-reduce benchmark
@@ -478,4 +493,76 @@ pub fn run(args: HaystackArgs) -> Result<(), SpnlError> {
     haystack_benchmark(&mut criterion, &args);
     criterion.final_summary();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- ratio ----
+
+    #[test]
+    fn ratio_basic() {
+        assert!((ratio(3, 4) - 0.75).abs() < f64::EPSILON);
+    }
+
+    // ---- score ----
+
+    #[test]
+    fn score_all_correct() {
+        let expected = vec!["a".into(), "b".into(), "c".into()];
+        let actual = vec!["a".into(), "b".into(), "c".into()];
+        let (precision, recall) = score(&expected, &actual);
+        assert!((precision - 1.0).abs() < f64::EPSILON);
+        assert!((recall - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn score_with_false_positives() {
+        let expected: Vec<String> = vec!["a".into(), "b".into()];
+        let actual: Vec<String> = vec!["a".into(), "b".into(), "x".into()];
+        let (precision, recall) = score(&expected, &actual);
+        // precision = 2/3
+        assert!((precision - 2.0 / 3.0).abs() < 1e-10);
+        // recall = 2/2 = 1.0
+        assert!((recall - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn score_with_false_negatives() {
+        let expected: Vec<String> = vec!["a".into(), "b".into(), "c".into()];
+        let actual: Vec<String> = vec!["a".into()];
+        let (precision, recall) = score(&expected, &actual);
+        assert!((precision - 1.0).abs() < f64::EPSILON);
+        assert!((recall - 1.0 / 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn score_empty_actual_precision_zero() {
+        let expected: Vec<String> = vec!["a".into()];
+        let actual: Vec<String> = vec![];
+        let (precision, _recall) = score(&expected, &actual);
+        assert!((precision - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ---- score_chain ----
+
+    #[test]
+    fn score_chain_filters_first_name() {
+        // expected[0] is the name to filter; subsequent actuals should NOT contain it
+        let expected: Vec<String> = vec!["bad-name".into(), "".into(), "".into()];
+        // actual[0] is ignored; actual[1..] are checked
+        let actual: Vec<String> = vec!["ignored".into(), "good".into(), "also-good".into()];
+        let (score, _) = score_chain(&expected, &actual);
+        assert!((score - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn score_chain_penalizes_leaked_name() {
+        let expected: Vec<String> = vec!["bad-name".into(), "".into(), "".into()];
+        let actual: Vec<String> = vec!["ignored".into(), "bad-name".into(), "ok".into()];
+        let (score, _) = score_chain(&expected, &actual);
+        // 1 out of 2 subsequent actuals matches do_not_want → 1 - 1/2 = 0.5
+        assert!((score - 0.5).abs() < f64::EPSILON);
+    }
 }

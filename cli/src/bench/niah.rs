@@ -39,15 +39,30 @@ pub struct NiahArgs {
     pub measurement_time: u64,
 
     /// Comma-separated context lengths in tokens
-    #[arg(long, default_value = "1000,2000,4000,8000", value_parser = super::parse_csv_usize, env = "BENCH_CONTEXT_LENGTHS")]
+    #[arg(
+        long,
+        default_value = "1000,2000,4000,8000",
+        value_delimiter = ',',
+        env = "BENCH_CONTEXT_LENGTHS"
+    )]
     pub context_lengths: Vec<usize>,
 
     /// Comma-separated depth percentages (0-100)
-    #[arg(long, default_value = "0,25,50,75,100", value_parser = super::parse_csv_usize, env = "BENCH_DEPTH_PERCENTAGES")]
+    #[arg(
+        long,
+        default_value = "0,25,50,75,100",
+        value_delimiter = ',',
+        env = "BENCH_DEPTH_PERCENTAGES"
+    )]
     pub depth_percentages: Vec<usize>,
 
     /// Comma-separated chunk sizes (0 = no chunking)
-    #[arg(long, default_value = "0,2,4", value_parser = super::parse_csv_usize, env = "BENCH_CHUNK_SIZES")]
+    #[arg(
+        long,
+        default_value = "0,2,4",
+        value_delimiter = ',',
+        env = "BENCH_CHUNK_SIZES"
+    )]
     pub chunk_sizes: Vec<usize>,
 
     /// Token buffer for system/question/response
@@ -517,4 +532,40 @@ pub fn run(args: NiahArgs) -> Result<(), SpnlError> {
     niah_benchmark(&mut criterion, &args);
     criterion.final_summary();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn evaluate_exact_substring_match() {
+        assert!(
+            (evaluate_needle_retrieval("The answer is 73.", "73", false) - 1.0).abs()
+                < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn evaluate_case_insensitive_match() {
+        assert!(
+            (evaluate_needle_retrieval("HELLO world", "hello", false) - 1.0).abs() < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn evaluate_numeric_match_in_tokens() {
+        // Number not as substring but parsed from a token
+        assert!(
+            (evaluate_needle_retrieval("The number is (73).", "73", false) - 1.0).abs()
+                < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn evaluate_no_match_returns_zero() {
+        assert!(
+            (evaluate_needle_retrieval("Nothing relevant here", "73", false)).abs() < f64::EPSILON
+        );
+    }
 }
