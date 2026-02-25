@@ -5,6 +5,187 @@ use super::args::GceConfig;
 use super::ssh_tunnel::SshTunnel;
 use tabled::{Table, Tabled, settings::Style};
 
+/// Candidate zones for fallback when a zone's resource pool is exhausted.
+const FALLBACK_ZONES: &[(&str, &str)] = &[
+    ("us-west1", "a"),
+    ("us-west1", "b"),
+    ("us-west1", "c"),
+    ("us-central1", "a"),
+    ("us-central1", "b"),
+    ("us-central1", "c"),
+    ("us-east1", "a"),
+    ("us-east1", "b"),
+    ("us-east1", "c"),
+];
+
+/// Error type to distinguish zone-exhaustion from fatal errors during instance creation.
+enum CreateError {
+    /// The zone's resource pool is exhausted — try the next zone.
+    ZoneExhausted(String),
+    /// Any other error — do not retry.
+    Fatal(anyhow::Error),
+}
+
+/// Returns `true` if the GCE API error indicates that the zone's resource pool is exhausted.
+fn is_zone_exhausted_api(err: &google_cloud_compute_v1::Error) -> bool {
+    err.http_status_code() == Some(503)
+}
+
+/// Returns `true` if the operation error indicates that the zone's resource pool is exhausted.
+fn is_zone_exhausted_op(err: &google_cloud_compute_v1::errors::OperationError) -> bool {
+    use google_cloud_compute_v1::errors::OperationError;
+    match err {
+        OperationError::Generic(g) => {
+            if g.status_code == Some(503) {
+                return true;
+            }
+            if let Some(details) = &g.details {
+                return details.errors.iter().any(|e| {
+                    e.code
+                        .as_deref()
+                        .is_some_and(|c| c.contains("ZONE_RESOURCE_POOL_EXHAUSTED"))
+                });
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
+/// Zone-independent parameters for instance creation, shared across zone retries.
+struct CreateInstanceParams<'a> {
+    client: &'a google_cloud_compute_v1::client::Instances,
+    project: &'a str,
+    instance_name: &'a str,
+    machine_type: &'a str,
+    is_dev_mode: bool,
+    source_image: &'a str,
+    run_id: &'a str,
+    service_account: &'a str,
+    labels: &'a HashMap<String, String>,
+    cloud_config: &'a str,
+}
+
+/// Attempt to create a GCE instance in a specific zone.
+///
+/// Builds the zone-dependent parts of the instance config and calls the Compute API.
+/// Returns `Ok(())` on success, or a `CreateError` distinguishing retryable zone
+/// exhaustion from fatal errors.
+async fn create_instance_in_zone(
+    params: &CreateInstanceParams<'_>,
+    zone: &str,
+    region: &str,
+) -> Result<(), CreateError> {
+    use google_cloud_compute_v1::model::{
+        AcceleratorConfig, AccessConfig, AttachedDisk, AttachedDiskInitializeParams, Instance,
+        Metadata, NetworkInterface, Scheduling, ServiceAccount, ShieldedInstanceConfig,
+        metadata::Items as MetadataItems,
+    };
+    use google_cloud_lro::Poller;
+
+    let (disk_size_gb, disk_type) = if params.is_dev_mode {
+        (300, format!("zones/{}/diskTypes/pd-balanced", zone))
+    } else {
+        (100, format!("zones/{}/diskTypes/pd-ssd", zone))
+    };
+
+    let instance = Instance::new()
+        .set_name(params.instance_name)
+        .set_machine_type(format!(
+            "zones/{}/machineTypes/{}",
+            zone, params.machine_type
+        ))
+        .set_disks([AttachedDisk::new()
+            .set_boot(true)
+            .set_auto_delete(true)
+            .set_device_name(format!("spnl-test-big-{}", params.run_id))
+            .set_initialize_params(
+                AttachedDiskInitializeParams::new()
+                    .set_source_image(params.source_image)
+                    .set_disk_size_gb(disk_size_gb)
+                    .set_disk_type(disk_type),
+            )
+            .set_mode("READ_WRITE")])
+        .set_network_interfaces([NetworkInterface::new()
+            .set_subnetwork(format!("regions/{}/subnetworks/default", region))
+            .set_access_configs([AccessConfig::new().set_network_tier("PREMIUM")])
+            .set_stack_type("IPV4_ONLY")])
+        .set_guest_accelerators([AcceleratorConfig::new()
+            .set_accelerator_count(1)
+            .set_accelerator_type(format!("zones/{}/acceleratorTypes/nvidia-l4", zone))])
+        .set_metadata(
+            Metadata::default().set_items([
+                MetadataItems::default()
+                    .set_key("enable-osconfig")
+                    .set_value("TRUE"),
+                MetadataItems::default()
+                    .set_key("user-data")
+                    .set_value(params.cloud_config),
+            ]),
+        )
+        .set_scheduling(
+            Scheduling::new()
+                .set_automatic_restart(false)
+                .set_on_host_maintenance("TERMINATE")
+                .set_preemptible(true)
+                .set_provisioning_model("SPOT")
+                .set_instance_termination_action("STOP"),
+        )
+        .set_service_accounts([ServiceAccount::new()
+            .set_email(format!(
+                "{}@{}.iam.gserviceaccount.com",
+                params.service_account, params.project
+            ))
+            .set_scopes([
+                "https://www.googleapis.com/auth/devstorage.read_write",
+                "https://www.googleapis.com/auth/logging.write",
+                "https://www.googleapis.com/auth/monitoring.write",
+                "https://www.googleapis.com/auth/service.management.readonly",
+                "https://www.googleapis.com/auth/servicecontrol",
+                "https://www.googleapis.com/auth/trace.append",
+            ])])
+        .set_shielded_instance_config(
+            ShieldedInstanceConfig::new()
+                .set_enable_integrity_monitoring(true)
+                .set_enable_secure_boot(false)
+                .set_enable_vtpm(true),
+        )
+        .set_labels(params.labels.clone())
+        .set_can_ip_forward(false)
+        .set_deletion_protection(false);
+
+    let result = params
+        .client
+        .insert()
+        .set_project(params.project)
+        .set_zone(zone)
+        .set_body(instance)
+        .poller()
+        .until_done()
+        .await;
+
+    let operation = match result {
+        Ok(op) => op,
+        Err(e) => {
+            if is_zone_exhausted_api(&e) {
+                return Err(CreateError::ZoneExhausted(format!("{e}")));
+            }
+            return Err(CreateError::Fatal(e.into()));
+        }
+    };
+
+    match operation.to_result() {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            if is_zone_exhausted_op(&e) {
+                Err(CreateError::ZoneExhausted(format!("{e}")))
+            } else {
+                Err(CreateError::Fatal(e.into()))
+            }
+        }
+    }
+}
+
 #[derive(derive_builder::Builder)]
 pub struct UpArgs {
     /// Name of resource
@@ -216,27 +397,14 @@ cloud_final_modules: []"#
 /// and streams the cloud-init output log until the instance setup completes.
 pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     use google_cloud_compute_v1::client::Instances;
-    use google_cloud_compute_v1::model::{
-        AcceleratorConfig, AccessConfig, AttachedDisk, AttachedDiskInitializeParams, Instance,
-        Metadata, NetworkInterface, Scheduling, ServiceAccount, ShieldedInstanceConfig,
-        metadata::Items as MetadataItems,
-    };
-    use google_cloud_lro::Poller;
 
     // Load and template the cloud-config
     let cloud_config = load_cloud_config(&args)?;
 
-    // Uncomment to debug cloud-config
-    // eprintln!("Cloud config YAML:");
-    // eprintln!("---");
-    // eprintln!("{}", cloud_config);
-    // eprintln!("---\n");
-
     // Get configuration from args
     let project = args.config.get_project()?;
     let service_account = args.config.get_service_account()?;
-    let region = &args.config.region;
-    let zone = &args.config.zone;
+    let configured_zone = args.config.zone.clone();
     let machine_type = &args.config.machine_type;
 
     // Generate a unique run ID for this instance (or use provided name)
@@ -277,47 +445,6 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
         value: String,
     }
 
-    let info = vec![
-        InstanceInfo {
-            property: "Name".to_string(),
-            value: instance_name.clone(),
-        },
-        InstanceInfo {
-            property: "Project".to_string(),
-            value: project.clone(),
-        },
-        InstanceInfo {
-            property: "Zone".to_string(),
-            value: zone.clone(),
-        },
-        InstanceInfo {
-            property: "Machine Type".to_string(),
-            value: machine_type.clone(),
-        },
-        InstanceInfo {
-            property: "Run ID".to_string(),
-            value: run_id.clone(),
-        },
-        InstanceInfo {
-            property: "Mode".to_string(),
-            value: if is_dev_mode {
-                "dev".to_string()
-            } else {
-                "production".to_string()
-            },
-        },
-        InstanceInfo {
-            property: "Source Image".to_string(),
-            value: source_image.clone(),
-        },
-    ];
-
-    let mut table = Table::new(info);
-    table.with(Style::sharp());
-
-    eprintln!("\nCreating GCE Instance:");
-    eprintln!("{}\n", table);
-
     // Create labels
     let mut labels = std::collections::HashMap::new();
     labels.insert("role".to_string(), "gh-runner".to_string());
@@ -328,101 +455,120 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
         "v2-x86-template-1-4-0".to_string(),
     );
 
-    // Configure disk based on mode
-    // Dev mode needs more space for compilation (300GB pd-balanced)
-    // Production mode uses smaller, faster disk (100GB pd-ssd)
-    let (disk_size_gb, disk_type) = if is_dev_mode {
-        (300, format!("zones/{}/diskTypes/pd-balanced", zone))
-    } else {
-        (100, format!("zones/{}/diskTypes/pd-ssd", zone))
-    };
-
-    // Create the instance configuration matching the terraform file
-    let instance = Instance::new()
-        .set_name(&instance_name)
-        .set_machine_type(format!("zones/{}/machineTypes/{}", zone, machine_type))
-        .set_disks([AttachedDisk::new()
-            .set_boot(true)
-            .set_auto_delete(true)
-            .set_device_name(format!("spnl-test-big-{}", run_id))
-            .set_initialize_params(
-                AttachedDiskInitializeParams::new()
-                    .set_source_image(&source_image)
-                    .set_disk_size_gb(disk_size_gb)
-                    .set_disk_type(disk_type),
-            )
-            .set_mode("READ_WRITE")])
-        .set_network_interfaces([NetworkInterface::new()
-            .set_subnetwork(format!("regions/{}/subnetworks/default", region))
-            .set_access_configs([AccessConfig::new().set_network_tier("PREMIUM")])
-            // .set_queue_count(0)
-            .set_stack_type("IPV4_ONLY")])
-        .set_guest_accelerators([AcceleratorConfig::new()
-            .set_accelerator_count(1)
-            .set_accelerator_type(format!("zones/{}/acceleratorTypes/nvidia-l4", zone))])
-        .set_metadata(
-            Metadata::default().set_items([
-                MetadataItems::default()
-                    .set_key("enable-osconfig")
-                    .set_value("TRUE"),
-                MetadataItems::default()
-                    .set_key("user-data")
-                    .set_value(&cloud_config),
-            ]),
-        )
-        .set_scheduling(
-            Scheduling::new()
-                .set_automatic_restart(false)
-                .set_on_host_maintenance("TERMINATE")
-                .set_preemptible(true)
-                .set_provisioning_model("SPOT")
-                .set_instance_termination_action("STOP"),
-        )
-        .set_service_accounts([ServiceAccount::new()
-            .set_email(format!(
-                "{}@{}.iam.gserviceaccount.com",
-                service_account, project
-            ))
-            .set_scopes([
-                "https://www.googleapis.com/auth/devstorage.read_write",
-                "https://www.googleapis.com/auth/logging.write",
-                "https://www.googleapis.com/auth/monitoring.write",
-                "https://www.googleapis.com/auth/service.management.readonly",
-                "https://www.googleapis.com/auth/servicecontrol",
-                "https://www.googleapis.com/auth/trace.append",
-            ])])
-        .set_shielded_instance_config(
-            ShieldedInstanceConfig::new()
-                .set_enable_integrity_monitoring(true)
-                .set_enable_secure_boot(false)
-                .set_enable_vtpm(true),
-        )
-        .set_labels(labels)
-        .set_can_ip_forward(false)
-        .set_deletion_protection(false);
-
-    // Create the client and insert the instance
+    // Create the client
     let client = Instances::builder().build().await?;
 
-    eprintln!("Submitting instance creation request...");
-    let _operation = client
-        .insert()
-        .set_project(&project)
-        .set_zone(zone)
-        .set_body(instance)
-        .poller()
-        .until_done()
-        .await?
-        .to_result()?;
+    // Build the ordered list of zones to try: user's configured zone first,
+    // then all fallback zones (skipping the configured one to avoid duplicates).
+    let configured_parts: Vec<&str> = configured_zone.rsplitn(2, '-').collect();
+    let configured_pair = if configured_parts.len() == 2 {
+        Some((configured_parts[1], configured_parts[0]))
+    } else {
+        None
+    };
 
-    eprintln!("Instance '{}' created successfully", instance_name);
-    // eprintln!("Operation: {:?}", operation);
+    let mut zones_to_try: Vec<(&str, &str)> = Vec::new();
+    if let Some(pair) = configured_pair {
+        zones_to_try.push(pair);
+    }
+    for &(region, suffix) in FALLBACK_ZONES {
+        if configured_pair.is_some_and(|p| p.0 == region && p.1 == suffix) {
+            continue;
+        }
+        zones_to_try.push((region, suffix));
+    }
+
+    let create_params = CreateInstanceParams {
+        client: &client,
+        project: &project,
+        instance_name: &instance_name,
+        machine_type,
+        is_dev_mode,
+        source_image: &source_image,
+        run_id: &run_id,
+        service_account: &service_account,
+        labels: &labels,
+        cloud_config: &cloud_config,
+    };
+
+    // Try each zone until one succeeds or we run out of zones.
+    let mut succeeded_zone = None;
+    for (region, suffix) in &zones_to_try {
+        let zone = format!("{}-{}", region, suffix);
+
+        let info = vec![
+            InstanceInfo {
+                property: "Name".to_string(),
+                value: instance_name.clone(),
+            },
+            InstanceInfo {
+                property: "Project".to_string(),
+                value: project.clone(),
+            },
+            InstanceInfo {
+                property: "Zone".to_string(),
+                value: zone.clone(),
+            },
+            InstanceInfo {
+                property: "Machine Type".to_string(),
+                value: machine_type.to_string(),
+            },
+            InstanceInfo {
+                property: "Run ID".to_string(),
+                value: run_id.clone(),
+            },
+            InstanceInfo {
+                property: "Mode".to_string(),
+                value: if is_dev_mode {
+                    "dev".to_string()
+                } else {
+                    "production".to_string()
+                },
+            },
+            InstanceInfo {
+                property: "Source Image".to_string(),
+                value: source_image.clone(),
+            },
+        ];
+
+        let mut table = Table::new(info);
+        table.with(Style::sharp());
+
+        eprintln!("\nCreating GCE Instance:");
+        eprintln!("{}\n", table);
+
+        eprintln!("Submitting instance creation request...");
+        match create_instance_in_zone(&create_params, &zone, region).await {
+            Ok(()) => {
+                eprintln!(
+                    "Instance '{}' created successfully in zone {}",
+                    instance_name, zone
+                );
+                succeeded_zone = Some(zone);
+                break;
+            }
+            Err(CreateError::ZoneExhausted(msg)) => {
+                eprintln!(
+                    "Zone {} resource pool exhausted: {}. Trying next zone...",
+                    zone, msg
+                );
+                continue;
+            }
+            Err(CreateError::Fatal(e)) => {
+                return Err(e);
+            }
+        }
+    }
+
+    let zone = succeeded_zone.ok_or_else(|| {
+        anyhow::anyhow!("Failed to create instance in any available zone — all zones exhausted")
+    })?;
 
     // Get the instance details to show the external IP
     let instance_info = client
         .get()
         .set_project(&project)
-        .set_zone(zone)
+        .set_zone(&zone)
         .set_instance(&instance_name)
         .send()
         .await?;
@@ -470,7 +616,7 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_else(|_| "spnl-test".to_string());
 
     // Stream the cloud-init output log
-    let stream_result = stream_cloud_init_log(&instance_name, zone, &project).await;
+    let stream_result = stream_cloud_init_log(&instance_name, &zone, &project).await;
 
     // Fetch the exit code from GCS
     eprintln!("\nFetching exit code from GCS...");
