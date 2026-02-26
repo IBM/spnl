@@ -4596,8 +4596,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "anyhow",
  "candle-core",
@@ -4623,8 +4623,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-audio"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "anyhow",
  "apodize",
@@ -4634,8 +4634,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-core"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "ahash",
  "akin",
@@ -4734,8 +4734,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-macros"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -4745,8 +4745,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-mcp"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4765,8 +4765,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-paged-attn"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "anyhow",
  "candle-core",
@@ -4782,8 +4782,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-quant"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "byteorder",
  "candle-core",
@@ -4812,8 +4812,8 @@ dependencies = [
 
 [[package]]
 name = "mistralrs-vision"
-version = "0.7.1-alpha.1"
-source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#10dd9591f603f69549ec340ef2066a5f1a58d975"
+version = "0.7.1"
+source = "git+https://github.com/starpit/mistral.rs?branch=pic-cache-reuse#e32243c7aa7e5373f4d8384dd7d3534c606e7ad0"
 dependencies = [
  "candle-core",
  "image",

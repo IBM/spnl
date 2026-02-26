@@ -44,12 +44,9 @@ async fn plus(units: &[Query], rp: &ExecuteOptions) -> SpnlResult {
     let evaluated =
         futures::future::try_join_all(units.iter().map(|u| run_subtree(u, rp, Some(&m)))).await?;
 
-    if evaluated.len() == 1 {
-        // the unwrap() is safe here, due to the len() == 1 guard
-        Ok(evaluated.into_iter().next().unwrap())
-    } else {
-        Ok(Query::Plus(evaluated))
-    }
+    // Always keep Plus wrapping — even for single elements — so that PIC
+    // tagging is preserved (prepare_fragment generates need the Plus sentinel).
+    Ok(Query::Plus(evaluated))
 }
 
 /// Intersperse a in-between every element of b
@@ -103,9 +100,10 @@ async fn run_subtree_(query: &Query, rp: &ExecuteOptions, m: Option<&MultiProgre
         }
 
         Query::Monad(q) => {
-            // ignore output
+            // Execute for side effects (e.g. populating PIC cache), discard output.
+            // Return empty Seq to avoid phantom empty-message tokens.
             let _ = run_subtree(q, rp, m).await?;
-            Ok("".into())
+            Ok(Query::Seq(vec![]))
         }
 
         Query::Bulk(Bulk::Repeat(repeat)) => crate::generate::generate(repeat.clone(), m, rp).await,

@@ -83,6 +83,7 @@ use rand::seq::SliceRandom;
 use spnl::{
     ExecuteOptions, SpnlError, execute,
     ir::{Message::Assistant, Query},
+    optimizer::hlo,
     spnl,
 };
 use std::time::Instant;
@@ -196,6 +197,10 @@ pub struct PicArgs {
     /// If omitted, only token F1 is reported (no LLM judge).
     #[arg(long, env = "BENCH_PIC_GRADING_MODEL")]
     pub grading_model: Option<String>,
+
+    /// Print the optimized query tree before each request
+    #[arg(short, long)]
+    pub verbose: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -540,7 +545,17 @@ fn build_query_flat(model: &str, docs: &[String], question: &str, max_tokens: i3
     })
 }
 
-async fn timed_request(query: &Query, options: &ExecuteOptions) -> anyhow::Result<(f64, String)> {
+async fn timed_request(
+    query: &Query,
+    options: &ExecuteOptions,
+    verbose: bool,
+) -> anyhow::Result<(f64, String)> {
+    let query = &hlo::optimize(query, &hlo::Options::default()).await?;
+    if verbose {
+        eprintln!("--- optimized query ---");
+        ptree::write_tree(query, ::std::io::stderr())?;
+        eprintln!("--- end ---");
+    }
     let start = Instant::now();
     let result = execute(query, options).await?;
     let ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -587,6 +602,7 @@ pub(crate) struct RunCtx<'a> {
     pub(crate) label: &'a str,
     pub(crate) pb: &'a ProgressBar,
     pub(crate) step_prefix: &'a str,
+    pub(crate) verbose: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -614,11 +630,13 @@ pub(crate) async fn run_one(
         label,
         pb,
         step_prefix,
+        verbose,
     } = ctx;
     let options = ExecuteOptions {
         silent: true,
         ..Default::default()
     };
+    let verbose = *verbose;
     let question = "Summarize the key topics from all the documents.";
 
     let mut nocache_ttfts = Vec::new();
@@ -634,7 +652,7 @@ pub(crate) async fn run_one(
         // No-cache request: first time these docs are seen — full prefill
         let _ = take_pic_stats();
         let nocache_query = build_query(model, &docs, question, 1);
-        let (nocache_ms, _) = timed_request(&nocache_query, &options).await?;
+        let (nocache_ms, _) = timed_request(&nocache_query, &options, verbose).await?;
         nocache_ttfts.push(nocache_ms);
         pb.inc(1);
         pb.set_message(format!(
@@ -647,7 +665,7 @@ pub(crate) async fn run_one(
         for reuse_i in 0..reuse_iters {
             let shuffled = shuffle_docs(&docs);
             let reuse_query = build_query(model, &shuffled, question, 1);
-            let (reuse_ms, _) = timed_request(&reuse_query, &options).await?;
+            let (reuse_ms, _) = timed_request(&reuse_query, &options, verbose).await?;
             reuse_ttfts.push(reuse_ms);
             pb.inc(1);
             pb.set_message(format!(
@@ -829,11 +847,13 @@ async fn run_accuracy(
         label,
         pb,
         step_prefix,
+        verbose,
     } = ctx;
     let options = ExecuteOptions {
         silent: true,
         ..Default::default()
     };
+    let verbose = *verbose;
 
     let mut trial_results = Vec::new();
 
@@ -847,7 +867,7 @@ async fn run_accuracy(
 
         // 1. Flat: causal attention, original doc order (def before use)
         let flat_query = build_query_flat(model, &docs, &question, accuracy_tokens);
-        let (_, flat_response) = timed_request(&flat_query, &options).await?;
+        let (_, flat_response) = timed_request(&flat_query, &options, verbose).await?;
         let flat_correct = check_answer(&flat_response, &expected);
         pb.inc(1);
         pb.set_message(format!(
@@ -859,7 +879,7 @@ async fn run_accuracy(
         // 2. Flat-shuffled: causal attention, shuffled doc order (no PIC involvement)
         let shuffled = shuffle_docs(&docs);
         let flat_shuf_query = build_query_flat(model, &shuffled, &question, accuracy_tokens);
-        let (_, flat_shuf_response) = timed_request(&flat_shuf_query, &options).await?;
+        let (_, flat_shuf_response) = timed_request(&flat_shuf_query, &options, verbose).await?;
         let flat_shuffled_correct = check_answer(&flat_shuf_response, &expected);
         pb.inc(1);
         pb.set_message(format!(
@@ -871,8 +891,14 @@ async fn run_accuracy(
         // 3. PIC: Plus block attention, original doc order
         let _ = take_pic_stats();
         let pic_query = build_query(model, &docs, &question, accuracy_tokens);
-        let (_, pic_response) = timed_request(&pic_query, &options).await?;
+        let (_, pic_response) = timed_request(&pic_query, &options, verbose).await?;
         let pic_correct = check_answer(&pic_response, &expected);
+        if verbose {
+            let (h, m) = take_pic_stats();
+            eprintln!(
+                "[pic] expected={expected:?} response={pic_response:?} correct={pic_correct} hits={h} misses={m}"
+            );
+        }
         pb.inc(1);
         pb.set_message(format!(
             "{step_prefix}{label} · accuracy {}/{trials} · pic · {}",
@@ -881,11 +907,17 @@ async fn run_accuracy(
         ));
 
         // 4. PIC-shuffled: Plus block attention, shuffled doc order
-        //    (may reuse cached Plus blocks from step 3 — this tests PIC cache correctness)
+        //    (reuses cached Plus blocks from step 3 — tests PIC cache correctness)
         let pic_shuffled = shuffle_docs(&docs);
         let pic_shuf_query = build_query(model, &pic_shuffled, &question, accuracy_tokens);
-        let (_, pic_shuf_response) = timed_request(&pic_shuf_query, &options).await?;
+        let (_, pic_shuf_response) = timed_request(&pic_shuf_query, &options, verbose).await?;
         let pic_shuffled_correct = check_answer(&pic_shuf_response, &expected);
+        if verbose {
+            let (h, m) = take_pic_stats();
+            eprintln!(
+                "[pshuf] expected={expected:?} response={pic_shuf_response:?} correct={pic_shuffled_correct} hits={h} misses={m}"
+            );
+        }
         pb.inc(1);
         pb.set_message(format!(
             "{step_prefix}{label} · accuracy {}/{trials} · pshuf · {}",
@@ -1097,6 +1129,7 @@ pub async fn run(args: PicArgs) -> Result<(), SpnlError> {
                 label,
                 pb: &pb,
                 step_prefix: &step_prefix,
+                verbose: args.verbose,
             };
 
             if wants_ttft {
@@ -1672,6 +1705,7 @@ mod tests {
             label: "test",
             pb: &pb,
             step_prefix: "",
+            verbose: false,
         };
         let result = run_one(&ctx, 3, 1).await.expect("benchmark should succeed");
         let nocache_p50 = percentile(&result.nocache_ttfts, 50);
