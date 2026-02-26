@@ -11,10 +11,11 @@
 //!   blocks skip prefill entirely.
 //! - **PIC hit rate**: How many reuse requests found all their Plus blocks
 //!   in the content-based PIC.
-//! - **Accuracy** (`-o accuracy`): Compares responses generated **with** Plus blocks
-//!   (PIC block attention) vs **without** Plus (standard causal attention) for the
-//!   same documents and question. Reports token F1 (word overlap) and optional
-//!   LLM-judge semantic equivalence score (with `--grading-model`).
+//! - **Accuracy** (`-o accuracy`): Tests ground-truth correctness using fictional
+//!   factual documents with verifiable answers. Runs three queries per trial:
+//!   flat (causal), PIC (Plus blocks), and PIC-shuffled (Plus blocks, shuffled
+//!   doc order). Reports `flat/pic/shuf` correctness counts. Token F1 and
+//!   optional LLM-judge (`--grading-model`) are secondary metrics.
 //!
 //! # Options
 //!
@@ -77,6 +78,7 @@
 //!    - With PIC active, Plus block KVs are reused; only Cross tokens need prefill
 
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::Rng;
 use rand::seq::SliceRandom;
 use spnl::{
     ExecuteOptions, SpnlError, execute,
@@ -97,7 +99,7 @@ const FULL_SPECTRUM: &[(usize, &str)] = &[
 ];
 
 /// All valid t-shirt size names, for help text.
-const ALL_SIZES: &str = "xs,sm,m,lg,xl,xxl";
+const ALL_SIZES: &str = "xs,s(m),m,l(g),xl,xxl";
 
 /// Default models for `--full` mode.
 const FULL_MODELS: &[&str] = &[
@@ -109,25 +111,24 @@ const FULL_MODELS: &[&str] = &[
 ];
 
 /// Resolve size names into spectrum entries.
-fn resolve_spectrum(sizes: &[String]) -> Option<Vec<(usize, String)>> {
-    if sizes.is_empty() {
-        return None;
+/// Accepts canonical names (xs, sm, m, lg, xl, xxl) and short aliases (s, l).
+/// Returns `Err` if any size name is unrecognized.
+fn resolve_spectrum(sizes: &[String]) -> Result<Vec<(usize, String)>, String> {
+    let mut selected = Vec::new();
+    for s in sizes {
+        let s = s.trim();
+        // Allow short aliases: s→sm, l→lg
+        let canonical = match s {
+            "s" => "sm",
+            "l" => "lg",
+            other => other,
+        };
+        match FULL_SPECTRUM.iter().find(|(_, name)| *name == canonical) {
+            Some(&(len, name)) => selected.push((len, name.to_string())),
+            None => return Err(s.to_string()),
+        }
     }
-    let selected: Vec<(usize, String)> = sizes
-        .iter()
-        .filter_map(|s| {
-            let s = s.trim();
-            FULL_SPECTRUM
-                .iter()
-                .find(|(_, name)| *name == s)
-                .map(|&(len, name)| (len, name.to_string()))
-        })
-        .collect();
-    if selected.is_empty() {
-        None
-    } else {
-        Some(selected)
-    }
+    Ok(selected)
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -213,6 +214,275 @@ fn make_documents(num_docs: usize, doc_length: usize) -> Vec<String> {
             )
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Factual document generation for accuracy testing
+// ---------------------------------------------------------------------------
+//
+// Design notes — why this catches order-sensitivity bugs:
+//
+// The core idea is CROSS-DOCUMENT INFERENCE CHAINS. Each test uses a pair of
+// documents where one defines an alias and the other uses it:
+//
+//   doc_def:  "A Vorpal is the local name for a school in Zephyria."
+//   doc_use:  "There are 45 Vorpals in the capital district of Zephyria."
+//   question: "How many schools are in the capital district of Zephyria?"
+//   answer:   "45"
+//
+// Answering requires composing "Vorpal = school" (from doc_def) with "45
+// Vorpals" (from doc_use). This makes document order mechanically relevant:
+//
+// - In CAUSAL (flat) attention, tokens can only attend to earlier positions.
+//   If doc_def precedes doc_use, the model can resolve the alias when it
+//   reaches doc_use. If the order is reversed, doc_use is processed before
+//   the definition exists — the model may fail.
+//
+// - In PIC (Plus block attention), each document is an independent Plus block
+//   whose KV cache is computed without attending to other blocks. The Cross
+//   block (question) then attends to ALL Plus blocks simultaneously. So
+//   document order should not matter — both docs are equally accessible.
+//
+// This gives us a deterministic, mechanistic test rather than relying on
+// weak statistical signals like primacy/recency bias.
+//
+// The benchmark runs 4 queries per trial and the comparison matrix is:
+//
+//   flat    (causal, original order)  → should work (def before use, causal chains forward)
+//   fshuf   (causal, shuffled order)  → may fail    (use before def, causal can't look ahead)
+//   pic     (Plus blocks, orig order) → should work (Plus blocks are independent)
+//   pshuf   (Plus blocks, shuffled)   → should work (same reason — PIC is order-invariant)
+//
+// Key diagnostic comparisons:
+//
+//   flat vs fshuf  → measures causal order-sensitivity (expected for inference chains)
+//   pic vs pshuf   → measures PIC order-sensitivity (should be zero if PIC is correct)
+//   fshuf vs pshuf → PIC's value proposition: does Plus attention recover what causal loses?
+//   flat vs pic    → sanity check: does Plus attention match causal in the easy case?
+//
+// If pshuf < pic, the PIC cache likely has a position-encoding bug: cached
+// KV entries retain RoPE rotations from their original positions and produce
+// garbled attention when reused at different positions.
+//
+// If fshuf ≈ pshuf (both low), Plus blocks may not be helping with cross-doc
+// reasoning at all — the model is equally order-sensitive in both modes.
+//
+// Additional design choices:
+//
+// - FICTIONAL ALIASES: Names like "Vorpal" and "Zephyria" are fictional, so
+//   the model can't resolve them from pretraining. It must read both docs.
+//
+// - LIPSUM PADDING: Facts are buried in lipsum filler (controlled by
+//   --length). This forces real attention over long contexts.
+//
+// - FILLER DOCUMENTS: Additional lipsum-only docs are added to reach
+//   num_docs, acting as distractors that dilute attention.
+//
+// - TERSE ANSWER FORMAT: The question asks for ONLY the value. This keeps
+//   responses short and makes substring checking reliable.
+
+/// Inference-chain entries for cross-document accuracy testing.
+///
+/// Each entry: (alias, real_meaning, context, quantity, unit, location).
+///
+/// These produce two documents per entry:
+///   doc_def: "A {alias} is the local name for a {real_meaning} in {location}."
+///   doc_use: "There are {quantity} {alias}s {unit} in {location}."
+///
+/// The question asks about the real_meaning, forcing the model to resolve the
+/// alias across documents.
+const INFERENCE_BANK: &[InferenceEntry] = &[
+    InferenceEntry {
+        alias: "Vorpal",
+        real_meaning: "school",
+        location: "Zephyria",
+        quantity: "45",
+        unit: "in the capital district of",
+    },
+    InferenceEntry {
+        alias: "Thalweg",
+        real_meaning: "hospital",
+        location: "Brontaal",
+        quantity: "12",
+        unit: "across the northern provinces of",
+    },
+    InferenceEntry {
+        alias: "Crenn",
+        real_meaning: "bridge",
+        location: "Velouria",
+        quantity: "89",
+        unit: "spanning the rivers of",
+    },
+    InferenceEntry {
+        alias: "Spelkraft",
+        real_meaning: "factory",
+        location: "Caskara",
+        quantity: "23",
+        unit: "along the coast of",
+    },
+    InferenceEntry {
+        alias: "Darvon",
+        real_meaning: "park",
+        location: "Nimbustan",
+        quantity: "67",
+        unit: "within the borders of",
+    },
+    InferenceEntry {
+        alias: "Quelm",
+        real_meaning: "library",
+        location: "Flarovia",
+        quantity: "31",
+        unit: "in the eastern region of",
+    },
+    InferenceEntry {
+        alias: "Broxite",
+        real_meaning: "market",
+        location: "Glacendia",
+        quantity: "8",
+        unit: "in the highland towns of",
+    },
+    InferenceEntry {
+        alias: "Vintara",
+        real_meaning: "temple",
+        location: "Terranova",
+        quantity: "54",
+        unit: "throughout the valleys of",
+    },
+    InferenceEntry {
+        alias: "Pellith",
+        real_meaning: "harbor",
+        location: "Quintara",
+        quantity: "19",
+        unit: "dotting the shoreline of",
+    },
+    InferenceEntry {
+        alias: "Orrenth",
+        real_meaning: "mine",
+        location: "Marivel",
+        quantity: "76",
+        unit: "beneath the mountains of",
+    },
+    InferenceEntry {
+        alias: "Straven",
+        real_meaning: "theater",
+        location: "Pyrothen",
+        quantity: "14",
+        unit: "in the old quarter of",
+    },
+    InferenceEntry {
+        alias: "Calyx",
+        real_meaning: "well",
+        location: "Solanthis",
+        quantity: "103",
+        unit: "across the desert of",
+    },
+    InferenceEntry {
+        alias: "Nimrath",
+        real_meaning: "tower",
+        location: "Verdantia",
+        quantity: "37",
+        unit: "rising above the canopy of",
+    },
+    InferenceEntry {
+        alias: "Glenth",
+        real_meaning: "dam",
+        location: "Aethermoor",
+        quantity: "5",
+        unit: "controlling the rivers of",
+    },
+    InferenceEntry {
+        alias: "Feroshi",
+        real_meaning: "clinic",
+        location: "Korundel",
+        quantity: "28",
+        unit: "in the outer villages of",
+    },
+    InferenceEntry {
+        alias: "Mordwyn",
+        real_meaning: "fort",
+        location: "Drakmere",
+        quantity: "41",
+        unit: "guarding the passes of",
+    },
+];
+
+struct InferenceEntry {
+    alias: &'static str,
+    real_meaning: &'static str,
+    location: &'static str,
+    quantity: &'static str,
+    unit: &'static str,
+}
+
+/// Result of generating accuracy test documents.
+struct AccuracyDocs {
+    /// All documents in the "correct" order (definition before usage, then fillers).
+    docs: Vec<String>,
+    /// The question that requires cross-document inference.
+    question: String,
+    /// The expected answer (substring to check for).
+    expected: String,
+}
+
+/// Generate documents for one accuracy trial.
+///
+/// Picks a random inference-chain entry, generates a definition doc and a
+/// usage doc (in that order), then fills up to `num_docs` with lipsum filler
+/// documents. All documents are padded to `doc_length` words.
+///
+/// The returned `docs` are in "correct" order: definition first, usage second,
+/// then fillers. The caller shuffles as needed for the shuffled test.
+fn make_accuracy_docs(num_docs: usize, doc_length: usize) -> AccuracyDocs {
+    assert!(num_docs >= 2, "need at least 2 docs for inference chain");
+    let mut rng = rand::rng();
+
+    // Pick a random inference chain
+    let entry = &INFERENCE_BANK[rng.random_range(0..INFERENCE_BANK.len())];
+
+    let mut pad = |text: &str| -> String {
+        let word_count = text.split_whitespace().count();
+        if doc_length > word_count {
+            let padding = lipsum::lipsum_words_with_rng(&mut rng, doc_length - word_count);
+            format!("{text} {padding}")
+        } else {
+            text.to_string()
+        }
+    };
+
+    // Definition document: defines the alias
+    let doc_def = pad(&format!(
+        "A {} is the local name for a {} in {}.",
+        entry.alias, entry.real_meaning, entry.location,
+    ));
+
+    // Usage document: uses the alias with a quantity
+    let doc_use = pad(&format!(
+        "There are {} {}s {} {}.",
+        entry.quantity, entry.alias, entry.unit, entry.location,
+    ));
+
+    let mut docs = vec![doc_def, doc_use];
+
+    // Filler documents (lipsum only, as distractors)
+    for _ in 2..num_docs {
+        docs.push(lipsum::lipsum_words_with_rng(&mut rng, doc_length));
+    }
+
+    let question = format!(
+        "How many {}s are there {} {}? Answer with ONLY the number, nothing else.",
+        entry.real_meaning, entry.unit, entry.location,
+    );
+
+    AccuracyDocs {
+        docs,
+        question,
+        expected: entry.quantity.to_string(),
+    }
+}
+
+/// Case-insensitive substring check for ground-truth answer verification.
+fn check_answer(response: &str, expected: &str) -> bool {
+    response.to_lowercase().contains(&expected.to_lowercase())
 }
 
 /// Build a query with Plus-wrapped documents (PIC block attention).
@@ -415,12 +685,45 @@ struct AccuracyResult {
 }
 
 struct AccuracyTrial {
+    flat_correct: bool,
+    flat_shuffled_correct: bool,
+    pic_correct: bool,
+    pic_shuffled_correct: bool,
+    /// Token F1 between flat and PIC responses (secondary metric)
     token_f1: f64,
     /// LLM-judge semantic equivalence score (0-100), None if no grading model
     llm_score: Option<f64>,
 }
 
 impl AccuracyResult {
+    fn flat_accuracy(&self) -> (usize, usize) {
+        let correct = self.trials.iter().filter(|t| t.flat_correct).count();
+        (correct, self.trials.len())
+    }
+
+    fn flat_shuffled_accuracy(&self) -> (usize, usize) {
+        let correct = self
+            .trials
+            .iter()
+            .filter(|t| t.flat_shuffled_correct)
+            .count();
+        (correct, self.trials.len())
+    }
+
+    fn pic_accuracy(&self) -> (usize, usize) {
+        let correct = self.trials.iter().filter(|t| t.pic_correct).count();
+        (correct, self.trials.len())
+    }
+
+    fn shuffle_accuracy(&self) -> (usize, usize) {
+        let correct = self
+            .trials
+            .iter()
+            .filter(|t| t.pic_shuffled_correct)
+            .count();
+        (correct, self.trials.len())
+    }
+
     fn avg_token_f1(&self) -> f64 {
         if self.trials.is_empty() {
             return 0.0;
@@ -531,40 +834,71 @@ async fn run_accuracy(
         silent: true,
         ..Default::default()
     };
-    let question = "Summarize the key topics from all the documents.";
 
     let mut trial_results = Vec::new();
 
     for trial in 0..trials {
-        let docs = make_documents(*num_docs, *doc_length);
+        // Generate inference-chain documents (definition before usage, then fillers)
+        let AccuracyDocs {
+            docs,
+            question,
+            expected,
+        } = make_accuracy_docs(*num_docs, *doc_length);
 
-        // Flat query: standard causal attention (no Plus)
-        let flat_query = build_query_flat(model, &docs, question, accuracy_tokens);
+        // 1. Flat: causal attention, original doc order (def before use)
+        let flat_query = build_query_flat(model, &docs, &question, accuracy_tokens);
         let (_, flat_response) = timed_request(&flat_query, &options).await?;
+        let flat_correct = check_answer(&flat_response, &expected);
         pb.inc(1);
         pb.set_message(format!(
-            "{step_prefix}{label} · accuracy {}/{trials} · Prefix · {} chars",
+            "{step_prefix}{label} · accuracy {}/{trials} · flat · {}",
             trial + 1,
-            flat_response.len(),
+            if flat_correct { "Y" } else { "N" },
         ));
 
-        // Plus query: PIC block attention
-        let _ = take_pic_stats(); // reset stats
-        let plus_query = build_query(model, &docs, question, accuracy_tokens);
-        let (_, plus_response) = timed_request(&plus_query, &options).await?;
+        // 2. Flat-shuffled: causal attention, shuffled doc order (no PIC involvement)
+        let shuffled = shuffle_docs(&docs);
+        let flat_shuf_query = build_query_flat(model, &shuffled, &question, accuracy_tokens);
+        let (_, flat_shuf_response) = timed_request(&flat_shuf_query, &options).await?;
+        let flat_shuffled_correct = check_answer(&flat_shuf_response, &expected);
         pb.inc(1);
         pb.set_message(format!(
-            "{step_prefix}{label} · accuracy {}/{trials} · PIC · {} chars",
+            "{step_prefix}{label} · accuracy {}/{trials} · fshuf · {}",
             trial + 1,
-            plus_response.len(),
+            if flat_shuffled_correct { "Y" } else { "N" },
         ));
 
-        // Token F1 (cheap, no LLM call)
-        let f1 = token_f1(&flat_response, &plus_response);
+        // 3. PIC: Plus block attention, original doc order
+        let _ = take_pic_stats();
+        let pic_query = build_query(model, &docs, &question, accuracy_tokens);
+        let (_, pic_response) = timed_request(&pic_query, &options).await?;
+        let pic_correct = check_answer(&pic_response, &expected);
+        pb.inc(1);
+        pb.set_message(format!(
+            "{step_prefix}{label} · accuracy {}/{trials} · pic · {}",
+            trial + 1,
+            if pic_correct { "Y" } else { "N" },
+        ));
+
+        // 4. PIC-shuffled: Plus block attention, shuffled doc order
+        //    (may reuse cached Plus blocks from step 3 — this tests PIC cache correctness)
+        let pic_shuffled = shuffle_docs(&docs);
+        let pic_shuf_query = build_query(model, &pic_shuffled, &question, accuracy_tokens);
+        let (_, pic_shuf_response) = timed_request(&pic_shuf_query, &options).await?;
+        let pic_shuffled_correct = check_answer(&pic_shuf_response, &expected);
+        pb.inc(1);
+        pb.set_message(format!(
+            "{step_prefix}{label} · accuracy {}/{trials} · pshuf · {}",
+            trial + 1,
+            if pic_shuffled_correct { "Y" } else { "N" },
+        ));
+
+        // Token F1 between flat and PIC (secondary metric)
+        let f1 = token_f1(&flat_response, &pic_response);
 
         // LLM-judge (if grading model provided)
         let llm_score = if let Some(gm) = grading_model {
-            let judge_query = build_equivalence_query(gm, &flat_response, &plus_response);
+            let judge_query = build_equivalence_query(gm, &flat_response, &pic_response);
             match execute(&judge_query, &options).await {
                 Ok(Query::Message(Assistant(s))) => {
                     pb.inc(1);
@@ -583,11 +917,19 @@ async fn run_accuracy(
             .map(|s| format!(" llm={s:.0}"))
             .unwrap_or_default();
         pb.set_message(format!(
-            "{step_prefix}{label} · accuracy {}/{trials} · f1={f1:.0}{score_str}",
+            "{step_prefix}{label} · accuracy {}/{trials} · {}/{}/{}/{} f1={f1:.0}{score_str}",
             trial + 1,
+            if flat_correct { "Y" } else { "N" },
+            if flat_shuffled_correct { "Y" } else { "N" },
+            if pic_correct { "Y" } else { "N" },
+            if pic_shuffled_correct { "Y" } else { "N" },
         ));
 
         trial_results.push(AccuracyTrial {
+            flat_correct,
+            flat_shuffled_correct,
+            pic_correct,
+            pic_shuffled_correct,
             token_f1: f1,
             llm_score,
         });
@@ -620,9 +962,10 @@ pub async fn run(args: PicArgs) -> Result<(), SpnlError> {
     }
 
     let spectrum: Vec<(usize, String)> = if !args.size.is_empty() {
-        resolve_spectrum(&args.size).ok_or_else(|| {
+        resolve_spectrum(&args.size).map_err(|bad| {
             anyhow::anyhow!(
-                "No valid sizes in --size={}. Valid sizes: {}",
+                "Unknown size '{}' in --size={}. Valid sizes: {}",
+                bad,
                 args.size.join(","),
                 ALL_SIZES
             )
@@ -697,11 +1040,11 @@ pub async fn run(args: PicArgs) -> Result<(), SpnlError> {
     }
     if wants_accuracy {
         let metric = match args.grading_model.as_deref() {
-            Some(m) => format!("metric=token-f1+llm-judge({m})"),
-            None => "metric=token-f1, llm-judge disabled (see --grading-model)".to_string(),
+            Some(m) => format!("secondary=token-f1+llm-judge({m})"),
+            None => "secondary=token-f1, llm-judge disabled (see --grading-model)".to_string(),
         };
         eprintln!(
-            "  Accuracy:    {} tokens, {} trials, {metric}",
+            "  Accuracy:    {} tokens, {} trials, flat/fshuf/pic/pshuf ground-truth, {metric}",
             args.length, args.trials
         );
     }
@@ -713,7 +1056,7 @@ pub async fn run(args: PicArgs) -> Result<(), SpnlError> {
     } else {
         0
     };
-    let accuracy_steps_per_trial = if args.grading_model.is_some() { 3 } else { 2 }; // flat + PIC + optional judge
+    let accuracy_steps_per_trial = if args.grading_model.is_some() { 5 } else { 4 }; // flat + flat-shuf + PIC + PIC-shuf + optional judge
     let accuracy_steps_per_len = if wants_accuracy {
         args.trials * accuracy_steps_per_trial
     } else {
@@ -946,14 +1289,27 @@ fn print_results_json(all_model_results: &[(String, Vec<RunResult>)]) {
 // ---------------------------------------------------------------------------
 
 fn format_accuracy_cell(r: &AccuracyResult) -> String {
+    let (fc, _) = r.flat_accuracy();
+    let (fsc, _) = r.flat_shuffled_accuracy();
+    let (pc, _) = r.pic_accuracy();
+    let (psc, total) = r.shuffle_accuracy();
+    let base = format!("{fc}/{fsc}/{pc}/{psc}");
+    // Append secondary metrics if available
     let f1 = r.avg_token_f1();
     match r.avg_llm_score() {
-        Some(llm) => format!("{f1:.0}%,{llm:.0}"),
-        None => format!("{f1:.0}%"),
+        Some(llm) => format!("{base} f1={f1:.0},llm={llm:.0}"),
+        None if total > 0 => format!("{base} f1={f1:.0}"),
+        _ => base,
     }
 }
 
 fn print_accuracy_table(all: &[(String, Vec<AccuracyResult>)]) {
+    // Legend
+    let total = all[0].1.first().map(|r| r.trials.len()).unwrap_or(0);
+    eprintln!("  Accuracy: flat/fshuf/pic/pshuf correct out of {total} trials");
+    eprintln!("    flat=causal  fshuf=causal+shuffled  pic=Plus blocks  pshuf=Plus+shuffled");
+    eprintln!();
+
     let size_labels: Vec<String> = all[0]
         .1
         .iter()
@@ -1108,6 +1464,123 @@ mod tests {
         assert_eq!(parse_score("150"), 100.0);
     }
 
+    // ---- check_answer ----
+
+    #[test]
+    fn check_answer_exact_match() {
+        assert!(check_answer("45", "45"));
+    }
+
+    #[test]
+    fn check_answer_case_insensitive() {
+        assert!(check_answer("there are 45 schools", "45"));
+        assert!(check_answer("FORTY-FIVE or 45", "45"));
+    }
+
+    #[test]
+    fn check_answer_not_present() {
+        assert!(!check_answer("There are 12 hospitals.", "45"));
+    }
+
+    #[test]
+    fn check_answer_empty_response() {
+        assert!(!check_answer("", "45"));
+    }
+
+    #[test]
+    fn check_answer_embedded_in_sentence() {
+        assert!(check_answer(
+            "Based on the documents, there are 45 schools in the capital district.",
+            "45"
+        ));
+    }
+
+    // ---- make_accuracy_docs ----
+
+    #[test]
+    fn make_accuracy_docs_correct_count() {
+        let result = make_accuracy_docs(4, 50);
+        assert_eq!(result.docs.len(), 4);
+    }
+
+    #[test]
+    fn make_accuracy_docs_minimum_two() {
+        let result = make_accuracy_docs(2, 50);
+        assert_eq!(result.docs.len(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "need at least 2 docs")]
+    fn make_accuracy_docs_panics_with_one() {
+        make_accuracy_docs(1, 50);
+    }
+
+    #[test]
+    fn make_accuracy_docs_def_contains_alias_and_meaning() {
+        // Run several times to cover different random entries
+        for _ in 0..10 {
+            let result = make_accuracy_docs(2, 100);
+            let doc_def = &result.docs[0];
+            // Definition doc should contain "local name for a" (our template)
+            assert!(
+                doc_def.contains("local name for a"),
+                "def doc should contain definition template: {doc_def}"
+            );
+        }
+    }
+
+    #[test]
+    fn make_accuracy_docs_use_contains_quantity() {
+        for _ in 0..10 {
+            let result = make_accuracy_docs(2, 100);
+            let doc_use = &result.docs[1];
+            // Usage doc should contain the expected answer (the quantity)
+            assert!(
+                doc_use.contains(&result.expected),
+                "usage doc should contain quantity '{}': {doc_use}",
+                result.expected,
+            );
+        }
+    }
+
+    #[test]
+    fn make_accuracy_docs_question_uses_real_meaning() {
+        for _ in 0..10 {
+            let result = make_accuracy_docs(2, 50);
+            // Question should NOT contain the alias (it uses the real meaning)
+            // and should ask "How many"
+            assert!(
+                result.question.starts_with("How many"),
+                "question should ask 'How many': {}",
+                result.question,
+            );
+            // Question should contain "ONLY the number"
+            assert!(
+                result.question.contains("ONLY the number"),
+                "question should include terse-answer instruction: {}",
+                result.question,
+            );
+        }
+    }
+
+    #[test]
+    fn make_accuracy_docs_question_does_not_leak_alias() {
+        // The question should use the real_meaning, not the alias.
+        // Collect all aliases to check none appear in the question.
+        let aliases: Vec<&str> = INFERENCE_BANK.iter().map(|e| e.alias).collect();
+        for _ in 0..20 {
+            let result = make_accuracy_docs(2, 50);
+            for alias in &aliases {
+                assert!(
+                    !result.question.contains(alias),
+                    "question should not leak alias '{}': {}",
+                    alias,
+                    result.question,
+                );
+            }
+        }
+    }
+
     // ---- resolve_spectrum ----
 
     #[test]
@@ -1123,22 +1596,29 @@ mod tests {
     #[test]
     fn resolve_spectrum_invalid_sizes() {
         let sizes: Vec<String> = vec!["bogus".into()];
-        assert!(resolve_spectrum(&sizes).is_none());
+        assert_eq!(resolve_spectrum(&sizes).unwrap_err(), "bogus");
     }
 
     #[test]
     fn resolve_spectrum_empty() {
         let sizes: Vec<String> = vec![];
-        assert!(resolve_spectrum(&sizes).is_none());
+        assert_eq!(resolve_spectrum(&sizes).unwrap(), vec![]);
     }
 
     #[test]
-    fn resolve_spectrum_mixed() {
+    fn resolve_spectrum_mixed_rejects_bad() {
         let sizes: Vec<String> = vec!["xs".into(), "bogus".into(), "m".into()];
+        assert_eq!(resolve_spectrum(&sizes).unwrap_err(), "bogus");
+    }
+
+    #[test]
+    fn resolve_spectrum_short_aliases() {
+        let sizes: Vec<String> = vec!["s".into(), "m".into(), "l".into()];
         let result = resolve_spectrum(&sizes).unwrap();
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0], (10, "xs".to_string()));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], (50, "sm".to_string()));
         assert_eq!(result[1], (200, "m".to_string()));
+        assert_eq!(result[2], (500, "lg".to_string()));
     }
 
     // ---- compute_hit_rate ----

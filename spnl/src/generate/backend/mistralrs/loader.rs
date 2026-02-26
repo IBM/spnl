@@ -55,8 +55,7 @@ fn get_hf_cache_dir() -> PathBuf {
 
 /// Get PagedAttention configuration from environment variables
 /// Returns None if PagedAttention is disabled or not supported
-fn get_paged_attn_config()
--> Option<impl FnOnce() -> anyhow::Result<mistralrs::PagedAttentionConfig>> {
+fn get_paged_attn_config() -> Option<mistralrs::PagedAttentionConfig> {
     // Check if explicitly enabled via environment variable (disabled by default for faster startup)
     let enabled = std::env::var("MISTRALRS_PAGED_ATTN")
         .unwrap_or_else(|_| "false".to_string())
@@ -84,11 +83,10 @@ fn get_paged_attn_config()
         eprintln!("Enabling PagedAttention with block_size={}", block_size);
     }
 
-    Some(move || {
-        PagedAttentionMetaBuilder::default()
-            .with_block_size(block_size)
-            .build()
-    })
+    PagedAttentionMetaBuilder::default()
+        .with_block_size(block_size)
+        .build()
+        .ok()
 }
 
 /// Get prefix cache size from environment variables
@@ -420,7 +418,7 @@ impl ModelPool {
 
             // Apply PagedAttention if available and enabled
             if let Some(paged_config) = get_paged_attn_config() {
-                builder = builder.with_paged_attn(paged_config)?;
+                builder = builder.with_paged_attn(paged_config);
             }
 
             // Apply prefix caching configuration
@@ -476,7 +474,7 @@ impl ModelPool {
 
             // Apply PagedAttention if available and enabled
             if let Some(paged_config) = get_paged_attn_config() {
-                builder = builder.with_paged_attn(paged_config)?;
+                builder = builder.with_paged_attn(paged_config);
             }
 
             // Apply prefix caching configuration

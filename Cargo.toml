@@ -7,7 +7,7 @@ exclude = ["cli", "mistral.rs"]
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
 
 # For continued development of PIC work, uncomment:
-# [patch."https://github.com/EricLBuehler/mistral.rs"]
+# [patch."https://github.com/starpit/mistral.rs"]
 # mistralrs = { path = "mistral.rs/mistralrs" }
 # mistralrs-core = { path = "mistral.rs/mistralrs-core" }
 
