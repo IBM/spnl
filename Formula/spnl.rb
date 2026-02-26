@@ -1,24 +1,24 @@
 class Spnl < Formula
   desc "Span Query library for optimizing LLM inference costs"
   homepage "https://github.com/IBM/spnl"
-  version "0.20.1"
+  version "0.21.0"
   license "Apache-2.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/IBM/spnl/releases/download/v0.20.1/spnl-v0.20.1-macos-aarch64.tar.gz"
-      sha256 "733d6037b17a24b689fa21479fbe16f752671646cee250c651fdd8bacff3105d"
+      url "https://github.com/IBM/spnl/releases/download/v0.21.0/spnl-v0.21.0-macos-aarch64.tar.gz"
+      sha256 "d4589e72efda02b7b36ff3cc8e35cfa07511b210d506a6e1e0362a349323c97e"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/IBM/spnl/releases/download/v0.20.1/spnl-v0.20.1-linux-aarch64-gnu.tar.gz"
-      sha256 "c741ba45f416619f67321db2470b15353ecd234c1ee13f070448cc8345c8a57e"
+      url "https://github.com/IBM/spnl/releases/download/v0.21.0/spnl-v0.21.0-linux-aarch64-gnu.tar.gz"
+      sha256 "784bd7996e57e87d6b0e3197f8eed057fac634490aac6deca482acfd76263d47"
     end
     on_intel do
-      url "https://github.com/IBM/spnl/releases/download/v0.20.1/spnl-v0.20.1-linux-x86_64-gnu.tar.gz"
-      sha256 "38a97bb9e8eafee6cdc913bcf1e50ade6f4a81bf2514b2a971396bf195436507"
+      url "https://github.com/IBM/spnl/releases/download/v0.21.0/spnl-v0.21.0-linux-x86_64-gnu.tar.gz"
+      sha256 "d4e664f258ed383e018e69a0ef9dc3c7032eeab436a499584590de357d2d8c18"
     end
   end
 
