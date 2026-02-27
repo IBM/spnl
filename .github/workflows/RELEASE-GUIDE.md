@@ -12,7 +12,7 @@
 
 3. Commit and push changes:
    ```bash
-   git add cli/Cargo.toml Cargo.lock
+   git add crates/spnl-cli/Cargo.toml Cargo.lock
    git commit -m "Bump version to 0.14.0"
    git push origin main
    ```
@@ -118,7 +118,7 @@ Users on Apple Silicon can run either version (Rosetta 2 compatibility).
 
 Before publishing a release:
 
-- [ ] Version bumped in `cli/Cargo.toml`
+- [ ] Version bumped in `crates/spnl-cli/Cargo.toml`
 - [ ] `Cargo.lock` updated
 - [ ] Changes committed and pushed to main
 - [ ] Release notes prepared

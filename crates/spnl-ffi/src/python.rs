@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 #[cfg(feature = "run_py")]
-fn handle_execute_err(e: crate::SpnlError) -> PyErr {
+fn handle_execute_err(e: spnl_run::SpnlError) -> PyErr {
     pyo3::exceptions::PyOSError::new_err(format!("{e}"))
 }
 
@@ -44,10 +44,13 @@ pub struct ChatResponse {
 #[cfg(feature = "run_py")]
 #[pyfunction]
 pub async fn execute(q: String) -> Result<ChatResponse, PyErr> {
-    let query: crate::ir::Query = serde_json::from_str(q.as_str()).map_err(handle_serde_err)?;
+    let query: spnl_run::ir::Query = serde_json::from_str(q.as_str()).map_err(handle_serde_err)?;
 
     let rt = tokio::runtime::Runtime::new()?;
-    let res = rt.block_on(crate::execute(&query, &crate::ExecuteOptions::default()));
+    let res = rt.block_on(spnl_run::execute(
+        &query,
+        &spnl_run::ExecuteOptions::default(),
+    ));
 
     res.map(|res| ChatResponse {
         data: res.to_string(),
@@ -62,27 +65,30 @@ pub fn spnl_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // TODO pyo3::create_exception!(m, PyModelNotFoundError, pyo3::exceptions::PyException);
 
     #[cfg(feature = "run_py")]
-    m.add_function(wrap_pyfunction!(crate::ffi::python::execute, m)?)?;
+    m.add_function(wrap_pyfunction!(execute, m)?)?;
     #[cfg(feature = "run_py")]
-    m.add_class::<crate::ffi::python::ChatResponse>()?;
+    m.add_class::<ChatResponse>()?;
 
     #[cfg(feature = "tok")]
-    m.add_class::<crate::optimizer::llo::tokenize::TokenizedQuery>()?;
+    m.add_class::<spnl_core::optimizer::llo::tokenize::TokenizedQuery>()?;
 
     #[cfg(feature = "tok")]
-    m.add_class::<crate::optimizer::llo::tokenize::TokenizedChatCompletionQuery>()?;
+    m.add_class::<spnl_core::optimizer::llo::tokenize::TokenizedChatCompletionQuery>()?;
 
     #[cfg(feature = "tok")]
-    m.add_class::<crate::optimizer::llo::tokenize::CompletionRequest>()?;
+    m.add_class::<spnl_core::optimizer::llo::tokenize::CompletionRequest>()?;
 
     #[cfg(feature = "tok")]
     m.add_function(wrap_pyfunction!(
-        crate::optimizer::llo::tokenize::tokenize_query,
+        spnl_core::optimizer::llo::tokenize::tokenize_query,
         m
     )?)?;
 
     #[cfg(feature = "tok")]
-    m.add_function(wrap_pyfunction!(crate::optimizer::llo::tokenize::init, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        spnl_core::optimizer::llo::tokenize::init,
+        m
+    )?)?;
 
     //m.add_class::<SimpleQuery>()?;
     //m.add_class::<SimpleGenerate>()?;

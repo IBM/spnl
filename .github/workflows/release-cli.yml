@@ -171,7 +171,7 @@ jobs:
         run: |
           # Only use openssl-vendored for musl builds (static linking)
           # Other platforms use system OpenSSL
-          cargo build --features $LOCAL_FEATURE,bench,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --manifest-path crates/spnl-cli/Cargo.toml --target-dir target --features $LOCAL_FEATURE,bench,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG --target $TARGET
 
       - name: Check for Apple signing secrets
         if: runner.os == 'macOS'
@@ -329,7 +329,7 @@ jobs:
       - name: Build CLI
         shell: sh
         run: |
-          cargo build --features $LOCAL_FEATURE,bench,rag,k8s,gce,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --package spnl-cli --target $TARGET
+          cargo build --manifest-path crates/spnl-cli/Cargo.toml --target-dir target --features $LOCAL_FEATURE,bench,rag,k8s,gce,spnl-api,openssl-vendored $BUILD_RELEASE_ARG --target $TARGET
 
       - name: Prepare binary
         shell: sh
@@ -516,8 +516,8 @@ jobs:
           echo "Building with features: $FEATURES,rag,k8s,gce,spnl-api"
           echo "CUDA_COMPUTE_CAP: $CUDA_COMPUTE_CAP"
           echo "CUDA_NVCC_FLAGS: $CUDA_NVCC_FLAGS"
-          cargo build --features $FEATURES,bench,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG \
-            --package spnl-cli --target $TARGET
+          cargo build --manifest-path crates/spnl-cli/Cargo.toml --target-dir target --features $FEATURES,bench,rag,k8s,gce,spnl-api $BUILD_RELEASE_ARG \
+            --target $TARGET
 
       - name: Prepare binary
         # Skip flash-attn variants on PRs (only run on release)

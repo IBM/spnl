@@ -1,9 +1,7 @@
-pub mod ir;
-
-#[cfg(feature = "ffi")]
-pub mod ffi;
-#[cfg(feature = "ffi")]
-pub use ffi::*;
+// Re-export core types for convenience — excludes `optimizer` and
+// `capabilities` to avoid collisions with spnl-run's own modules.
+pub use spnl_core::capabilities;
+pub use spnl_core::ir;
 
 #[cfg(feature = "run")]
 mod execute;
@@ -14,7 +12,7 @@ pub use execute::*;
 #[cfg(feature = "run")]
 pub mod generate;
 
-// TODO optimizer feature?
+#[cfg(feature = "run")]
 pub mod optimizer;
 
 #[cfg(feature = "rag")]

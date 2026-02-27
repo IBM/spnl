@@ -51,7 +51,7 @@ jobs:
       - name: install maturin
         run: pip install maturin
       - name: maturin develop
-        run: maturin develop -m spnl/Cargo.toml --no-default-features -F pypi
+        run: maturin develop -m crates/spnl-ffi/Cargo.toml --no-default-features -F pypi,tok
 
       - name: invoke the python tokenize api
         run: |

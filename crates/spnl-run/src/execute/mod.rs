@@ -1,6 +1,6 @@
 use crate::ir::{Bulk, Generate, GenerateBuilder, Message::*, Query, Repeat};
-use crate::optimizer::hlo::simplify;
 use indicatif::MultiProgress;
+use spnl_core::optimizer::simplify;
 
 #[cfg(feature = "pull")]
 pub mod pull;

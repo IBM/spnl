@@ -65,7 +65,7 @@ jobs:
       - name: Install spnl CLI
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN"
         run: |
-          cargo build --features gce
+          cargo build --manifest-path crates/spnl-cli/Cargo.toml --target-dir target --features gce
           sudo cp target/debug/spnl /usr/local/bin/
         
       - name: Launch GCE VM
