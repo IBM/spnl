@@ -1,4 +1,4 @@
-use crate::generate::backend::capabilities::{supports_bulk_map, supports_bulk_repeat};
+use crate::capabilities::{supports_bulk_map, supports_bulk_repeat};
 use crate::ir::{Bulk, Generate, Map, Message, Query, Repeat};
 
 /// If every query in the given list is a Generate with equivalent

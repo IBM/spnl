@@ -226,7 +226,7 @@ fn indent(text: &str, spaces: usize) -> String {
 }
 
 fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
-    let cloud_config_template = include_str!("../../../docker/gce/vllm/cloud-config.yaml");
+    let cloud_config_template = include_str!("../../../../../docker/gce/vllm/cloud-config.yaml");
 
     // Generate a unique run ID
     let run_id = uuid::Uuid::new_v4().to_string();
@@ -288,7 +288,7 @@ fn load_cloud_config(args: &UpArgs) -> anyhow::Result<String> {
         cloud_init_modules_section,
         runcmd_section,
     ) = if is_dev_mode {
-        let setup_dev_script = include_str!("../../../docker/gce/vllm/setup-dev.sh");
+        let setup_dev_script = include_str!("../../../../../docker/gce/vllm/setup-dev.sh");
 
         // Read vllm patch file if it exists
         let vllm_patch_path = std::path::Path::new("../git/spnl/docker/gce/vllm/vllm.patch");
@@ -425,8 +425,9 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
     } else {
         // Production mode: use custom image based on vLLM configuration
         // Generate the exact image name using the same logic as image creation
-        let patch_content =
-            include_bytes!("../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz");
+        let patch_content = include_bytes!(
+            "../../../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz"
+        );
         let image_name = super::image::generate_image_name(
             patch_content,
             &args.config.vllm_org,

@@ -1,13 +1,12 @@
 use crate::{
-    generate::backend::capabilities::supports_spans,
+    capabilities::supports_spans,
     ir::{Bulk, Generate, GenerateBuilder, Query, Repeat, RepeatBuilder},
 };
 
 #[cfg(feature = "rag")]
 use crate::augment;
 
-mod simplify;
-pub use simplify::simplify;
+pub use spnl_core::optimizer::simplify::simplify;
 
 #[derive(Debug, Default)]
 pub struct Options {

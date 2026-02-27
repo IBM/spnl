@@ -1,6 +1,6 @@
 use super::args::GceConfig;
 
-pub(super) const DEFAULTS_ENV: &str = include_str!("../../../docker/vllm/llm-d/defaults.env");
+pub(super) const DEFAULTS_ENV: &str = include_str!("../../../../../docker/vllm/llm-d/defaults.env");
 
 pub(super) fn env_default(key: &str) -> &'static str {
     for line in DEFAULTS_ENV.lines() {
@@ -640,7 +640,9 @@ pub async fn create_image(args: ImageCreateArgs) -> anyhow::Result<String> {
     // Embed patch file at compile time based on LLMD version
     let patch_content = match args.llmd_version.as_str() {
         "0.5.0" => {
-            include_bytes!("../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz")
+            include_bytes!(
+                "../../../../../docker/vllm/llm-d/patches/0.5.0/01-spans-llmd-vllm.patch.gz"
+            )
         }
         _ => {
             return Err(anyhow::anyhow!(

@@ -51,7 +51,7 @@ then
             git remote add origin $SPNL_GITHUB && \
             git fetch --prune --no-recurse-submodules --depth=1 origin +$GITHUB_SHA:$GITHUB_REF && \
             git checkout --progress --force $GITHUB_REF && \
-            cargo build -F rag,spnl-api,vllm && sudo cp target/debug/spnl /usr/local/bin && sudo chmod a+rX /usr/local/bin/spnl \
+            cargo build --manifest-path crates/spnl-cli/Cargo.toml -F rag,spnl-api,vllm && sudo cp crates/spnl-cli/target/debug/spnl /usr/local/bin && sudo chmod a+rX /usr/local/bin/spnl \
             ) &
     spnl_pid=$!
 else
@@ -61,7 +61,7 @@ else
             source $HOME/.cargo/env && \
             git clone $SPNL_GITHUB spnl && \
             cd spnl && \
-            cargo build -F rag,spnl-api,vllm && sudo cp target/debug/spnl /usr/local/bin && sudo chmod a+rX /usr/local/bin/spnl \
+            cargo build --manifest-path crates/spnl-cli/Cargo.toml -F rag,spnl-api,vllm && sudo cp crates/spnl-cli/target/debug/spnl /usr/local/bin && sudo chmod a+rX /usr/local/bin/spnl \
             ) &
     spnl_pid=$!
 fi
@@ -126,7 +126,7 @@ spnl vllm patchfile | git apply
 # Build the cloned version of spnl into vLLM, via maturin
 uv pip install maturin[patchelf]
 source $HOME/.cargo/env # to get rustc on path
-(cd $HOME/spnl && maturin develop -F tok,run_py -m spnl/Cargo.toml)
+(cd $HOME/spnl && maturin develop -F tok,run_py -m crates/spnl-ffi/Cargo.toml)
 
 # Start vLLM
 VLLM_ATTENTION_BACKEND=TRITON_ATTN \

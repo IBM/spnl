@@ -251,7 +251,7 @@ To add support for a new platform, add an entry to the `matrix.platform` array:
 Modify the `cargo build` command in the workflow:
 
 ```yaml
-cargo build --features your,features,here --release --package spnl-cli --target $TARGET
+cargo build --manifest-path crates/spnl-cli/Cargo.toml --features your,features,here --release --target $TARGET
 ```
 
 ### Adjusting Compression
@@ -374,5 +374,5 @@ sha256sum -c checksums.txt
 ## Related Files
 
 - Workflow: `.github/workflows/release-cli.yml`
-- CLI Cargo.toml: `cli/Cargo.toml`
+- CLI Cargo.toml: `crates/spnl-cli/Cargo.toml`
 - Main Cargo.toml: `Cargo.toml`
