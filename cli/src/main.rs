@@ -171,6 +171,7 @@ async fn run(args: Args) -> Result<(), SpnlError> {
 
     let query = hlo::optimize(
         &match args.builtin {
+            Some(Builtin::Chat) => chat::query(args),
             Some(Builtin::BulkMap) => bulk_map::query(args),
             Some(Builtin::Email) => email::query(args),
             Some(Builtin::Email2) => email2::query(args),
