@@ -1,0 +1,54 @@
+[package]
+name = "spnl"
+version = "0.22.0"
+edition = "2024"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/IBM/spnl"
+description = "A Span Query is a declarative way to specify which portions of a generative AI (GenAI) program should be run directly on model serving components."
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+]
+
+[features]
+default = ["cli_support","lisp","run","ollama","openai","gemini","pull","yaml"]
+cli_support = ["print","spnl-run/cli_support"]
+print = ["spnl-run/print"]
+lisp = ["spnl-run/lisp"]
+ollama = ["openai"]
+openai = ["spnl-run/openai"]
+gemini = ["spnl-run/gemini"]
+local = ["spnl-run/local"]
+metal = ["spnl-run/metal"]
+cuda = ["spnl-run/cuda"]
+cuda-flash-attn = ["spnl-run/cuda-flash-attn"]
+cuda-flash-attn-v3 = ["spnl-run/cuda-flash-attn-v3"]
+openssl-vendored = ["spnl-run/openssl-vendored"]
+pull = ["spnl-run/pull"]
+ffi = []
+pypi = ["ffi","tok","dep:pyo3","pyo3/extension-module","spnl-ffi/pypi","spnl-ffi/tok"]
+rag = ["spnl-run/rag"]
+rag-deep-debug = ["spnl-run/rag-deep-debug"]
+run = ["spnl-run/run"]
+run_py = ["run","pypi","spnl-ffi/run_py","spnl-run/openai","spnl-run/ollama","spnl-run/gemini"]
+tok = ["spnl-core/tok"]
+spnl-api = ["spnl-run/spnl-api"]
+yaml = ["spnl-run/yaml"]
+vllm = ["spnl-run/vllm"]
+k8s = ["spnl-run/k8s"]
+gce = ["spnl-run/gce"]
+
+[dependencies]
+spnl-core = { version = "0.22.0", path = "../spnl-core", default-features = false }
+spnl-run = { version = "0.22.0", path = "../spnl-run", default-features = false }
+spnl-ffi = { version = "0.22.0", path = "../spnl-ffi", default-features = false, optional = true }
+pyo3 = { version = "0.28.0", features = ["macros"], optional = true }
+
+[dev-dependencies]
+cargo-husky.workspace = true
+tower-test = "0.4"
+http = "1.0"
+tokio = { version = "1.44.1", features = ["rt-multi-thread"] }
+serde_json = "1.0"

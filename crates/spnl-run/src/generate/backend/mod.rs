@@ -10,7 +10,5 @@ pub(crate) mod mistralrs;
 #[cfg(feature = "local")]
 pub mod prettynames;
 
-pub(crate) mod capabilities;
-
 mod progress;
 pub(crate) mod timing;

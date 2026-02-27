@@ -88,16 +88,21 @@ jobs:
             # IMPORTANT: Cannot use --all-features because mistralrs (used by local/metal/cuda features)
             # unconditionally depends on candle-core, which depends on cudarc (CUDA).
             #
-            # When adding new features to spnl/Cargo.toml, update this list!
-            # Current features tested (from spnl/Cargo.toml):
-            # - Included: cli_support, print, lisp, run, ollama, openai, gemini, pull, yaml, metal, rag, rag-deep-debug, spnl-api, vllm, k8s, gce, ffi, pypi, run_py, tok, openssl-vendored
+            # When adding new features to crates/spnl/Cargo.toml, update this list!
+            # Current features tested (from crates/spnl/Cargo.toml):
+            # - Included: cli_support, print, lisp, run, ollama, openai, gemini, pull, yaml, metal, rag, rag-deep-debug, spnl-api, vllm, k8s, gce, tok, openssl-vendored
+            # - Excluded: ffi, pypi, run_py (pyo3/extension-module can't link into test binary; tested via python.yml)
             # - Excluded: local (CPU inference - pulls in CUDA deps via mistralrs)
             # - Excluded: cuda, cuda-flash-attn, cuda-flash-attn-v3 (CUDA features)
-            cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored -- --nocapture
-            cargo test -p spnl-cli --features bench,rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
+            cargo test -p spnl-core --features lisp,yaml,tok -- --nocapture
+            cargo test -p spnl-run --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,tok,openssl-vendored -- --nocapture
+            cargo test -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,tok,openssl-vendored -- --nocapture
+            cargo test --manifest-path crates/spnl-cli/Cargo.toml --features bench,rag,spnl-api,vllm,k8s,gce,local,metal -- --nocapture
           else
             # Test default features on Linux (no GPU features)
-            cargo test -p spnl -p spnl-cli -- --nocapture
+            # spnl-cli is excluded from workspace, test separately
+            cargo test -p spnl-core -p spnl-run -p spnl -- --nocapture
+            cargo test --manifest-path crates/spnl-cli/Cargo.toml -- --nocapture
           fi
 
       - name: cargo clippy
@@ -109,8 +114,12 @@ jobs:
         # When adding new features, update the feature list above in cargo test!
         if: runner.os == 'macOS'
         run: |
-          cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,ffi,pypi,run_py,tok,openssl-vendored --tests --no-deps -- -D warnings
-          cargo clippy -p spnl-cli --features bench,rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
+          cargo clippy -p spnl-core --features lisp,yaml,tok --tests --no-deps -- -D warnings
+          cargo clippy -p spnl-run --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,tok,openssl-vendored --tests --no-deps -- -D warnings
+          cargo clippy -p spnl --features cli_support,print,lisp,run,ollama,openai,gemini,pull,yaml,metal,rag,rag-deep-debug,spnl-api,vllm,k8s,gce,tok,openssl-vendored --tests --no-deps -- -D warnings
+          cargo clippy --manifest-path crates/spnl-cli/Cargo.toml --features bench,rag,spnl-api,vllm,k8s,gce,local,metal --tests --no-deps -- -D warnings
 
       - name: rustfmt
-        run: cargo fmt --all -- --check
+        run: |
+          cargo fmt --all -- --check
+          cargo fmt --manifest-path crates/spnl-cli/Cargo.toml -- --check

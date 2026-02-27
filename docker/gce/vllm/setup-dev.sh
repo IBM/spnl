@@ -126,7 +126,7 @@ spnl vllm patchfile | git apply
 # Build the cloned version of spnl into vLLM, via maturin
 uv pip install maturin[patchelf]
 source $HOME/.cargo/env # to get rustc on path
-(cd $HOME/spnl && maturin develop -F tok,run_py -m spnl/Cargo.toml)
+(cd $HOME/spnl && maturin develop -F tok,run_py -m crates/spnl-ffi/Cargo.toml)
 
 # Start vLLM
 VLLM_ATTENTION_BACKEND=TRITON_ATTN \

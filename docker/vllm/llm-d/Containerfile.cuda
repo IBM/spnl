@@ -16,11 +16,10 @@ COPY --from=python_version /tmp/llmd_python_version /tmp/llmd_python_version
 RUN cat /tmp/llmd_python_version
 RUN pipx install maturin || pip$(cat /tmp/llmd_python_version) install maturin
 COPY Cargo.* .
-COPY spnl spnl
-COPY cli cli
+COPY crates crates
 RUN --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
     --mount=type=cache,target=/root/.cargo/git,sharing=locked \
-    . "$HOME/.cargo/env" && maturin build $BUILD_RELEASE_ARG -m spnl/Cargo.toml --no-default-features -F tok,run_py -i python$(cat /tmp/llmd_python_version) --compatibility linux
+    . "$HOME/.cargo/env" && maturin build $BUILD_RELEASE_ARG -m crates/spnl-ffi/Cargo.toml --no-default-features -F tok,run_py -i python$(cat /tmp/llmd_python_version) --compatibility linux
 
 # Main
 FROM ghcr.io/llm-d/llm-d-cuda:v$LLMD_VERSION

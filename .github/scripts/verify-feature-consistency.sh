@@ -7,21 +7,25 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CORE_YML="$REPO_ROOT/.github/workflows/core.yml"
-SPNL_CARGO_TOML="$REPO_ROOT/spnl/Cargo.toml"
+SPNL_CARGO_TOML="$REPO_ROOT/crates/spnl/Cargo.toml"
 
 echo "Verifying feature consistency between core.yml and spnl/Cargo.toml..."
 
 # Extract features from spnl/Cargo.toml
-# Parse the [features] section, excluding only:
+# Parse the [features] section, excluding:
 # - default = [...]
 # - local (CPU inference - mistralrs unconditionally depends on CUDA via candle-core/cudarc)
 # - cuda* (CUDA-specific features)
+# - ffi, pypi, run_py (pyo3/extension-module can't link into test binary; tested via python.yml)
 CARGO_FEATURES=$(sed -n '/^\[features\]/,/^\[/p' "$SPNL_CARGO_TOML" | \
     grep -E '^[a-z]' | \
     sed 's/ *=.*//' | \
     grep -v '^default$' | \
     grep -v '^local$' | \
     grep -v '^cuda' | \
+    grep -v '^ffi$' | \
+    grep -v '^pypi$' | \
+    grep -v '^run_py$' | \
     sort)
 
 # Extract features from core.yml cargo test command
@@ -34,7 +38,7 @@ CORE_YML_FEATURES=$(grep 'cargo test -p spnl --features' "$CORE_YML" | \
     uniq)
 
 echo ""
-echo "Features in spnl/Cargo.toml (excluding default, local, cuda*):"
+echo "Features in spnl/Cargo.toml (excluding default, local, cuda*, ffi, pypi, run_py):"
 echo "$CARGO_FEATURES"
 echo ""
 echo "Features tested in core.yml (macOS cargo test -p spnl):"
@@ -67,6 +71,7 @@ echo "Excluded features (not tested in core.yml for spnl package):"
 echo "  - default (tested implicitly)"
 echo "  - local (CPU inference - mistralrs unconditionally depends on CUDA via candle-core/cudarc)"
 echo "  - cuda* (CUDA-specific features)"
+echo "  - ffi, pypi, run_py (pyo3/extension-module can't link into test binary; tested via python.yml)"
 echo ""
 echo "Note: 'local' feature IS tested in spnl-cli package tests, which uses it differently."
 
