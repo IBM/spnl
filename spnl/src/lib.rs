@@ -39,3 +39,13 @@ pub mod model_pool {
         crate::generate::backend::mistralrs::unload_all_models().await
     }
 }
+
+/// PIC cache hit/miss statistics (delegates to mistralrs-core).
+/// Only available with the `local` feature.
+#[cfg(feature = "local")]
+pub mod pic_stats {
+    /// Read and reset global PIC cache hit/miss counters. Returns `(hits, misses)`.
+    pub fn take_cache_stats() -> (u64, u64) {
+        mistralrs::pic::take_cache_stats()
+    }
+}

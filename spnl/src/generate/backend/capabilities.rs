@@ -1,7 +1,15 @@
-/// Does the given provider support the spnl REST API?
+/// Does the given provider support PIC (Position-Independent Caching)?
+///
+/// This includes:
+/// - `spnl/` prefixed models (vLLM spans backend)
+/// - `local/` prefixed models (mistral.rs backend)
+/// - Pretty names that resolve to the local backend (e.g. `llama3.1:8b`)
 pub fn supports_spans(provider_slash_model: &str) -> bool {
-    // for now...
-    provider_slash_model.starts_with("spnl/")
+    if provider_slash_model.starts_with("spnl/") || provider_slash_model.starts_with("local/") {
+        return true;
+    }
+    // No recognized prefix → falls through to prettynames → local backend
+    !provider_slash_model.contains('/')
 }
 
 /// Does the given provider support the bulk-repeat API (generate with `n`)?

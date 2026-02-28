@@ -46,12 +46,35 @@ async fn optimize_vec_iter<'a>(
     )
 }
 
-/// Wrap a 1-token inner generate around each fragment
-#[cfg(feature = "rag")]
+/// Wrap a 1-token inner generate around each fragment.
+///
+/// The generate includes any Cross context (e.g. system prompt) from the
+/// parent generate so that the cached Plus block KV encodes system-prompt
+/// attention — making it usable by the main query without re-prefilling
+/// the Plus blocks.
 fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Query> {
     if let Some(g) = parent_generate
         && supports_spans(&g.metadata.model)
     {
+        // Extract leading Cross context (system prompt, etc.) from parent input,
+        // stopping before Plus blocks or the trailing question.
+        let cross_prefix: Vec<Query> = match &*g.input {
+            Query::Cross(items) => items
+                .iter()
+                .take_while(|q| matches!(q, Query::Message(crate::ir::Message::System(_))))
+                .cloned()
+                .collect(),
+            _ => vec![],
+        };
+
+        let input = if cross_prefix.is_empty() {
+            Query::Plus(vec![m.clone()])
+        } else {
+            let mut children = cross_prefix;
+            children.push(Query::Plus(vec![m.clone()]));
+            Query::Cross(children)
+        };
+
         Some(Query::Generate(
             GenerateBuilder::from(g)
                 .metadata(
@@ -61,7 +84,7 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
                         .build()
                         .unwrap(), // TODO...
                 )
-                .input(Box::new(m.clone()))
+                .input(Box::new(input))
                 .build()
                 .unwrap(), // TODO...
         ))
@@ -71,7 +94,6 @@ fn prepare_fragment(m: &Query, parent_generate: Option<&Generate>) -> Option<Que
 }
 
 /// Wrap a list of queries into a monad
-#[cfg(feature = "rag")]
 fn prepare_monad(prepares: Vec<Query>) -> Option<Query> {
     if !prepares.is_empty() {
         Some(Query::Monad(Query::Plus(prepares).into()))
@@ -86,7 +108,17 @@ async fn optimize_iter<'a>(
     attrs: &'a InheritedAttributes<'a>,
 ) -> anyhow::Result<Query> {
     match query {
-        Query::Plus(v) => Ok(Query::Plus(optimize_vec_iter(v, attrs).await?)),
+        Query::Plus(v) => {
+            let optimized = optimize_vec_iter(v, attrs).await?;
+            let prepares: Vec<_> = optimized
+                .iter()
+                .filter_map(|m| prepare_fragment(m, attrs.parent_generate))
+                .collect();
+            match prepare_monad(prepares) {
+                Some(monad) => Ok(Query::Seq(vec![monad, Query::Plus(optimized)])),
+                None => Ok(Query::Plus(optimized)),
+            }
+        }
         Query::Cross(v) => Ok(Query::Cross(optimize_vec_iter(v, attrs).await?)),
 
         #[cfg(feature = "rag")]
@@ -238,7 +270,7 @@ mod tests {
 
     #[tokio::test] // <-- needed for async tests
     async fn nested_gen_expect_no_span_optimization() -> anyhow::Result<()> {
-        let (outer_generate, _, _, _, _) = nested_gen_query("m")?;
+        let (outer_generate, _, _, _, _) = nested_gen_query("openai/m")?;
         assert_eq!(
             optimize(&outer_generate, &Options::default()).await?,
             outer_generate,
