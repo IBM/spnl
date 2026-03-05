@@ -38,7 +38,7 @@ jobs:
         run: echo "RELEASE_VERSION=$RELEASE_VERSION"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # We only need to log in if we are going to push
       - name: Login to Container Registry
