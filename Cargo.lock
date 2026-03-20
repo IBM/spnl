@@ -7511,7 +7511,7 @@ dependencies = [
 
 [[package]]
 name = "spnl"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "cargo-husky",
  "http",
@@ -7526,7 +7526,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-core"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "cargo-husky",
@@ -7546,7 +7546,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-ffi"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "pyo3",
  "serde_json",
@@ -7557,7 +7557,7 @@ dependencies = [
 
 [[package]]
 name = "spnl-run"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "async-openai",
