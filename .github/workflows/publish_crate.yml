@@ -41,12 +41,13 @@ jobs:
         # Users can enable CUDA features explicitly when needed
         run: |
           cargo publish --manifest-path crates/spnl-core/Cargo.toml $DRY_RUN
-          # spnl-run and spnl depend on spnl-core being on crates.io, so
-          # dry-run (PR) can only validate spnl-core; real publish runs all three.
+          # spnl-run, spnl-ffi, and spnl depend on spnl-core being on crates.io, so
+          # dry-run (PR) can only validate spnl-core; real publish runs all.
           if [ "$DRY_RUN" = " " ]; then
             sleep 30  # wait for crates.io to index spnl-core
             cargo publish --manifest-path crates/spnl-run/Cargo.toml
-            sleep 30  # wait for crates.io to index spnl-run
+            cargo publish --manifest-path crates/spnl-ffi/Cargo.toml
+            sleep 30  # wait for crates.io to index spnl-run and spnl-ffi
             cargo publish --manifest-path crates/spnl/Cargo.toml
           fi
         env:
