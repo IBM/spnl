@@ -1,8 +1,7 @@
 use futures::StreamExt;
 
 use async_openai::types::{
-    chat::{CreateChatCompletionResponse, CreateChatCompletionStreamResponse},
-    completions::CreateCompletionResponse,
+    chat::CreateChatCompletionResponse, completions::CreateCompletionResponse,
 };
 use indicatif::MultiProgress;
 use tokio::io::{AsyncWriteExt, stdout};
@@ -125,28 +124,41 @@ pub async fn generate(
             ttft = Some(start.elapsed());
         }
     } else {
-        // Streaming case
+        // Streaming case — the server returns SSE (text/event-stream).
+        // Each event is formatted as "data: {json}\n\n". Multiple events
+        // may arrive in a single chunk, or a single event may be split
+        // across chunks. The endpoint always returns completion-stream
+        // format (not chat-completion format).
         let mut stream = response.error_for_status()?.bytes_stream();
         let mut buffer = Vec::new();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            buffer.extend_from_slice(if chunk.starts_with(DATA_COLON) {
-                // Hack support for text/event-stream
-                // (i.e. Server-Sent Events a.k.a SSE). Each
-                // serialized data event is prefixed with "data:
-                // ". SSE includes several other non-data events
-                // (e.g. begin, end) that we can safely ignore.
-                &chunk[DATA_COLON.len()..]
-            } else {
-                &chunk
-            });
+            buffer.extend_from_slice(&chunk);
 
-            // Process complete JSON objects as they arrive. TODO:
-            // figure out how to share code between Bulk::Map and
-            // Bulk::Repeat cases.
-            if is_map {
-                if let Ok(res) = serde_json::from_slice::<CreateCompletionResponse>(&buffer) {
-                    buffer.clear();
+            // Process all complete SSE lines in the buffer.
+            loop {
+                // Find a complete "data: ...\n" line.
+                let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') else {
+                    break;
+                };
+                let line = buffer.drain(..=newline_pos).collect::<Vec<_>>();
+                let line = line.strip_suffix(b"\n").unwrap_or(&line);
+                let line = line.strip_suffix(b"\r").unwrap_or(line);
+
+                // Skip empty lines (SSE event separators) and non-data lines.
+                if line.is_empty() || !line.starts_with(DATA_COLON) {
+                    continue;
+                }
+                let json_data = &line[DATA_COLON.len()..];
+
+                // Skip [DONE] sentinel.
+                if json_data == b"[DONE]" {
+                    continue;
+                }
+
+                // Parse as completion stream response (both map and repeat
+                // use the same completions endpoint).
+                if let Ok(res) = serde_json::from_slice::<CreateCompletionResponse>(json_data) {
                     for choice in res.choices.iter() {
                         let idx: usize = choice.index.try_into()?;
 
@@ -158,7 +170,6 @@ pub async fn generate(
                             ttft = Some(start.elapsed());
                         }
 
-                        // Count tokens (approximate by characters for now)
                         token_count += choice.text.len() as u64;
 
                         if !quiet {
@@ -173,40 +184,6 @@ pub async fn generate(
                         }
                         if idx < response_strings.len() {
                             response_strings[idx] += choice.text.as_str();
-                        }
-                    }
-                }
-            } else if let Ok(res) =
-                serde_json::from_slice::<CreateChatCompletionStreamResponse>(&buffer)
-            {
-                buffer.clear();
-                for choice in res.choices.iter() {
-                    if let Some(ref content) = choice.delta.content {
-                        let idx: usize = choice.index.try_into()?;
-
-                        // Track TTFT (time to first token)
-                        if ttft.is_none()
-                            && !content.is_empty()
-                            && let Some(start) = start_time
-                        {
-                            ttft = Some(start.elapsed());
-                        }
-
-                        // Count tokens (approximate by characters for now)
-                        token_count += content.len() as u64;
-
-                        if !quiet {
-                            stdout.write_all(b"\x1b[32m").await?; // green
-                            stdout.write_all(content.as_bytes()).await?;
-                            stdout.flush().await?;
-                            stdout.write_all(b"\x1b[0m").await?; // reset color
-                        } else if let Some(ref pbs) = pbs
-                            && idx < pbs.len()
-                        {
-                            pbs[idx].inc(content.len() as u64);
-                        }
-                        if idx < response_strings.len() {
-                            response_strings[idx] += content.as_str();
                         }
                     }
                 }
