@@ -50,7 +50,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build the Container Image for ${{ matrix.gpu }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: ${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease }}
           #cache-from: type=gha                              # Use github action mechanisms to cache layers
