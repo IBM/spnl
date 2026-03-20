@@ -2,7 +2,7 @@ use crate::ir::{GenerateMetadata, Map, Message};
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Bulk {
+pub enum Bulk {
     Repeat(Repeat),
 
     Map(Map),
@@ -10,7 +10,7 @@ pub(crate) enum Bulk {
 
 /// Bulk operation: generate `n` outputs for the given `generate` specification
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub(crate) struct Repeat {
+pub struct Repeat {
     /// The number of outputs to generate
     pub n: u8,
 
@@ -21,7 +21,7 @@ pub(crate) struct Repeat {
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum NonGenerateInput {
+pub enum NonGenerateInput {
     /// Execute serially
     Seq(Vec<NonGenerateInput>),
 
@@ -40,7 +40,7 @@ pub(crate) enum NonGenerateInput {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub(crate) struct SingleGenerate {
+pub struct SingleGenerate {
     #[serde(flatten)]
     pub metadata: GenerateMetadata,
 
@@ -49,7 +49,7 @@ pub(crate) struct SingleGenerate {
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum SingleGenerateQuery {
+pub enum SingleGenerateQuery {
     #[serde(rename = "g")]
     SingleGenerate(SingleGenerate),
 
