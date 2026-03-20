@@ -1,6 +1,6 @@
 [package]
 name = "spnl"
-version = "0.22.0"
+version = "0.22.1"
 edition = "2024"
 license = "Apache-2.0"
 readme = "README.md"
@@ -41,9 +41,9 @@ k8s = ["spnl-run/k8s"]
 gce = ["spnl-run/gce"]
 
 [dependencies]
-spnl-core = { version = "0.22.0", path = "../spnl-core", default-features = false }
-spnl-run = { version = "0.22.0", path = "../spnl-run", default-features = false }
-spnl-ffi = { version = "0.22.0", path = "../spnl-ffi", default-features = false, optional = true }
+spnl-core = { version = "0.22.1", path = "../spnl-core", default-features = false }
+spnl-run = { version = "0.22.1", path = "../spnl-run", default-features = false }
+spnl-ffi = { version = "0.22.1", path = "../spnl-ffi", default-features = false, optional = true }
 pyo3 = { version = "0.28.0", features = ["macros"], optional = true }
 
 [dev-dependencies]
