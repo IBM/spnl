@@ -72,7 +72,7 @@ mistralrs = { version = "0.7.0", git = "https://github.com/EricLBuehler/mistral.
 mistralrs-core = { version = "0.7.0", git = "https://github.com/EricLBuehler/mistral.rs", rev = "dd8d0c6f9dc2fe3129ff4228de667e2a0efcf5b4", optional = true, default-features = false }
 hf-hub = { version = "0.4.3", features = ["tokio"], optional = true }
 derive_builder = "0.20.2"
-reqwest = { version = "0.12.20", features = ["json", "stream"], optional = true }
+reqwest = { version = "0.13.0", features = ["json", "stream"], optional = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 thiserror = { version = "2.0.14", optional = true }
 clap = { version = "4.5.45", features = ["derive","env"] }
