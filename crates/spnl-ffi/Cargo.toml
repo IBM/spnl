@@ -19,6 +19,6 @@ tok = ["spnl-core/tok"]
 [dependencies]
 spnl-core = { version = "0.22.1", path = "../spnl-core", default-features = false }
 spnl-run = { version = "0.22.1", path = "../spnl-run", default-features = false }
-pyo3 = { version = "0.28.0", features = ["macros"], optional = true }
+pyo3 = { version = "0.29.0", features = ["macros"], optional = true }
 tokio = { version = "1.44.1", features = ["rt-multi-thread"], optional = true }
 serde_json = { version = "1.0.140", optional = true }
