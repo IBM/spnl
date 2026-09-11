@@ -85,8 +85,10 @@ async fn cross_index(
 
     let stored_vectors: Vec<f32> = match &graph.vector_storage {
         VectorStorage::Raw { data, .. } => data
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| f32::from_le_bytes(*c))
             .collect(),
         VectorStorage::Null => {
             anyhow::bail!("HNSW index has no stored vectors for RAPTOR cross-indexing")

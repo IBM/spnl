@@ -509,7 +509,7 @@ fn print_document_reuse_report(rows: &[EvalRow]) {
         .filter(|(_, positions)| positions.len() > 1)
         .map(|(doc, positions)| (*doc, positions))
         .collect();
-    reused.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    reused.sort_by_key(|a| std::cmp::Reverse(a.1.len()));
 
     // Reuse distance = total tokens of intervening documents between
     // consecutive occurrences of the same document.

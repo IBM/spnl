@@ -136,11 +136,7 @@ pub async fn generate(
             buffer.extend_from_slice(&chunk);
 
             // Process all complete SSE lines in the buffer.
-            loop {
-                // Find a complete "data: ...\n" line.
-                let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') else {
-                    break;
-                };
+            while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
                 let line = buffer.drain(..=newline_pos).collect::<Vec<_>>();
                 let line = line.strip_suffix(b"\n").unwrap_or(&line);
                 let line = line.strip_suffix(b"\r").unwrap_or(line);
