@@ -42,7 +42,7 @@ jobs:
 
       # We only need to log in if we are going to push
       - name: Login to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         if: ${{ env.RELEASE_VERSION != 'latest' && !github.event.release.prerelease }}
         with:
           registry: ghcr.io
