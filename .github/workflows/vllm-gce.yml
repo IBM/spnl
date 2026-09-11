@@ -1,11 +1,11 @@
 name: vLLM GCE
 
 on:
-  #workflow_dispatch:
+  workflow_dispatch:
   #push:
   #  branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  #pull_request:
+  #  branches: [ main ]
 
 # cancel any prior runs for this workflow and this PR (or branch)
 concurrency:
