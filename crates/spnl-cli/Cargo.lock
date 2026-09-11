@@ -364,7 +364,7 @@ dependencies = [
  "eventsource-stream",
  "futures",
  "getrandom 0.3.4",
- "rand 0.9.3",
+ "rand 0.9.4",
  "reqwest 0.12.28",
  "reqwest-eventsource",
  "secrecy",
@@ -876,7 +876,7 @@ dependencies = [
  "num_cpus",
  "objc2-foundation",
  "objc2-metal",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_distr 0.5.1",
  "rayon",
  "safetensors 0.7.0",
@@ -2642,7 +2642,7 @@ dependencies = [
  "cudarc 0.19.3",
  "half",
  "num-traits",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_distr 0.5.1",
 ]
 
@@ -3278,7 +3278,7 @@ dependencies = [
  "google-cloud-wkt",
  "http",
  "pin-project",
- "rand 0.9.3",
+ "rand 0.9.4",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -3507,7 +3507,7 @@ dependencies = [
  "cfg-if",
  "crunchy",
  "num-traits",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_distr 0.5.1",
  "zerocopy",
 ]
@@ -3598,7 +3598,7 @@ dependencies = [
  "libc",
  "log",
  "num_cpus",
- "rand 0.9.3",
+ "rand 0.9.4",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4451,7 +4451,7 @@ dependencies = [
  "libc",
  "ndarray",
  "pdf-extract",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rayon",
  "regex",
  "serde",
@@ -4556,7 +4556,7 @@ name = "lipsum"
 version = "0.9.1"
 source = "git+https://github.com/mgeisler/lipsum.git#233e48a36df40641a609a9476fe9009d928757c5"
 dependencies = [
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_chacha 0.9.0",
 ]
 
@@ -4624,7 +4624,7 @@ dependencies = [
  "md-5",
  "nom 8.0.0",
  "nom_locate",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rangemap",
  "sha2 0.10.9",
  "stringprep",
@@ -4877,7 +4877,7 @@ dependencies = [
  "indexmap 2.13.0",
  "mistralrs-core",
  "mistralrs-macros",
- "rand 0.9.3",
+ "rand 0.9.4",
  "reqwest 0.13.2",
  "schemars 1.2.1",
  "serde",
@@ -4959,7 +4959,7 @@ dependencies = [
  "ordered-float 5.1.0",
  "parking_lot",
  "radix_trie 0.3.0",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_distr 0.5.1",
  "rand_isaac",
  "rayon",
@@ -6521,7 +6521,7 @@ dependencies = [
  "bytes",
  "getrandom 0.3.4",
  "lru-slab",
- "rand 0.9.3",
+ "rand 0.9.4",
  "ring",
  "rustc-hash 2.1.1",
  "rustls",
@@ -6595,9 +6595,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ec095654a25171c2124e9e3393a930bddbffdc939556c914957a4c3e0a87166"
+checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -6675,7 +6675,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
 dependencies = [
  "num-traits",
- "rand 0.9.3",
+ "rand 0.9.4",
 ]
 
 [[package]]
@@ -6720,7 +6720,7 @@ dependencies = [
  "num-traits",
  "paste",
  "profiling",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rand_chacha 0.9.0",
  "simd_helpers",
  "thiserror 2.0.18",
@@ -8173,7 +8173,7 @@ dependencies = [
  "lipsum",
  "petname",
  "ptree",
- "rand 0.9.3",
+ "rand 0.9.4",
  "reqwest 0.12.28",
  "rustyline",
  "serde",
@@ -8227,7 +8227,7 @@ dependencies = [
  "ndarray",
  "openssl",
  "pdf-extract",
- "rand 0.9.3",
+ "rand 0.9.4",
  "regex",
  "reqwest 0.12.28",
  "russh",
@@ -8937,7 +8937,7 @@ dependencies = [
  "macro_rules_attribute",
  "monostate",
  "paste",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rayon",
  "rayon-cond",
  "regex",
@@ -8971,7 +8971,7 @@ dependencies = [
  "monostate",
  "onig",
  "paste",
- "rand 0.9.3",
+ "rand 0.9.4",
  "rayon",
  "rayon-cond",
  "regex",
@@ -9343,7 +9343,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
- "rand 0.9.3",
+ "rand 0.9.4",
  "sha1 0.10.6",
  "thiserror 2.0.18",
  "utf-8",
