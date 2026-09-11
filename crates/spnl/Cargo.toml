@@ -44,7 +44,7 @@ gce = ["spnl-run/gce"]
 spnl-core = { version = "0.22.1", path = "../spnl-core", default-features = false }
 spnl-run = { version = "0.22.1", path = "../spnl-run", default-features = false }
 spnl-ffi = { version = "0.22.1", path = "../spnl-ffi", default-features = false, optional = true }
-pyo3 = { version = "0.28.0", features = ["macros"], optional = true }
+pyo3 = { version = "0.29.0", features = ["macros"], optional = true }
 
 [dev-dependencies]
 cargo-husky.workspace = true
