@@ -176,7 +176,7 @@ pub async fn generate_completion(
         let total_time = start.elapsed();
         let tasks: Vec<super::timing::TaskTiming> = ttfts
             .into_iter()
-            .zip(token_counts.into_iter())
+            .zip(token_counts)
             .map(|(ttft, token_count)| super::timing::TaskTiming {
                 ttft,
                 total_duration: total_time,
@@ -340,7 +340,7 @@ pub async fn generate_chat(
         let total_time = start.elapsed();
         let tasks: Vec<super::timing::TaskTiming> = ttfts
             .into_iter()
-            .zip(token_counts.into_iter())
+            .zip(token_counts)
             .map(|(ttft, token_count)| super::timing::TaskTiming {
                 ttft,
                 total_duration: total_time,
