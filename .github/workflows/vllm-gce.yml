@@ -38,7 +38,7 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: "!contains(github.event.pull_request.title, 'chore(deps)') && !contains(github.event.pull_request.title, 'fix(deps)') && env.GCP_CREDENTIALS && env.HF_TOKEN" # sigh, we `env` context is not available on job-level `if` so we need to repeat this for every step
 
       - id: auth
