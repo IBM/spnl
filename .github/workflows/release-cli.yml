@@ -458,7 +458,7 @@ jobs:
         # On exact match, actions/cache skips the expensive Post save step entirely.
         # Cargo's fingerprinting handles staleness — it recompiles changed deps regardless.
         if: github.event_name == 'release' && matrix.platform.features != 'cuda'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: target/
           key: cuda-build-${{ matrix.platform.features }}-${{ matrix.platform.cuda_compute_cap }}
