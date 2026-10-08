@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use russh::client::{self, AuthResult, Handle};
-use russh::keys::{PrivateKey, PrivateKeyWithHashAlg, PublicKey};
+use russh::keys::{PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::*;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -16,7 +16,7 @@ impl client::Handler for Client {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        _server_public_key: &PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
         // Accept any server key (equivalent to StrictHostKeyChecking=no)
         Ok(true)
