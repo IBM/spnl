@@ -93,7 +93,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         # Skip ARM builds on PRs (only run on release)
         if: github.event_name == 'release' || (matrix.platform.arch != 'aarch64')
 
@@ -305,7 +305,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Get version from release
         id: version
@@ -444,7 +444,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         # Skip flash-attn variants on PRs (only run on release)
         if: github.event_name == 'release' || matrix.platform.features == 'cuda'
 
@@ -563,7 +563,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Get version from release
         id: version
@@ -677,7 +677,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 

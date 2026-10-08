@@ -18,7 +18,7 @@ jobs:
     # Use macOS runner to support publishing with all features including candle-metal
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup protoc
         run: |
           if [ $RUNNER_OS = "Linux" ]

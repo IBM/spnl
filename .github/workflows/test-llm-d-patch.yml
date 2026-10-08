@@ -23,7 +23,7 @@ jobs:
         os:
           - ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # The git rebase in genpatch.sh needs this. The values don't matter, since the branch isn't going anywhere.
       - name: Configure git user
