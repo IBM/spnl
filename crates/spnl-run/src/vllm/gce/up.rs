@@ -614,14 +614,14 @@ pub async fn up(args: UpArgs) -> anyhow::Result<()> {
 
     // Extract run_id from cloud_config to fetch exit code later
     let run_id = extract_run_id_from_cloud_config(&cloud_config)?;
-    let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_else(|_| "spnl-test".to_string());
+    let gcs_bucket = &args.config.gcs_bucket;
 
     // Stream the cloud-init output log
     let stream_result = stream_cloud_init_log(&instance_name, &zone, &project).await;
 
     // Fetch the exit code from GCS
     eprintln!("\nFetching exit code from GCS...");
-    let exit_code = fetch_exit_code_from_gcs(&gcs_bucket, &run_id).await?;
+    let exit_code = fetch_exit_code_from_gcs(gcs_bucket, &run_id).await?;
 
     // Clean up SSH tunnel
     if let Some(tunnel) = tunnel_handle {
@@ -879,6 +879,77 @@ async fn start_ssh_tunnel_rust(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_gcs_bucket_precedence() -> anyhow::Result<()> {
+        use clap::Parser;
+        use std::process::Command;
+
+        #[derive(Parser)]
+        struct Args {
+            #[command(flatten)]
+            config: GceConfig,
+        }
+
+        const CHILD_CASE: &str = "SPNL_TEST_GCS_BUCKET_CASE";
+        let cases = [
+            (None, None, "spnl-test"),
+            (Some("env-bucket"), None, "env-bucket"),
+            (None, Some("cli-bucket"), "cli-bucket"),
+            (Some("env-bucket"), Some("cli-bucket"), "cli-bucket"),
+        ];
+
+        if let Ok(case) = std::env::var(CHILD_CASE) {
+            let (_, cli_bucket, expected) = cases[case.parse::<usize>()?];
+            let mut argv = vec!["test", "--project", "test-project"];
+            if let Some(bucket) = cli_bucket {
+                argv.extend(["--gcs-bucket", bucket]);
+            }
+            let config = Args::try_parse_from(argv)?.config;
+            assert_eq!(config.gcs_bucket, expected);
+            let args = UpArgsBuilder::default()
+                .hf_token("test-token")
+                .config(config)
+                .build()?;
+
+            // Check the resolved configuration used by up() for both the instance
+            // configuration and the final exit-code fetch.
+            let cloud_config = load_cloud_config(&args)?;
+            let result_bucket = &args.config.gcs_bucket;
+            assert_eq!(result_bucket, expected);
+            assert!(
+                cloud_config
+                    .lines()
+                    .any(|line| { line.trim() == format!("GCS_BUCKET={result_bucket}") })
+            );
+            return Ok(());
+        }
+
+        // Isolate clap's environment reads without mutating the test process.
+        for (case, (env_bucket, _, _)) in cases.iter().enumerate() {
+            let mut command = Command::new(std::env::current_exe()?);
+            command
+                .args([
+                    "--exact",
+                    "vllm::gce::up::tests::test_gcs_bucket_precedence",
+                    "--nocapture",
+                ])
+                .env(CHILD_CASE, case.to_string())
+                .env_remove("GCS_BUCKET")
+                .env_remove("SPNL_GITHUB");
+            if let Some(bucket) = env_bucket {
+                command.env("GCS_BUCKET", bucket);
+            }
+            let output = command.output()?;
+            assert!(
+                output.status.success(),
+                "bucket case {case} failed:\n{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(())
+    }
 
     #[test]
     fn test_load_cloud_config() -> anyhow::Result<()> {
