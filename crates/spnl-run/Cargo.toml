@@ -51,7 +51,7 @@ russh = { version = "0.64", optional = true }
 async-trait = { version = "0.1", optional = true }
 
 serde = { version = "1.0.219", features = ["derive"] }
-async-openai = { version = "0.33.0", features=["embedding","chat-completion","completions","_api"], optional = true }
+async-openai = { version = "0.42.0", features=["embedding","chat-completion","completions","_api"], optional = true }
 async-recursion = {version = "1.1.1", optional = true }
 futures = { version = "0.3.31", optional = true }
 indicatif = { version = "0.18.0", optional = true }
