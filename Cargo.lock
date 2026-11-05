@@ -7657,7 +7657,7 @@ dependencies = [
  "pdf-extract",
  "rand 0.9.5",
  "regex",
- "reqwest 0.12.28",
+ "reqwest 0.13.5",
  "russh",
  "rustls",
  "schemars 1.2.3",
