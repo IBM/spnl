@@ -2,8 +2,8 @@
 
 use indicatif::{ProgressBar, ProgressStyle};
 use mistralrs::{
-    Device, GgufModelBuilder, IsqType, Model, PagedAttentionMetaBuilder, TextModelBuilder,
-    best_device, paged_attn_supported,
+    Device, GgufModelBuilder, IsqType, Model, PagedAttentionMetaBuilder, PrefixCacheCapacity,
+    TextModelBuilder, best_device, paged_attn_supported,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -71,35 +71,35 @@ fn get_paged_attn_config()
 }
 
 /// Get prefix cache size from environment variables
-/// Returns None to disable prefix caching, or Some(n) to cache n sequences
-fn get_prefix_cache_n() -> Option<usize> {
+/// Returns `PrefixCacheCapacity::DISABLED` to disable prefix caching, or `Fixed(n)` to cache n sequences
+fn get_prefix_cache_n() -> PrefixCacheCapacity {
     match std::env::var("MISTRALRS_PREFIX_CACHE_N") {
         Ok(val) => {
             if val.to_lowercase() == "false" || val == "0" {
                 if should_enable_logging() {
                     eprintln!("Prefix caching disabled via MISTRALRS_PREFIX_CACHE_N");
                 }
-                None
+                PrefixCacheCapacity::DISABLED
             } else {
                 match val.parse::<usize>() {
                     Ok(n) => {
                         if should_enable_logging() {
                             eprintln!("Prefix caching enabled with n={}", n);
                         }
-                        Some(n)
+                        PrefixCacheCapacity::Fixed(n)
                     }
                     Err(_) => {
                         if should_enable_logging() {
                             eprintln!("Invalid MISTRALRS_PREFIX_CACHE_N value, using default (16)");
                         }
-                        Some(16)
+                        PrefixCacheCapacity::Fixed(16)
                     }
                 }
             }
         }
         Err(_) => {
             // Default: enable with 16 sequences
-            Some(16)
+            PrefixCacheCapacity::Fixed(16)
         }
     }
 }
@@ -381,7 +381,7 @@ impl ModelPool {
 
             // Apply PagedAttention if available and enabled
             if let Some(paged_config) = get_paged_attn_config() {
-                builder = builder.with_paged_attn(paged_config)?;
+                builder = builder.with_paged_attn(paged_config()?);
             }
 
             // Apply prefix caching configuration
@@ -434,7 +434,7 @@ impl ModelPool {
 
             // Apply PagedAttention if available and enabled
             if let Some(paged_config) = get_paged_attn_config() {
-                builder = builder.with_paged_attn(paged_config)?;
+                builder = builder.with_paged_attn(paged_config()?);
             }
 
             // Apply prefix caching configuration
